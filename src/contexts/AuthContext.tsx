@@ -8,6 +8,7 @@ interface AuthContextType {
   logout: () => void;
   isAuthenticated: boolean;
   updateCompany: (company: Company) => void;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,15 +28,16 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [company, setCompany] = useState<Company | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
     const storedCompany = localStorage.getItem('company');
-    
     if (storedToken && storedCompany) {
       setToken(storedToken);
       setCompany(JSON.parse(storedCompany));
     }
+    setLoading(false);
   }, []);
 
   const login = (company: Company, token: string) => {
@@ -64,6 +66,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
     isAuthenticated: !!token,
     updateCompany,
+    loading,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

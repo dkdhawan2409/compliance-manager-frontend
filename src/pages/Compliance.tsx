@@ -46,20 +46,28 @@ const Compliance: React.FC = () => {
     onSubmit: async (values) => {
       // Transform values to backend payload
       const payload = {
-        basFrequency: values.basFrequency,
+        basFrequency: values.basFrequency as 'Monthly' | 'Quarterly' | 'Annually',
         nextBasDue: values.nextBasDue,
         fbtApplicable: values.fbtApplicable === 'yes',
         ...(values.fbtApplicable === 'yes' && { nextFbtDue: values.nextFbtDue }),
         iasRequired: values.iasRequired === 'yes',
         ...(values.iasRequired === 'yes' && {
-          iasFrequency: values.iasFrequency,
+          iasFrequency: values.iasFrequency as 'Monthly' | 'Quarterly' | 'Annually',
           nextIasDue: values.nextIasDue,
         }),
         financialYearEnd: values.financialEndDate,
       };
-      // You can now send 'payload' to your backend
-      toast.success('Compliance details submitted!');
-      // ...submit logic here...
+      try {
+        setError('');
+        const response = await companyService.updateComplianceDetails(payload);
+        updateCompany(response.data!);
+        toast.success('Compliance details updated successfully!');
+        navigate('/dashboard');
+      } catch (err: any) {
+        const errorMessage = err.response?.data?.message || 'Update failed';
+        setError(errorMessage);
+        toast.error(errorMessage);
+      }
     },
   });
 

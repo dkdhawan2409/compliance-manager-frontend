@@ -48,9 +48,30 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route path="/admin/companies" element={<AdminCompanyList />} />
-            <Route path="/admin/notify" element={<AdminNotify />} />
-            <Route path="/admin/settings" element={<AdminSettings />} />
+            <Route
+              path="/admin/companies"
+              element={
+                <ProtectedRoute>
+                  <AdminCompanyList />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/notify"
+              element={
+                <ProtectedRoute>
+                  <AdminNotify />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/settings"
+              element={
+                <ProtectedRoute>
+                  <AdminSettings />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </Router>

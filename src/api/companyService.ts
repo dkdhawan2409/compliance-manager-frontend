@@ -14,7 +14,12 @@ export interface CompanyLoginData {
 
 export interface ComplianceData {
   basFrequency: 'Monthly' | 'Quarterly' | 'Annually';
+  nextBasDue: string;
   fbtApplicable: boolean;
+  nextFbtDue?: string;
+  iasRequired: boolean;
+  iasFrequency?: 'Monthly' | 'Quarterly' | 'Annually';
+  nextIasDue?: string;
   financialYearEnd: string;
 }
 
@@ -168,5 +173,10 @@ export const companyService = {
 
   async deleteSetting(id: number): Promise<void> {
     await apiClient.delete(`/companies/settings/${id}`);
+  },
+
+  async updateComplianceDetails(data: ComplianceData): Promise<ApiResponse<Company>> {
+    const response = await apiClient.patch<ApiResponse<Company>>('/companies/compliance-details', data);
+    return response.data;
   },
 };
