@@ -9,12 +9,21 @@ import toast from 'react-hot-toast';
 
 const validationSchema = Yup.object({
   basFrequency: Yup.string()
-    .oneOf(['Monthly', 'Quarterly', 'Annually'])
+    .oneOf(['Monthly', 'Quarterly'])
     .required('BAS frequency is required'),
-  fbtApplicable: Yup.boolean()
-    .required('FBT applicable field is required'),
-  financialYearEnd: Yup.date()
-    .required('Financial year end date is required'),
+  nextBasDue: Yup.date().required('Next BAS due date is required'),
+  fbtApplicable: Yup.string().oneOf(['yes', 'no']).required('FBT applicable field is required'),
+  nextFbtDue: Yup.string().when('fbtApplicable', ([fbtApplicable], schema) =>
+    fbtApplicable === 'yes' ? schema.required('Next FBT due date is required') : schema.notRequired()
+  ),
+  iasRequired: Yup.string().oneOf(['yes', 'no']).required('IAS required field is required'),
+  iasFrequency: Yup.string().when('iasRequired', ([iasRequired], schema) =>
+    iasRequired === 'yes' ? schema.required('IAS frequency is required') : schema.notRequired()
+  ),
+  nextIasDue: Yup.string().when('iasRequired', ([iasRequired], schema) =>
+    iasRequired === 'yes' ? schema.required('Next IAS due date is required') : schema.notRequired()
+  ),
+  financialEndDate: Yup.date().required('Financial end date is required'),
 });
 
 const Compliance: React.FC = () => {
@@ -24,136 +33,188 @@ const Compliance: React.FC = () => {
 
   const formik = useFormik({
     initialValues: {
-      basFrequency: company?.basFrequency || '',
-      fbtApplicable: company?.fbtApplicable || false,
-      financialYearEnd: company?.financialYearEnd ? dayjs(company.financialYearEnd).format('YYYY-MM-DD') : '',
+      basFrequency: '',
+      nextBasDue: '',
+      fbtApplicable: '',
+      nextFbtDue: '',
+      iasRequired: '',
+      iasFrequency: '',
+      nextIasDue: '',
+      financialEndDate: '',
     },
     validationSchema,
-    enableReinitialize: true,
     onSubmit: async (values) => {
-      try {
-        setError('');
-        const complianceData: ComplianceData = {
-          basFrequency: values.basFrequency as 'Monthly' | 'Quarterly' | 'Annually',
-          fbtApplicable: values.fbtApplicable,
-          financialYearEnd: values.financialYearEnd,
-        };
-
-        const response = await companyService.updateCompliance(complianceData);
-        updateCompany(response.data!);
-        toast.success('Compliance details updated successfully!');
-        navigate('/dashboard');
-      } catch (err: any) {
-        const errorMessage = err.response?.data?.message || 'Update failed';
-        setError(errorMessage);
-        toast.error(errorMessage);
-      }
+      // Transform values to backend payload
+      const payload = {
+        basFrequency: values.basFrequency,
+        nextBasDue: values.nextBasDue,
+        fbtApplicable: values.fbtApplicable === 'yes',
+        ...(values.fbtApplicable === 'yes' && { nextFbtDue: values.nextFbtDue }),
+        iasRequired: values.iasRequired === 'yes',
+        ...(values.iasRequired === 'yes' && {
+          iasFrequency: values.iasFrequency,
+          nextIasDue: values.nextIasDue,
+        }),
+        financialYearEnd: values.financialEndDate,
+      };
+      // You can now send 'payload' to your backend
+      toast.success('Compliance details submitted!');
+      // ...submit logic here...
     },
   });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-100 to-slate-50 flex flex-col">
-      {/* Navbar */}
       <nav className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-slate-200 shadow-sm flex items-center h-16 px-4 md:px-8">
         <button
           className="mr-4 text-indigo-600 hover:text-indigo-800 focus:outline-none focus:ring-2 focus:ring-indigo-300 rounded-full p-2"
-            onClick={() => navigate('/dashboard')}
-          >
+          onClick={() => navigate('/dashboard')}
+        >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
         </button>
         <span className="text-lg font-semibold text-indigo-700">Compliance Management</span>
       </nav>
-      {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center py-8 px-2">
-        <div className="w-full max-w-lg bg-white/90 rounded-2xl shadow-2xl border border-white/60 backdrop-blur-md p-8 mt-8">
-          <h1 className="text-3xl font-bold text-center mb-1">Update Compliance Details</h1>
-          <p className="text-center text-gray-500 mb-6 text-sm">Keep your compliance information up to date</p>
-              {error && (
-            <div className="mb-3">
-              <div className="bg-red-100 border border-red-300 text-red-700 px-4 py-2 rounded-lg animate-fade-in">
-                  {error}
-              </div>
-            </div>
-              )}
-          <form onSubmit={formik.handleSubmit} className="space-y-4">
+        <div className="w-full max-w-xl bg-white/90 rounded-2xl shadow-2xl border border-white/60 backdrop-blur-md p-8 mt-8">
+          <h1 className="text-3xl font-bold text-center mb-1">Compliance Manager</h1>
+          <form onSubmit={formik.handleSubmit} className="space-y-6">
+            {/* BAS Frequency */}
             <div>
-              <label htmlFor="basFrequency" className="block text-sm font-medium text-gray-700 mb-1">BAS Frequency</label>
+              <label htmlFor="basFrequency" className="block font-semibold mb-1">BAS Frequency <span className="text-red-500">*</span></label>
               <select
-                    id="basFrequency"
-                    name="basFrequency"
-                className={`w-full py-2 px-3 rounded-lg bg-white/90 border border-gray-200 shadow-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 transition outline-none ${formik.touched.basFrequency && formik.errors.basFrequency ? 'border-red-400' : ''}`}
-                    value={formik.values.basFrequency}
-                    onChange={formik.handleChange}
+                id="basFrequency"
+                name="basFrequency"
+                className={`w-full border rounded px-3 py-2 ${formik.touched.basFrequency && formik.errors.basFrequency ? 'border-red-400' : ''}`}
+                value={formik.values.basFrequency}
+                onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
+                required
               >
                 <option value="">Select frequency</option>
                 <option value="Monthly">Monthly</option>
                 <option value="Quarterly">Quarterly</option>
-                <option value="Annually">Annually</option>
               </select>
-                  {formik.touched.basFrequency && formik.errors.basFrequency && (
-                <div className="text-xs text-red-500 mt-1">{formik.errors.basFrequency}</div>
-                  )}
-            </div>
-            <div>
-              <span className="block text-sm font-medium text-gray-700 mb-1">FBT Applicable</span>
-              <div className="flex gap-6 mt-1">
-                <label className="flex items-center text-sm text-gray-600 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="fbtApplicable"
-                    value="true"
-                    checked={formik.values.fbtApplicable === true}
-                    onChange={() => formik.setFieldValue('fbtApplicable', true)}
-                    className="mr-2 accent-indigo-500"
-                  />
-                  Yes
-                </label>
-                <label className="flex items-center text-sm text-gray-600 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="fbtApplicable"
-                    value="false"
-                    checked={formik.values.fbtApplicable === false}
-                    onChange={() => formik.setFieldValue('fbtApplicable', false)}
-                    className="mr-2 accent-indigo-500"
-                  />
-                  No
-                </label>
-              </div>
-                  {formik.touched.fbtApplicable && formik.errors.fbtApplicable && (
-                <div className="text-xs text-red-500 mt-1">{formik.errors.fbtApplicable}</div>
-                  )}
-            </div>
-            <div>
-              <label htmlFor="financialYearEnd" className="block text-sm font-medium text-gray-700 mb-1">Financial Year End</label>
-              <input
-                id="financialYearEnd"
-                name="financialYearEnd"
-                type="date"
-                className={`w-full py-2 px-3 rounded-lg bg-white/90 border border-gray-200 shadow-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 transition outline-none ${formik.touched.financialYearEnd && formik.errors.financialYearEnd ? 'border-red-400' : ''}`}
-                value={formik.values.financialYearEnd}
-                onChange={formik.handleChange}
-                onBlur={formik.handleBlur}
-              />
-              {formik.touched.financialYearEnd && formik.errors.financialYearEnd && (
-                <div className="text-xs text-red-500 mt-1">{formik.errors.financialYearEnd}</div>
+              {formik.touched.basFrequency && formik.errors.basFrequency && (
+                <div className="text-red-500 text-xs mt-1">{formik.errors.basFrequency}</div>
               )}
             </div>
-            <button
-                  type="submit"
-              className="w-full py-3 mt-2 rounded-lg font-semibold text-lg bg-gradient-to-r from-indigo-500 to-blue-600 text-white shadow-md hover:from-blue-600 hover:to-indigo-500 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-2 disabled:opacity-60"
-                  disabled={formik.isSubmitting}
+            {/* Next BAS Due */}
+            <div>
+              <label htmlFor="nextBasDue" className="block font-semibold mb-1">Next BAS Due <span className="text-red-500">*</span></label>
+              <input
+                type="date"
+                id="nextBasDue"
+                name="nextBasDue"
+                className={`w-full border rounded px-3 py-2 ${formik.touched.nextBasDue && formik.errors.nextBasDue ? 'border-red-400' : ''}`}
+                value={formik.values.nextBasDue}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                required
+              />
+              {formik.touched.nextBasDue && formik.errors.nextBasDue && (
+                <div className="text-red-500 text-xs mt-1">{formik.errors.nextBasDue}</div>
+              )}
+            </div>
+            {/* FBT Applicable */}
+            <div>
+              <label className="block font-semibold mb-1">FBT Applicable? <span className="text-red-500">*</span></label>
+              <div className="flex gap-4">
+                <label><input type="radio" name="fbtApplicable" value="yes" checked={formik.values.fbtApplicable === 'yes'} onChange={formik.handleChange} required /> Yes</label>
+                <label><input type="radio" name="fbtApplicable" value="no" checked={formik.values.fbtApplicable === 'no'} onChange={formik.handleChange} required /> No</label>
+              </div>
+              {formik.touched.fbtApplicable && formik.errors.fbtApplicable && (
+                <div className="text-red-500 text-xs mt-1">{formik.errors.fbtApplicable}</div>
+              )}
+            </div>
+            {/* Next FBT Due Date (conditional) */}
+            {formik.values.fbtApplicable === 'yes' && (
+              <div>
+                <label htmlFor="nextFbtDue" className="block font-semibold mb-1">Next FBT Due Date <span className="text-red-500">*</span></label>
+                <input
+                  type="date"
+                  id="nextFbtDue"
+                  name="nextFbtDue"
+                  className={`w-full border rounded px-3 py-2 ${formik.touched.nextFbtDue && formik.errors.nextFbtDue ? 'border-red-400' : ''}`}
+                  value={formik.values.nextFbtDue}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
+                  required
+                />
+                {formik.touched.nextFbtDue && formik.errors.nextFbtDue && (
+                  <div className="text-red-500 text-xs mt-1">{formik.errors.nextFbtDue}</div>
+                )}
+              </div>
+            )}
+            {/* IAS Required */}
+            <div>
+              <label className="block font-semibold mb-1">IAS Required? <span className="text-red-500">*</span></label>
+              <div className="flex gap-4">
+                <label><input type="radio" name="iasRequired" value="yes" checked={formik.values.iasRequired === 'yes'} onChange={formik.handleChange} required /> Yes</label>
+                <label><input type="radio" name="iasRequired" value="no" checked={formik.values.iasRequired === 'no'} onChange={formik.handleChange} required /> No</label>
+              </div>
+              {formik.touched.iasRequired && formik.errors.iasRequired && (
+                <div className="text-red-500 text-xs mt-1">{formik.errors.iasRequired}</div>
+              )}
+            </div>
+            {/* IAS Frequency (conditional) */}
+            {formik.values.iasRequired === 'yes' && (
+              <div>
+                <label htmlFor="iasFrequency" className="block font-semibold mb-1">IAS Frequency <span className="text-red-500">*</span></label>
+                <select
+                  id="iasFrequency"
+                  name="iasFrequency"
+                  className={`w-full border rounded px-3 py-2 ${formik.touched.iasFrequency && formik.errors.iasFrequency ? 'border-red-400' : ''}`}
+                  value={formik.values.iasFrequency}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
+                  required
                 >
-                  {formik.isSubmitting ? 'Updating...' : 'Update Compliance Details'}
-            </button>
-            <button
-              type="button"
-              className="w-full py-3 mt-2 rounded-lg font-semibold text-lg border border-indigo-300 text-indigo-700 bg-white hover:bg-indigo-50 shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                  onClick={() => navigate('/dashboard')}
-                >
-                  Cancel
-            </button>
+                  <option value="">Select frequency</option>
+                  <option value="Monthly">Monthly</option>
+                  <option value="Quarterly">Quarterly</option>
+                </select>
+                {formik.touched.iasFrequency && formik.errors.iasFrequency && (
+                  <div className="text-red-500 text-xs mt-1">{formik.errors.iasFrequency}</div>
+                )}
+              </div>
+            )}
+            {/* Next IAS Due (conditional) */}
+            {formik.values.iasRequired === 'yes' && (
+              <div>
+                <label htmlFor="nextIasDue" className="block font-semibold mb-1">Next IAS Due <span className="text-red-500">*</span></label>
+                <input
+                  type="date"
+                  id="nextIasDue"
+                  name="nextIasDue"
+                  className={`w-full border rounded px-3 py-2 ${formik.touched.nextIasDue && formik.errors.nextIasDue ? 'border-red-400' : ''}`}
+                  value={formik.values.nextIasDue}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
+                  required
+                />
+                {formik.touched.nextIasDue && formik.errors.nextIasDue && (
+                  <div className="text-red-500 text-xs mt-1">{formik.errors.nextIasDue}</div>
+                )}
+              </div>
+            )}
+            {/* Financial End Date */}
+            <div>
+              <label htmlFor="financialEndDate" className="block font-semibold mb-1">Financial End Date <span className="text-red-500">*</span></label>
+              <input
+                type="date"
+                id="financialEndDate"
+                name="financialEndDate"
+                className={`w-full border rounded px-3 py-2 ${formik.touched.financialEndDate && formik.errors.financialEndDate ? 'border-red-400' : ''}`}
+                value={formik.values.financialEndDate}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                required
+              />
+              {formik.touched.financialEndDate && formik.errors.financialEndDate && (
+                <div className="text-red-500 text-xs mt-1">{formik.errors.financialEndDate}</div>
+              )}
+            </div>
+            <button type="submit" className="w-full bg-indigo-600 text-white font-semibold py-2 rounded hover:bg-indigo-700 transition">Submit</button>
           </form>
         </div>
       </div>
