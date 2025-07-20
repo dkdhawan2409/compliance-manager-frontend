@@ -1,11 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { companyService, NotificationSetting, NotificationSettingInput, NotificationSettingType } from '../api/companyService';
+import {
+  companyService,
+  NotificationSetting,
+  NotificationSettingInput,
+  NotificationSettingType,
+} from '../api/companyService';
+import AppNavbar from '../components/AppNavbar';
+import SidebarLayout from '../components/SidebarLayout';
 
 const adminNavLinks = [
   { name: 'Company List', to: '/admin/companies' },
   { name: 'Send Notification', to: '/admin/notify' },
   { name: 'Settings', to: '/admin/settings' },
+  { name: 'Cronjob Settings', to: '/admin/cron-settings' },
 ];
 
 const emptySetting: NotificationSettingInput = {
@@ -13,16 +21,15 @@ const emptySetting: NotificationSettingInput = {
   config: {},
 };
 
-const smtpFields = [
-  { key: 'host', label: 'Host', type: 'text' },
-  { key: 'port', label: 'Port', type: 'number' },
-  { key: 'user', label: 'User', type: 'text' },
-  { key: 'pass', label: 'Password', type: 'password' },
-];
 const twilioFields = [
   { key: 'accountSid', label: 'Account SID', type: 'text' },
   { key: 'authToken', label: 'Auth Token', type: 'password' },
-  { key: 'from', label: 'From', type: 'text' },
+  { key: 'fromNumber', label: 'From Number', type: 'text' },
+];
+const sendgridFields = [
+  { key: 'apiKey', label: 'API Key', type: 'password' },
+  { key: 'fromEmail', label: 'From Email', type: 'email' },
+  { key: 'fromName', label: 'From Name', type: 'text' },
 ];
 
 const AdminSettings: React.FC = () => {
@@ -30,44 +37,66 @@ const AdminSettings: React.FC = () => {
   const [settings, setSettings] = useState<NotificationSetting[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showModal, setShowModal] = useState(false);
-  const [editId, setEditId] = useState<number | null>(null);
-  const [form, setForm] = useState<NotificationSettingInput>(emptySetting);
+  const [showDrawer, setShowDrawer] = useState(false);
+  const [editType, setEditType] = useState<'twilio' | 'sendgrid' | null>(null);
+  const [editForm, setEditForm] = useState<NotificationSettingInput | null>(null);
+  const [twilioForm, setTwilioForm] = useState<NotificationSettingInput>({ type: 'twilio', config: {} });
+  const [sendgridForm, setSendgridForm] = useState<NotificationSettingInput>({ type: 'sendgrid', config: {} });
+  const [twilioId, setTwilioId] = useState<number | null>(null);
+  const [sendgridId, setSendgridId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [editId, setEditId] = useState<number | null>(null);
 
-  const fetchSettings = async () => {
-    setLoading(true);
-    setError(null);
+  const handleAddNew = () => {
+    setEditId(null);
+    setTwilioForm(emptySetting);
+    setSendgridForm(emptySetting);
+  };
+
+  const handleEdit = (type: 'twilio' | 'sendgrid', setting: NotificationSettingInput) => {
+    setEditType(type);
+    setEditForm(setting);
+    setShowDrawer(true);
+  };
+
+  const handleCloseDrawer = () => {
+    setShowDrawer(false);
+    setEditType(null);
+    setEditForm(null);
+  };
+
+  const handleSaveTwilio = async (e: React.FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSaving(true);
     try {
-      const data = await companyService.getSettings();
-      setSettings(data);
+      if (twilioId) {
+        await companyService.updateSetting(twilioId, twilioForm.config);
+      } else {
+        await companyService.createSetting(twilioForm);
+      }
+      await fetchSettings();
     } catch {
-      setError('Failed to fetch settings.');
+      setError('Failed to save Twilio setting.');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  useEffect(() => { fetchSettings(); }, []);
-
-  const openAdd = () => { setEditId(null); setForm(emptySetting); setShowModal(true); };
-  const openEdit = (s: NotificationSetting) => { setEditId(s.id); setForm({ type: s.type, config: { ...s.config } }); setShowModal(true); };
-  const closeModal = () => { setShowModal(false); setEditId(null); setForm(emptySetting); };
-
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSaveSendgrid = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setSaving(true);
     try {
-      if (editId) {
-        await companyService.updateSetting(editId, form.config);
+      if (sendgridId) {
+        await companyService.updateSetting(sendgridId, sendgridForm.config);
       } else {
-        await companyService.createSetting(form);
+        await companyService.createSetting(sendgridForm);
       }
       await fetchSettings();
-      closeModal();
     } catch {
-      setError('Failed to save setting.');
+      setError('Failed to save SendGrid setting.');
     } finally {
       setSaving(false);
     }
@@ -85,103 +114,201 @@ const AdminSettings: React.FC = () => {
     }
   };
 
-  const fields = form.type === 'smtp' ? smtpFields : twilioFields;
+  const fetchSettings = async () => {
+    setLoading(true);
+    try {
+      const settings = await companyService.getSettings();
+      setSettings(settings);
+      settings.forEach(s => {
+        if (s.type === 'twilio') {
+          setTwilioForm({ type: 'twilio', config: { ...s.config } });
+          setTwilioId(s.id);
+        } else if (s.type === 'sendgrid') {
+          setSendgridForm({ type: 'sendgrid', config: { ...s.config } });
+          setSendgridId(s.id);
+        }
+      });
+    } catch (err) {
+      setError('Failed to fetch settings.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
+    fetchSettings();
+  }, []);
+
+  const fields =
+    twilioForm.type === 'twilio'
+      ? twilioFields
+      : sendgridForm.type === 'sendgrid'
+      ? sendgridFields
+      : [];
+
+  /* -------------------------- JSX -------------------------- */
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-indigo-100 to-slate-50">
-      {/* Sidebar */}
-      <aside className="w-64 bg-white/90 border-r border-slate-200 shadow-lg hidden md:flex flex-col">
-        <div className="h-20 flex items-center justify-center border-b border-slate-100">
-          <span className="text-2xl font-bold text-indigo-600 tracking-tight">Super Admin</span>
-        </div>
-        <nav className="flex-1 px-4 py-6 space-y-2">
-          {adminNavLinks.map(link => (
-            <Link
-              key={link.to}
-              to={link.to}
-              className={`block px-4 py-2 rounded-lg font-medium transition-all duration-150 text-gray-700 hover:bg-indigo-100 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 ${location.pathname === link.to ? 'bg-indigo-600 text-white shadow-lg scale-105' : ''}`}
-            >
-              {link.name}
-            </Link>
-          ))}
-        </nav>
-      </aside>
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-start py-10 px-2">
-        <div className="bg-white/90 rounded-2xl shadow-2xl p-8 max-w-3xl w-full mt-8 md:mt-0">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-3xl font-bold text-indigo-700">Notification Settings</h1>
-            <button onClick={openAdd} className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold shadow hover:bg-indigo-700 transition">Add Setting</button>
-          </div>
-          {loading ? (
-            <div className="flex justify-center items-center py-10">
-              <span className="text-indigo-600 font-semibold animate-pulse">Loading settings...</span>
+    <SidebarLayout>
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-slate-100 flex flex-col items-center py-10 px-4 md:px-8">
+        <div className="w-full max-w-3xl bg-white/90 backdrop-blur-md rounded-3xl shadow-2xl p-8 md:p-10 border border-slate-100/80">
+          <h1 className="text-3xl md:text-4xl font-extrabold text-indigo-700 mb-10 text-center tracking-tight">
+            Notification Settings
+          </h1>
+
+          {/* ===================== Twilio ===================== */}
+          <section className="mb-12">
+            <header className="flex items-center justify-between mb-6">
+              <h2 className="text-xl md:text-2xl font-semibold text-gray-800 flex items-center gap-2">
+                <span className="inline-flex h-3 w-3 rounded-full bg-indigo-500/80 animate-pulse"></span> Twilio Settings
+              </h2>
+              {twilioId && (
+                <button
+                  onClick={() => handleEdit('twilio', { type: 'twilio', config: twilioForm.config })}
+                  className="px-4 py-2 rounded-lg bg-indigo-50 text-indigo-700 font-semibold hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-1 transition"
+                >
+                  Edit
+                </button>
+              )}
+            </header>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {twilioFields.map(field => (
+                <div key={field.key} className="flex flex-col gap-1">
+                  <label className="text-sm font-medium text-gray-600">{field.label}</label>
+                  <input
+                    type={field.type}
+                    value={twilioForm.config[field.key] || ''}
+                    disabled
+                    onChange={e =>
+                      setTwilioForm(f => ({
+                        ...f,
+                        config: { ...f.config, [field.key]: e.target.value },
+                      }))
+                    }
+                    className="rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 placeholder:text-slate-400"
+                  />
+                </div>
+              ))}
             </div>
-          ) : error ? (
-            <div className="text-red-600 text-center py-6">{error}</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full border border-slate-200 rounded-lg overflow-hidden">
-                <thead className="bg-indigo-100">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-sm font-semibold text-indigo-700">Type</th>
-                    <th className="px-4 py-2 text-left text-sm font-semibold text-indigo-700">Config</th>
-                    <th className="px-4 py-2 text-left text-sm font-semibold text-indigo-700">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {settings.map(s => (
-                    <tr key={s.id} className="border-b last:border-b-0 hover:bg-indigo-50 transition">
-                      <td className="px-4 py-2 capitalize">{s.type}</td>
-                      <td className="px-4 py-2 text-xs text-gray-700">
-                        {Object.entries(s.config).map(([k, v]) => (
-                          <div key={k}><span className="font-semibold text-gray-600">{k}:</span> {typeof v === 'string' && v.length > 20 ? v.slice(0, 20) + '...' : v.toString()}</div>
-                        ))}
-                      </td>
-                      <td className="px-4 py-2 flex gap-2">
-                        <button onClick={() => openEdit(s)} className="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">Edit</button>
-                        <button onClick={() => handleDelete(s.id)} disabled={deleteId === s.id} className="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50">{deleteId === s.id ? 'Deleting...' : 'Delete'}</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          </section>
+
+          {/* ===================== SendGrid ===================== */}
+          <section className="mb-8">
+            <header className="flex items-center justify-between mb-6">
+              <h2 className="text-xl md:text-2xl font-semibold text-gray-800 flex items-center gap-2">
+                <span className="inline-flex h-3 w-3 rounded-full bg-sky-500/80 animate-pulse"></span> SendGrid Settings
+              </h2>
+              <button
+                onClick={() => handleEdit('sendgrid', { type: 'sendgrid', config: sendgridForm.config })}
+                className="px-4 py-2 rounded-lg bg-indigo-50 text-indigo-700 font-semibold hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-1 transition"
+              >
+                Edit
+              </button>
+            </header>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {sendgridFields.map(field => (
+                <div key={field.key} className="flex flex-col gap-1">
+                  <label className="text-sm font-medium text-gray-600">{field.label}</label>
+                  <input
+                    type={field.type}
+                    value={sendgridForm.config[field.key] || ''}
+                    disabled
+                    onChange={e =>
+                      setSendgridForm(f => ({
+                        ...f,
+                        config: { ...f.config, [field.key]: e.target.value },
+                      }))
+                    }
+                    className="rounded-xl border border-slate-200 bg-gray-100 px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 placeholder:text-slate-400"
+                  />
+                </div>
+              ))}
             </div>
+          </section>
+
+          {/* helper text */}
+          {error && <p className="text-red-600 text-center text-sm mt-6">{error}</p>}
+          {(!twilioId || !sendgridId) && (
+            <p className="text-yellow-600 text-center text-sm mt-6">
+              Some settings are missing. Please contact your administrator.
+            </p>
           )}
         </div>
-        {/* Modal for Add/Edit */}
-        {showModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
-            <div className="bg-white rounded-xl shadow-xl p-8 w-full max-w-lg relative">
-              <button onClick={closeModal} className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
-              <h2 className="text-2xl font-bold mb-4 text-indigo-700">{editId ? 'Edit' : 'Add'} Setting</h2>
-              <form onSubmit={handleSave} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                  <select className="w-full rounded border-gray-300" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as NotificationSettingType, config: {} }))} disabled={!!editId}>
-                    <option value="smtp">SMTP</option>
-                    <option value="twilio">Twilio</option>
-                  </select>
-                </div>
-                {fields.map(field => (
-                  <div key={field.key}>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">{field.label}</label>
+
+        {/* ===================== Drawer ===================== */}
+        {showDrawer && editForm && (
+          <div className="fixed inset-0 z-50 flex">
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={handleCloseDrawer}></div>
+            <aside className="relative ml-auto h-full w-full max-w-lg bg-white shadow-2xl flex flex-col animate-slideInRight rounded-l-3xl overflow-hidden">
+              <header className="flex items-center justify-between px-8 py-5 border-b border-slate-200 bg-indigo-50/90">
+                <h2 className="text-2xl font-bold text-indigo-700">
+                  Edit {editType === 'twilio' ? 'Twilio' : 'SendGrid'} Settings
+                </h2>
+                <button
+                  onClick={handleCloseDrawer}
+                  className="text-slate-500 hover:text-slate-700 text-3xl leading-none font-semibold focus:outline-none"
+                >
+                  &times;
+                </button>
+              </header>
+
+              <form
+                onSubmit={async e => {
+                  e.preventDefault();
+                  if (editType === 'twilio') {
+                    await handleSaveTwilio(e);
+                    setTwilioForm(editForm);
+                  } else if (editType === 'sendgrid') {
+                    await handleSaveSendgrid(e);
+                    setSendgridForm(editForm);
+                  }
+                  handleCloseDrawer();
+                }}
+                className="flex-1 overflow-y-auto px-8 py-6 space-y-6"
+              >
+                {(editType === 'twilio' ? twilioFields : sendgridFields).map(field => (
+                  <div key={field.key} className="flex flex-col gap-1">
+                    <label className="text-sm font-medium text-gray-700">{field.label}</label>
                     <input
-                      className="w-full rounded border-gray-300"
                       type={field.type}
-                      value={form.config[field.key] || ''}
-                      onChange={e => setForm(f => ({ ...f, config: { ...f.config, [field.key]: e.target.value } }))}
+                      value={editForm!.config[field.key] || ''}
+                      onChange={e =>
+                        setEditForm(f =>
+                          f ? { ...f, config: { ...f.config, [field.key]: e.target.value }, type: f.type } : f,
+                        )
+                      }
                       required
+                      className="rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 shadow-sm"
                     />
                   </div>
                 ))}
-                <button type="submit" className="w-full py-2 rounded bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition disabled:opacity-50" disabled={saving}>{saving ? (editId ? 'Saving...' : 'Adding...') : (editId ? 'Save Changes' : 'Add Setting')}</button>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleCloseDrawer}
+                    className="px-4 py-2 rounded-lg bg-slate-200 text-slate-700 font-semibold hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-50"
+                  >
+                    {saving ? 'Saving...' : 'Save Settings'}
+                  </button>
+                </div>
+
+                {error && <p className="text-red-600 text-sm pt-2 text-center">{error}</p>}
               </form>
-            </div>
+            </aside>
           </div>
         )}
       </div>
-    </div>
+    </SidebarLayout>
   );
 };
-export default AdminSettings; 
+export default AdminSettings;

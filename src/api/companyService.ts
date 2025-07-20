@@ -4,6 +4,7 @@ export interface CompanyRegistrationData {
   companyName: string;
   email: string;
   mobileNumber: string;
+  countryCode: string;
   password: string;
 }
 
@@ -27,6 +28,7 @@ export interface ProfileData {
   companyName: string;
   email: string;
   mobileNumber: string;
+  countryCode: string;
 }
 
 export interface Company {
@@ -34,6 +36,7 @@ export interface Company {
   companyName: string;
   email: string;
   mobileNumber: string;
+  countryCode?: string;
   basFrequency?: 'Monthly' | 'Quarterly' | 'Annually';
   fbtApplicable?: boolean;
   financialYearEnd?: string;
@@ -86,7 +89,7 @@ export interface NotificationTemplateInput {
   body: string;
 }
 
-export type NotificationSettingType = 'smtp' | 'twilio';
+export type NotificationSettingType = 'smtp' | 'twilio' | 'sendgrid';
 
 export interface NotificationSetting {
   id: number;
@@ -99,6 +102,22 @@ export interface NotificationSetting {
 export interface NotificationSettingInput {
   type: NotificationSettingType;
   config: Record<string, any>;
+}
+
+// Cronjob Settings Types
+export interface CronjobSettings {
+  id: number;
+  notificationTypes: string[]; // e.g. ['BAS', 'FBT', 'IAS', 'FYEND']
+  duration: number; // in days
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CronjobSettingsInput {
+  notificationTypes: string[];
+  duration: number;
+  enabled: boolean;
 }
 
 export const companyService = {
@@ -177,6 +196,35 @@ export const companyService = {
 
   async updateComplianceDetails(data: ComplianceData): Promise<ApiResponse<Company>> {
     const response = await apiClient.patch<ApiResponse<Company>>('/companies/compliance-details', data);
+    return response.data;
+  },
+
+  async updateCompanyById(companyId: number, data: Partial<Company>): Promise<ApiResponse<Company>> {
+    const response = await apiClient.put<ApiResponse<Company>>(`/companies/${companyId}`, data);
+    return response.data;
+  },
+
+  async getCompanyById(companyId: number): Promise<any> {
+    const response = await apiClient.get(`/companies/${companyId}`);
+    return response.data;
+  },
+
+  // Cronjob Settings API
+  async getCronjobSettings(): Promise<CronjobSettings> {
+    const response = await apiClient.get<{ data: CronjobSettings }>('/cronjob-settings');
+    return response.data.data;
+  },
+
+  async updateCronjobSettings(id: number, data: CronjobSettingsInput): Promise<CronjobSettings> {
+    const response = await apiClient.put<{ data: CronjobSettings }>(`/cronjob-settings/${id}`, data);
+    return response.data.data;
+  },
+
+  async sendSmsToAllUsers(message: string): Promise<{ success: boolean; message: string }> {
+    const response = await apiClient.post<{ success: boolean; message: string }>(
+      '/companies/notify/sms-all',
+      { message }
+    );
     return response.data;
   },
 };

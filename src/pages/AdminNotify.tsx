@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { companyService, NotificationTemplate, NotificationTemplateInput } from '../api/companyService';
+import AppNavbar from '../components/AppNavbar';
+import SidebarLayout from '../components/SidebarLayout';
 
 const adminNavLinks = [
   { name: 'Company List', to: '/admin/companies' },
   { name: 'Send Notification', to: '/admin/notify' },
   { name: 'Settings', to: '/admin/settings' },
+  { name: 'Cronjob Settings', to: '/admin/cron-settings' },
 ];
 
 const emptyTemplate: NotificationTemplateInput = {
@@ -20,11 +23,15 @@ const AdminNotify: React.FC = () => {
   const [templates, setTemplates] = useState<NotificationTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showModal, setShowModal] = useState(false);
+  const [showDrawer, setShowDrawer] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState<NotificationTemplateInput>(emptyTemplate);
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [notifTypes, setNotifTypes] = useState<{BAS: boolean, FBT: boolean, IAS: boolean, FYEND: boolean}>({ BAS: false, FBT: false, IAS: false, FYEND: false });
+  const [smsMessage, setSmsMessage] = useState('');
+  const [smsSending, setSmsSending] = useState(false);
+  const [smsResult, setSmsResult] = useState<string | null>(null);
 
   const fetchTemplates = async () => {
     setLoading(true);
@@ -41,9 +48,9 @@ const AdminNotify: React.FC = () => {
 
   useEffect(() => { fetchTemplates(); }, []);
 
-  const openAdd = () => { setEditId(null); setForm(emptyTemplate); setShowModal(true); };
-  const openEdit = (tpl: NotificationTemplate) => { setEditId(tpl.id); setForm({ type: tpl.type, name: tpl.name, subject: tpl.subject, body: tpl.body }); setShowModal(true); };
-  const closeModal = () => { setShowModal(false); setEditId(null); setForm(emptyTemplate); };
+  const openAdd = () => { setEditId(null); setForm(emptyTemplate); setNotifTypes({ BAS: false, FBT: false, IAS: false, FYEND: false }); setShowDrawer(true); };
+  const openEdit = (tpl: NotificationTemplate) => { setEditId(tpl.id); setForm({ type: tpl.type, name: tpl.name, subject: tpl.subject, body: tpl.body }); setNotifTypes({ BAS: false, FBT: false, IAS: false, FYEND: false }); setShowDrawer(true); };
+  const closeDrawer = () => { setShowDrawer(false); setEditId(null); setForm(emptyTemplate); setNotifTypes({ BAS: false, FBT: false, IAS: false, FYEND: false }); };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,7 +62,7 @@ const AdminNotify: React.FC = () => {
         await companyService.createTemplate(form);
       }
       await fetchTemplates();
-      closeModal();
+      closeDrawer();
     } catch {
       setError('Failed to save template.');
     } finally {
@@ -75,31 +82,47 @@ const AdminNotify: React.FC = () => {
     }
   };
 
+  const handleSendSmsToAll = async () => {
+    setSmsSending(true);
+    setSmsResult(null);
+    try {
+      const res = await companyService.sendSmsToAllUsers(smsMessage);
+      setSmsResult(res.success ? 'SMS sent to all users!' : res.message);
+      setSmsMessage('');
+    } catch (err: any) {
+      setSmsResult('Failed to send SMS.');
+    } finally {
+      setSmsSending(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-indigo-100 to-slate-50">
-      {/* Sidebar */}
-      <aside className="w-64 bg-white/90 border-r border-slate-200 shadow-lg hidden md:flex flex-col">
-        <div className="h-20 flex items-center justify-center border-b border-slate-100">
-          <span className="text-2xl font-bold text-indigo-600 tracking-tight">Super Admin</span>
-        </div>
-        <nav className="flex-1 px-4 py-6 space-y-2">
-          {adminNavLinks.map(link => (
-            <Link
-              key={link.to}
-              to={link.to}
-              className={`block px-4 py-2 rounded-lg font-medium transition-all duration-150 text-gray-700 hover:bg-indigo-100 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 ${location.pathname === link.to ? 'bg-indigo-600 text-white shadow-lg scale-105' : ''}`}
-            >
-              {link.name}
-            </Link>
-          ))}
-        </nav>
-      </aside>
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-start py-10 px-2">
+    <SidebarLayout>
+      <div className="flex flex-col items-center justify-start min-h-screen">
+        <AppNavbar />
         <div className="bg-white/90 rounded-2xl shadow-2xl p-8 max-w-4xl w-full mt-8 md:mt-0">
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-3xl font-bold text-indigo-700">Notification Templates</h1>
             <button onClick={openAdd} className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold shadow hover:bg-indigo-700 transition">Add Template</button>
+          </div>
+          {/* --- SMS to All Users Section --- */}
+          <div className="mb-8 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+            <h2 className="text-xl font-semibold mb-2 text-indigo-800">Send SMS to All Users</h2>
+            <textarea
+              className="w-full rounded border-gray-300 min-h-[60px] mb-2"
+              placeholder="Enter SMS message to send to all users"
+              value={smsMessage}
+              onChange={e => setSmsMessage(e.target.value)}
+              disabled={smsSending}
+            />
+            <button
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold shadow hover:bg-indigo-700 transition disabled:opacity-50"
+              onClick={handleSendSmsToAll}
+              disabled={smsSending || !smsMessage.trim()}
+            >
+              {smsSending ? 'Sending...' : 'Send SMS to All Users'}
+            </button>
+            {smsResult && <div className="mt-2 text-sm text-indigo-700">{smsResult}</div>}
           </div>
           {loading ? (
             <div className="flex justify-center items-center py-10">
@@ -135,13 +158,16 @@ const AdminNotify: React.FC = () => {
             </div>
           )}
         </div>
-        {/* Modal for Add/Edit */}
-        {showModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
-            <div className="bg-white rounded-xl shadow-xl p-8 w-full max-w-lg relative">
-              <button onClick={closeModal} className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
-              <h2 className="text-2xl font-bold mb-4 text-indigo-700">{editId ? 'Edit' : 'Add'} Template</h2>
-              <form onSubmit={handleSave} className="space-y-4">
+        {/* Drawer for Add/Edit */}
+        {showDrawer && (
+          <div className="fixed inset-0 z-50 flex">
+            <div className="fixed inset-0 bg-black bg-opacity-30" onClick={closeDrawer}></div>
+            <div className="relative ml-auto h-full w-full max-w-lg bg-white shadow-2xl flex flex-col">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+                <h2 className="text-2xl font-bold text-indigo-700">{editId ? 'Edit' : 'Add'} Template</h2>
+                <button onClick={closeDrawer} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+              </div>
+              <form onSubmit={handleSave} className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
                   <select className="w-full rounded border-gray-300" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as 'email' | 'sms' }))}>
@@ -161,13 +187,30 @@ const AdminNotify: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Body</label>
                   <textarea className="w-full rounded border-gray-300 min-h-[100px]" value={form.body} onChange={e => setForm(f => ({ ...f, body: e.target.value }))} required />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Notification Types</label>
+                  <div className="flex flex-wrap gap-4 mt-2">
+                    <label className="flex items-center gap-2">
+                      <input type="checkbox" checked={notifTypes.BAS} onChange={e => setNotifTypes(t => ({ ...t, BAS: e.target.checked }))} /> BAS
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input type="checkbox" checked={notifTypes.FBT} onChange={e => setNotifTypes(t => ({ ...t, FBT: e.target.checked }))} /> FBT
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input type="checkbox" checked={notifTypes.IAS} onChange={e => setNotifTypes(t => ({ ...t, IAS: e.target.checked }))} /> IAS
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input type="checkbox" checked={notifTypes.FYEND} onChange={e => setNotifTypes(t => ({ ...t, FYEND: e.target.checked }))} /> Financial Year End Date
+                    </label>
+                  </div>
+                </div>
                 <button type="submit" className="w-full py-2 rounded bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition disabled:opacity-50" disabled={saving}>{saving ? (editId ? 'Saving...' : 'Adding...') : (editId ? 'Save Changes' : 'Add Template')}</button>
               </form>
             </div>
           </div>
         )}
       </div>
-    </div>
+    </SidebarLayout>
   );
 };
 export default AdminNotify; 

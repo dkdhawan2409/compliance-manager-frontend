@@ -13,11 +13,13 @@ import {
   Alert,
   InputAdornment,
   IconButton,
+  Grid,
 } from '@mui/material';
 import { Visibility, VisibilityOff, Business, Email, Phone } from '@mui/icons-material';
 import { companyService, CompanyRegistrationData } from '../api/companyService';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
+import CountryCodeSelect from '../components/CountryCodeSelect';
 
 const validationSchema = Yup.object({
   companyName: Yup.string()
@@ -27,8 +29,10 @@ const validationSchema = Yup.object({
   email: Yup.string()
     .email('Invalid email address')
     .required('Email is required'),
+  countryCode: Yup.string()
+    .required('Country code is required'),
   mobileNumber: Yup.string()
-    .matches(/^[+]?[1-9][\d\s\-\(\)]{8,20}$/, 'Invalid mobile number')
+    .matches(/^[1-9][\d\s\-\(\)]{8,20}$/, 'Invalid mobile number')
     .required('Mobile number is required'),
   password: Yup.string()
     .min(8, 'Password must be at least 8 characters')
@@ -53,6 +57,7 @@ const Register: React.FC = () => {
     initialValues: {
       companyName: '',
       email: '',
+      countryCode: '+61',
       mobileNumber: '',
       password: '',
       confirmPassword: '',
@@ -65,6 +70,7 @@ const Register: React.FC = () => {
           companyName: values.companyName,
           email: values.email,
           mobileNumber: values.mobileNumber,
+          countryCode: values.countryCode,
           password: values.password,
         };
 
@@ -81,150 +87,164 @@ const Register: React.FC = () => {
   });
 
   return (
-    <Container maxWidth="sm">
-      <Box
-        sx={{
-          marginTop: 8,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-        }}
-      >
-        <Card sx={{ width: '100%', maxWidth: 500 }}>
+    <Container maxWidth="md">
+      <Box sx={{ mt: 6, mb: 6 }}>
+        <Card sx={{ width: '100%', maxWidth: 800, mx: 'auto', borderRadius: 3, boxShadow: 2 }}>
           <CardContent sx={{ p: 4 }}>
-            <Typography component="h1" variant="h4" align="center" gutterBottom>
-              Company Registration
+            <Typography component="h2" variant="h5" fontWeight={700} gutterBottom>
+              Personal Information
             </Typography>
-            <Typography variant="body2" align="center" color="textSecondary" sx={{ mb: 3 }}>
-              Create your company account to get started
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+              Please provide your personal information in order to complete your KYC
             </Typography>
-
             {error && (
               <Alert severity="error" sx={{ mb: 2 }}>
                 {error}
               </Alert>
             )}
-
             <Box component="form" onSubmit={formik.handleSubmit} sx={{ mt: 1 }}>
-              <TextField
-                fullWidth
-                id="companyName"
-                name="companyName"
-                label="Company Name"
-                value={formik.values.companyName}
-                onChange={formik.handleChange}
-                error={formik.touched.companyName && Boolean(formik.errors.companyName)}
-                helperText={formik.touched.companyName && formik.errors.companyName}
-                margin="normal"
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Business />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-
-              <TextField
-                fullWidth
-                id="email"
-                name="email"
-                label="Email Address"
-                type="email"
-                value={formik.values.email}
-                onChange={formik.handleChange}
-                error={formik.touched.email && Boolean(formik.errors.email)}
-                helperText={formik.touched.email && formik.errors.email}
-                margin="normal"
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Email />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-
-              <TextField
-                fullWidth
-                id="mobileNumber"
-                name="mobileNumber"
-                label="Mobile Number"
-                value={formik.values.mobileNumber}
-                onChange={formik.handleChange}
-                error={formik.touched.mobileNumber && Boolean(formik.errors.mobileNumber)}
-                helperText={formik.touched.mobileNumber && formik.errors.mobileNumber}
-                margin="normal"
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Phone />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-
-              <TextField
-                fullWidth
-                id="password"
-                name="password"
-                label="Password"
-                type={showPassword ? 'text' : 'password'}
-                value={formik.values.password}
-                onChange={formik.handleChange}
-                error={formik.touched.password && Boolean(formik.errors.password)}
-                helperText={formik.touched.password && formik.errors.password}
-                margin="normal"
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        onClick={() => setShowPassword(!showPassword)}
-                        edge="end"
-                      >
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-              />
-
-              <TextField
-                fullWidth
-                id="confirmPassword"
-                name="confirmPassword"
-                label="Confirm Password"
-                type={showConfirmPassword ? 'text' : 'password'}
-                value={formik.values.confirmPassword}
-                onChange={formik.handleChange}
-                error={formik.touched.confirmPassword && Boolean(formik.errors.confirmPassword)}
-                helperText={formik.touched.confirmPassword && formik.errors.confirmPassword}
-                margin="normal"
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        edge="end"
-                      >
-                        {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-              />
-
-              <Button
-                type="submit"
-                fullWidth
-                variant="contained"
-                sx={{ mt: 3, mb: 2, py: 1.5 }}
-                disabled={formik.isSubmitting}
-              >
-                {formik.isSubmitting ? 'Creating Account...' : 'Create Account'}
-              </Button>
-
-              <Box textAlign="center">
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    id="companyName"
+                    name="companyName"
+                    label="Company Name"
+                    value={formik.values.companyName}
+                    onChange={formik.handleChange}
+                    error={formik.touched.companyName && Boolean(formik.errors.companyName)}
+                    helperText={formik.touched.companyName && formik.errors.companyName}
+                    margin="normal"
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Business />
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    id="email"
+                    name="email"
+                    label="Email Address"
+                    type="email"
+                    value={formik.values.email}
+                    onChange={formik.handleChange}
+                    error={formik.touched.email && Boolean(formik.errors.email)}
+                    helperText={formik.touched.email && formik.errors.email}
+                    margin="normal"
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Email />
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <CountryCodeSelect
+                    value={formik.values.countryCode}
+                    onChange={(value) => formik.setFieldValue('countryCode', value)}
+                    error={formik.touched.countryCode && Boolean(formik.errors.countryCode)}
+                    helperText={formik.touched.countryCode && formik.errors.countryCode ? String(formik.errors.countryCode) : undefined}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={8}>
+                  <TextField
+                    fullWidth
+                    id="mobileNumber"
+                    name="mobileNumber"
+                    label="Phone Number"
+                    value={formik.values.mobileNumber}
+                    onChange={formik.handleChange}
+                    error={formik.touched.mobileNumber && Boolean(formik.errors.mobileNumber)}
+                    helperText={formik.touched.mobileNumber && formik.errors.mobileNumber}
+                    margin="normal"
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Phone />
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    id="password"
+                    name="password"
+                    label="Password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={formik.values.password}
+                    onChange={formik.handleChange}
+                    error={formik.touched.password && Boolean(formik.errors.password)}
+                    helperText={formik.touched.password && formik.errors.password}
+                    margin="normal"
+                    InputProps={{
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            onClick={() => setShowPassword(!showPassword)}
+                            edge="end"
+                          >
+                            {showPassword ? <VisibilityOff /> : <Visibility />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    label="Confirm Password"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={formik.values.confirmPassword}
+                    onChange={formik.handleChange}
+                    error={formik.touched.confirmPassword && Boolean(formik.errors.confirmPassword)}
+                    helperText={formik.touched.confirmPassword && formik.errors.confirmPassword}
+                    margin="normal"
+                    InputProps={{
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            edge="end"
+                          >
+                            {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Grid>
+              </Grid>
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 4 }}>
+                <Button
+                  variant="outlined"
+                  color="inherit"
+                  onClick={() => navigate('/login')}
+                  sx={{ minWidth: 120, borderRadius: 2 }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  sx={{ minWidth: 120, borderRadius: 2 }}
+                  disabled={formik.isSubmitting}
+                >
+                  {formik.isSubmitting ? 'Creating Account...' : 'Next'}
+                </Button>
+              </Box>
+              <Box textAlign="center" sx={{ mt: 2 }}>
                 <Typography variant="body2">
                   Already have an account?{' '}
                   <Link to="/login" style={{ color: '#1976d2', textDecoration: 'none' }}>

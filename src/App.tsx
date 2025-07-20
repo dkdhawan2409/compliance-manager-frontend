@@ -14,6 +14,7 @@ import Compliance from './pages/Compliance';
 import AdminCompanyList from './pages/AdminCompanyList';
 import AdminNotify from './pages/AdminNotify';
 import AdminSettings from './pages/AdminSettings';
+import AdminCronSettings from './pages/AdminCronSettings';
 
 function App() {
   return (
@@ -69,6 +70,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AdminSettings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/cron-settings"
+              element={
+                <ProtectedRoute>
+                  <AdminCronSettings />
                 </ProtectedRoute>
               }
             />
