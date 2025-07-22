@@ -1,219 +1,391 @@
-import React, { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import AppNavbar from '../components/AppNavbar';
-import { companyService, CronjobSettings } from '../api/companyService';
-import { FaEdit, FaSave, FaTimes } from 'react-icons/fa';
+import React, { useState, useEffect } from 'react';
+import SidebarLayout from '../components/SidebarLayout';
+import toast from 'react-hot-toast';
+import { companyService, ComplianceDeadlines } from '../api/companyService';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs, { Dayjs } from 'dayjs';
+import { Tabs, Tab, Box } from '@mui/material';
 
-const adminNavLinks = [
-  { name: 'Company List', to: '/admin/companies' },
-  { name: 'Send Notification', to: '/admin/notify' },
-  { name: 'Settings', to: '/admin/settings' },
-  { name: 'Cronjob Settings', to: '/admin/cron-settings' },
+const initialDeadlines = {
+  basMonthly: '',
+  basQuarterly: {
+    q1: '',
+    q2: '',
+    q3: '',
+    q4: '',
+  },
+  basAnnual: '',
+  iasMonthly: '',
+  iasQuarterly: {
+    q1: '',
+    q2: '',
+    q3: '',
+    q4: '',
+  },
+  fbtAnnual: { self: '', agent: '' },
+  annualRadio: 'standard',
+};
+
+type Quarter = 'q1' | 'q2' | 'q3' | 'q4';
+type QuarterField = Quarter | `${Quarter}Start` | `${Quarter}End`;
+
+const quarterLabels: Array<{
+  key: Quarter;
+  label: string;
+  deadline: string;
+}> = [
+  { key: 'q1', label: 'Q1 (Jul–Sep)', deadline: '28 Oct' },
+  { key: 'q2', label: 'Q2 (Oct–Dec)', deadline: '28 Feb' },
+  { key: 'q3', label: 'Q3 (Jan–Mar)', deadline: '28 Apr' },
+  { key: 'q4', label: 'Q4 (Apr–Jun)', deadline: '28 Jul' },
 ];
 
-type Channel = 'sms' | 'email';
-type ChannelType = 'BAS' | 'FBT' | 'IAS' | 'FED';
-const notificationTypes: ChannelType[] = ['BAS', 'FBT', 'IAS', 'FED'];
-const channels: Channel[] = ['sms', 'email'];
-
-const channelLabels: Record<Channel, string> = { sms: 'SMS', email: 'Email' };
-
-// For MUI-like switch
-const Switch = ({ checked, onChange, disabled }: { checked: boolean; onChange: () => void; disabled?: boolean }) => (
-  <button
-    type="button"
-    onClick={onChange}
-    disabled={disabled}
-    className={`relative inline-flex h-6 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none border-2 border-transparent ${checked ? 'bg-indigo-600' : 'bg-gray-300'} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-    aria-checked={checked}
-    role="switch"
-  >
-    <span
-      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${checked ? 'translate-x-6' : 'translate-x-1'}`}
-    />
-  </button>
-);
-
-type CronState = Record<ChannelType, {
-  sms: { enabled: boolean; duration: number | '' };
-  email: { enabled: boolean; duration: number | '' };
-}>;
-
-const defaultState: CronState = notificationTypes.reduce((acc, type) => {
-  acc[type] = {
-    sms: { enabled: false, duration: '' },
-    email: { enabled: false, duration: '' },
-  };
-  return acc;
-}, {} as CronState);
+const formatDate = (date: Dayjs | null) => (date ? date.format('DD MMM YYYY') : '');
+const parseDate = (str: string) => (str ? dayjs(str, 'DD MMM YYYY') : null);
 
 const AdminCronSettings: React.FC = () => {
-  const location = useLocation();
-  const [cronState, setCronState] = useState<CronState>(defaultState);
-  const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [deadlines, setDeadlines] = useState<typeof initialDeadlines>(initialDeadlines);
   const [loading, setLoading] = useState(true);
-  const [editRow, setEditRow] = useState<ChannelType | null>(null);
-  const [editBuffer, setEditBuffer] = useState<CronState>(defaultState);
+  const [saving, setSaving] = useState(false);
+  const [tab, setTab] = useState(0);
+
+  // Map API data to form state
+  const apiToForm = (data: ComplianceDeadlines) => ({
+    basMonthly: data.bas.monthly || '',
+    basQuarterly: {
+      q1: data.bas.quarterly.q1 || '',
+      q2: data.bas.quarterly.q2 || '',
+      q3: data.bas.quarterly.q3 || '',
+      q4: data.bas.quarterly.q4 || '',
+    },
+    basAnnual: '',
+    iasMonthly: data.ias.monthly || '',
+    iasQuarterly: {
+      q1: data.ias.quarterly.q1 || '',
+      q2: data.ias.quarterly.q2 || '',
+      q3: data.ias.quarterly.q3 || '',
+      q4: data.ias.quarterly.q4 || '',
+    },
+    fbtAnnual: {
+      self: data.fbt.annual.selfLodgement || '',
+      agent: data.fbt.annual.taxAgentElectronic || '',
+    },
+    annualRadio:
+      data.annual && data.annual.noTaxReturn && data.annual.noTaxReturn.trim() !== ''
+        ? 'late'
+        : 'standard',
+  });
+
+  // Map form state to API payload
+  const formToApi = (form: typeof initialDeadlines): ComplianceDeadlines => ({
+    bas: {
+      monthly: form.basMonthly,
+      quarterly: {
+        q1: form.basQuarterly.q1,
+        q2: form.basQuarterly.q2,
+        q3: form.basQuarterly.q3,
+        q4: form.basQuarterly.q4,
+      },
+    },
+    annual: form.annualRadio === 'late'
+      ? { standard: '', noTaxReturn: '28 Feb' }
+      : { standard: '31 Oct', noTaxReturn: '' },
+    ias: {
+      monthly: form.iasMonthly,
+      quarterly: {
+        q1: form.iasQuarterly.q1,
+        q2: form.iasQuarterly.q2,
+        q3: form.iasQuarterly.q3,
+        q4: form.iasQuarterly.q4,
+      },
+    },
+    fbt: {
+      annual: {
+        selfLodgement: form.fbtAnnual.self,
+        taxAgentElectronic: form.fbtAnnual.agent,
+      },
+    },
+  });
 
   useEffect(() => {
-    setLoading(false);
+    setLoading(true);
+    companyService
+      .getComplianceDeadlines()
+      .then((data) => {
+        setDeadlines(apiToForm(data));
+      })
+      .catch(() => {
+        toast.error('Failed to load deadlines');
+      })
+      .finally(() => setLoading(false));
   }, []);
 
-  const startEdit = (type: ChannelType) => {
-    setEditRow(type);
-    setEditBuffer({ ...cronState });
-    setError(null);
-    setSuccess(false);
+  const handleChange = (
+    field: 'basMonthly' | 'iasMonthly' | 'annualRadio',
+    value: string
+  ) => {
+    setDeadlines((prev) => ({ ...prev, [field]: value }));
   };
-
-  const cancelEdit = () => {
-    setEditRow(null);
-    setEditBuffer(defaultState);
-    setError(null);
-  };
-
-  const saveEdit = (type: ChannelType) => {
-    setCronState(editBuffer);
-    setEditRow(null);
-    setSuccess(true);
-    setTimeout(() => setSuccess(false), 1500);
-  };
-
-  const handleDurationChange = (type: ChannelType, channel: Channel, value: string) => {
-    if (editRow === type) {
-      setEditBuffer(s => ({
-        ...s,
-        [type]: {
-          ...s[type],
-          [channel]: {
-            ...s[type][channel],
-            duration: value === '' ? '' : Math.max(0, Number(value)),
-          },
+  const handleQuarterChange = (
+    section: 'basQuarterly' | 'iasQuarterly',
+    quarter: QuarterField,
+    value: string
+  ) => {
+    setDeadlines((prev) => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        [quarter]: value,
         },
       }));
-    }
   };
-
-  const handleToggle = (type: ChannelType, channel: Channel) => {
-    if (editRow === type) {
-      setEditBuffer(s => ({
-        ...s,
-        [type]: {
-          ...s[type],
-          [channel]: {
-            ...s[type][channel],
-            enabled: !s[type][channel].enabled,
-          },
+  const handleAnnualRadio = (value: string) => {
+    setDeadlines((prev) => ({ ...prev, annualRadio: value }));
+  };
+  const handleFbtAnnual = (type: string, value: string) => {
+    setDeadlines((prev) => ({
+      ...prev,
+      fbtAnnual: {
+        ...prev.fbtAnnual,
+        [type]: value,
         },
       }));
-    }
   };
 
-  const handleSave = async (e: React.FormEvent) => {
+  // Single submit handler for the full form
+  const handleSubmitAll = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    setError(null);
-    setSuccess(false);
-    // TODO: Map cronState to API payload and call companyService.updateCronjobSettings
-    setTimeout(() => {
+    try {
+      await companyService.updateComplianceDeadlines(formToApi(deadlines));
+      toast.success('Deadlines updated! All clients now see the new due‑dates.');
+    } catch {
+      toast.error('Failed to save deadlines');
+    } finally {
       setSaving(false);
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 2000);
-    }, 1000);
+    }
   };
 
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-indigo-100 to-slate-50">
-      {/* Sidebar */}
-      <aside className="w-64 bg-white/90 border-r border-slate-200 shadow-lg hidden md:flex flex-col">
-        <div className="h-20 flex items-center justify-center border-b border-slate-100">
-          <span className="text-2xl font-bold text-indigo-600 tracking-tight">Super Admin</span>
-        </div>
-        <nav className="flex-1 px-4 py-6 space-y-2">
-          {adminNavLinks.map(link => (
-            <Link
-              key={link.to}
-              to={link.to}
-              className={`block px-4 py-2 rounded-lg font-medium transition-all duration-150 text-gray-700 hover:bg-indigo-100 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 ${location.pathname === link.to ? 'bg-indigo-600 text-white shadow-lg scale-105' : ''}`}
+    <SidebarLayout>
+      <div className="max-w-3xl mx-auto py-10 px-4 md:px-0">
+        <h1 className="text-3xl md:text-4xl font-extrabold text-indigo-700 mb-2 text-center tracking-tight">Compliance Deadlines</h1>
+        <p className="text-gray-600 text-center mb-8 text-base md:text-lg">Set the statutory due‑dates that will appear in every client dashboard. All dates must be in DD MMM format (e.g., 21 Aug).</p>
+        {loading ? (
+          <div className="flex justify-center items-center py-20 text-lg text-indigo-600 font-semibold animate-pulse">Loading deadlines...</div>
+        ) : (
+          <Box sx={{ width: '100%' }}>
+            <Tabs
+              value={tab}
+              onChange={(_, v) => !saving && setTab(v)}
+              variant="fullWidth"
+              textColor="primary"
+              indicatorColor="primary"
+              sx={{ mb: 4, borderRadius: 2, boxShadow: 1, background: '#f8fafc' }}
             >
-              {link.name}
-            </Link>
-          ))}
-        </nav>
-      </aside>
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-start min-h-screen">
-        <AppNavbar />
-        <div className="bg-white/90 rounded-2xl shadow-2xl p-4 md:p-8 max-w-4xl w-full mt-8 md:mt-0">
-          <h1 className="text-3xl font-bold text-indigo-700 mb-8 text-center">Cron Job Notification Settings</h1>
-          <form onSubmit={handleSave}>
-            <div className="overflow-x-auto">
-              <table className="min-w-full border-separate border-spacing-0 rounded-xl shadow-lg bg-white">
-                <thead>
-                  <tr className="bg-blue-700 text-white sticky top-0 z-10 rounded-t-xl">
-                    <th className="px-6 py-4 text-left text-lg font-semibold rounded-tl-xl">Notification Type</th>
-                    {channels.map(channel => (
-                      <th key={channel} className="px-6 py-4 text-center text-lg font-semibold">{channelLabels[channel]}</th>
-                    ))}
-                    <th className="px-6 py-4 text-center text-lg font-semibold rounded-tr-xl">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {notificationTypes.map((type, idx) => (
-                    <tr key={type} className={`transition-all duration-150 ${idx % 2 === 0 ? 'bg-slate-50' : 'bg-white'} ${editRow === type ? 'ring-2 ring-indigo-400 bg-indigo-50' : ''}`}> 
-                      <td className="px-6 py-4 font-semibold text-gray-800 text-lg whitespace-nowrap">{type}</td>
-                      {channels.map(channel => (
-                        <td key={channel} className="px-6 py-4 text-center">
-                          <div className="flex flex-col items-center gap-2">
-                            <Switch
-                              checked={editRow === type ? editBuffer[type][channel].enabled : cronState[type][channel].enabled}
-                              onChange={() => editRow === type && handleToggle(type, channel)}
-                              disabled={editRow !== type}
-                            />
+              <Tab label="BAS" disabled={saving} />
+              <Tab label="IAS" disabled={saving} />
+              <Tab label="FBT" disabled={saving} />
+            </Tabs>
+            <form onSubmit={handleSubmitAll} className="space-y-10 bg-white rounded-xl shadow p-6 border border-slate-100">
+              {/* BAS Tab */}
+              {tab === 0 && (
+                <section>
+                  <h2 className="text-xl font-bold text-gray-800 mb-4">BAS</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block font-medium mb-1">Monthly deadline</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          className="rounded-lg border border-slate-300 px-3 py-2 w-32"
+                          placeholder="21"
+                          value={deadlines.basMonthly}
+                          onChange={e => handleChange('basMonthly', e.target.value)}
+                        />
+                        <span className="text-gray-500 text-sm">Day of following month</span>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">e.g. July BAS → 21 Aug</p>
+                    </div>
+                    <div>
+                      <label className="block font-medium mb-1">Annual deadline</label>
+                      <div className="flex flex-col gap-2 mt-1">
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="annualRadio"
+                            value="standard"
+                            checked={deadlines.annualRadio === 'standard'}
+                            onChange={() => handleAnnualRadio('standard')}
+                          />
+                          <span>Standard 31 Oct</span>
+                        </label>
+                        <label className="flex items-center gap-2">
                             <input
-                              type="number"
-                              min={0}
-                              className={`w-24 rounded-lg border-2 text-center py-1 px-2 text-base font-medium transition-all duration-150 focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 ${editRow === type ? 'border-indigo-400 bg-white' : 'border-gray-200 bg-gray-100'} ${editRow === type && editBuffer[type][channel].enabled ? '' : 'opacity-60'}`}
-                              value={editRow === type ? editBuffer[type][channel].duration : cronState[type][channel].duration}
-                              onChange={e => handleDurationChange(type, channel, e.target.value)}
-                              disabled={editRow !== type || !(editRow === type ? editBuffer[type][channel].enabled : cronState[type][channel].enabled)}
-                              placeholder="Days"
-                            />
+                            type="radio"
+                            name="annualRadio"
+                            value="late"
+                            checked={deadlines.annualRadio === 'late'}
+                            onChange={() => handleAnnualRadio('late')}
+                          />
+                          <span>No tax‑return lodged ➜ 28 Feb</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-6">
+                    <label className="block font-medium mb-1">Quarterly periods</label>
+                    <div className="grid grid-cols-1 gap-4">
+                      {quarterLabels.map(q => (
+                        <div key={q.key} className="flex flex-col md:flex-row md:items-center gap-2 md:gap-6 bg-gray-50 border border-slate-200 rounded-xl px-4 py-3">
+                          <span className="w-32 font-medium text-gray-700 text-sm mb-1 md:mb-0">{q.label}</span>
+                          <div className="flex flex-col md:flex-row gap-2 flex-1">
+                            <div className="flex flex-col flex-1">
+                              <label className="text-xs text-gray-500 mb-1">Deadline</label>
+                              <DatePicker
+                                format="DD MMM YYYY"
+                                value={parseDate(deadlines.basQuarterly[q.key])}
+                                onChange={date => handleQuarterChange('basQuarterly', q.key, formatDate(date))}
+                                slotProps={{ textField: { size: 'small', fullWidth: true, variant: 'outlined', placeholder: q.deadline + ' 2024' } }}
+                              />
+                            </div>
                           </div>
-                        </td>
+                        </div>
                       ))}
-                      <td className="px-6 py-4 text-center">
-                        {editRow === type ? (
-                          <div className="flex gap-2 justify-center">
-                            <button type="button" title="Save" onClick={() => saveEdit(type)} className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded flex items-center gap-1 shadow transition"><FaSave /> <span className="hidden md:inline">Save</span></button>
-                            <button type="button" title="Cancel" onClick={cancelEdit} className="px-3 py-1 bg-gray-400 hover:bg-gray-500 text-white rounded flex items-center gap-1 shadow transition"><FaTimes /> <span className="hidden md:inline">Cancel</span></button>
+                    </div>
+                  </div>
+                  <div className="pt-6 flex justify-end">
+                    <button
+                      type="button"
+                      className="px-8 py-3 rounded-lg bg-indigo-600 text-white font-semibold text-lg shadow hover:bg-indigo-700 transition disabled:opacity-50"
+                      onClick={() => setTab(1)}
+                      disabled={saving}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </section>
+              )}
+              {/* IAS Tab */}
+              {tab === 1 && (
+                <section>
+                  <h2 className="text-xl font-bold text-gray-800 mb-4">IAS (Income Activity Statement)</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block font-medium mb-1">Monthly deadline</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          className="rounded-lg border border-slate-300 px-3 py-2 w-32"
+                          placeholder="21"
+                          value={deadlines.iasMonthly}
+                          onChange={e => handleChange('iasMonthly', e.target.value)}
+                        />
+                        <span className="text-gray-500 text-sm">Day of following month</span>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">e.g. July IAS → 21 Aug</p>
+                    </div>
+                  </div>
+                  <div className="mt-6">
+                    <label className="block font-medium mb-1">Quarterly periods</label>
+                    <div className="grid grid-cols-1 gap-4">
+                      {quarterLabels.map(q => (
+                        <div key={q.key} className="flex flex-col md:flex-row md:items-center gap-2 md:gap-6 bg-gray-50 border border-slate-200 rounded-xl px-4 py-3">
+                          <span className="w-32 font-medium text-gray-700 text-sm mb-1 md:mb-0">{q.label}</span>
+                          <div className="flex flex-col md:flex-row gap-2 flex-1">
+                            <div className="flex flex-col flex-1">
+                              <label className="text-xs text-gray-500 mb-1">Deadline</label>
+                              <DatePicker
+                                format="DD MMM YYYY"
+                                value={parseDate(deadlines.iasQuarterly[q.key])}
+                                onChange={date => handleQuarterChange('iasQuarterly', q.key, formatDate(date))}
+                                slotProps={{ textField: { size: 'small', fullWidth: true, variant: 'outlined', placeholder: q.deadline + ' 2024' } }}
+                              />
+                            </div>
                           </div>
-                        ) : (
-                          <button type="button" title="Edit" onClick={() => startEdit(type)} className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded flex items-center gap-1 shadow transition"><FaEdit /> <span className="hidden md:inline">Edit</span></button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="flex flex-col md:flex-row gap-4 items-center justify-between mt-8">
-              <button
-                type="submit"
-                className="w-full md:w-auto py-2 px-8 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition disabled:opacity-50 shadow-lg text-lg"
-                disabled={saving}
-              >
-                {saving ? 'Saving...' : 'Save All Changes'}
-              </button>
-              {success && <div className="text-green-600 text-center font-semibold animate-pulse">Settings saved!</div>}
-              {error && <div className="text-red-600 text-center font-semibold animate-pulse">{error}</div>}
-            </div>
-          </form>
-        </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="pt-6 flex justify-between">
+                    <button
+                      type="button"
+                      className="px-8 py-3 rounded-lg bg-slate-200 text-slate-700 font-semibold text-lg shadow hover:bg-slate-300 transition disabled:opacity-50"
+                      onClick={() => setTab(0)}
+                      disabled={saving}
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="button"
+                      className="px-8 py-3 rounded-lg bg-indigo-600 text-white font-semibold text-lg shadow hover:bg-indigo-700 transition disabled:opacity-50"
+                      onClick={() => setTab(2)}
+                      disabled={saving}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </section>
+              )}
+              {/* FBT Tab */}
+              {tab === 2 && (
+                <section>
+                  <h2 className="text-xl font-bold text-gray-800 mb-4">FBT (Fringe Benefits Tax)</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block font-medium mb-1">Annual</label>
+                      <div className="flex flex-col gap-2 mt-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-700 text-sm w-40">Self‑lodgement</span>
+                          <DatePicker
+                            format="DD MMM YYYY"
+                            value={parseDate(deadlines.fbtAnnual.self)}
+                            onChange={date => handleFbtAnnual('self', formatDate(date))}
+                            slotProps={{ textField: { size: 'small', fullWidth: false, variant: 'outlined', placeholder: '21 May 2024' } }}
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-700 text-sm w-40">Tax agent electronic</span>
+                          <DatePicker
+                            format="DD MMM YYYY"
+                            value={parseDate(deadlines.fbtAnnual.agent)}
+                            onChange={date => handleFbtAnnual('agent', formatDate(date))}
+                            slotProps={{ textField: { size: 'small', fullWidth: false, variant: 'outlined', placeholder: '25 Jun 2024' } }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block font-medium mb-1">Quarterly instalments</label>
+                      <div className="bg-gray-100 border border-gray-200 rounded-lg px-4 py-3 text-gray-500 text-sm mt-2">
+                        Follows BAS quarterly due‑dates (read‑only).
+                      </div>
+                    </div>
+                  </div>
+                  <div className="pt-6 flex justify-between">
+                    <button
+                      type="button"
+                      className="px-8 py-3 rounded-lg bg-slate-200 text-slate-700 font-semibold text-lg shadow hover:bg-slate-300 transition disabled:opacity-50"
+                      onClick={() => setTab(1)}
+                      disabled={saving}
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-8 py-3 rounded-lg bg-green-600 text-white font-semibold text-lg shadow hover:bg-green-700 transition disabled:opacity-50"
+                      disabled={saving}
+                    >
+                      {saving ? 'Submitting...' : 'Submit'}
+                    </button>
+                  </div>
+                </section>
+              )}
+            </form>
+          </Box>
+        )}
       </div>
-    </div>
+    </SidebarLayout>
   );
 };
 export default AdminCronSettings; 

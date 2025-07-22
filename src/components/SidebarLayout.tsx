@@ -2,8 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
+import AdminComplianceDeadlines from '../pages/AdminComplianceDeadlines';
 
-const navLinks = [
+const userNavLinks = [
   { name: 'Dashboard', to: '/dashboard', icon: (
     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M13 5v6h6m-6 0v6m0 0H7m6 0h6" /></svg>
   ) },
@@ -13,6 +14,13 @@ const navLinks = [
   { name: 'Compliance', to: '/compliance', icon: (
     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2a2 2 0 012-2h2a2 2 0 012 2v2m-6 0a2 2 0 01-2-2V7a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2m-6 0h6" /></svg>
   ) },
+];
+
+const superAdminNavLinks = [
+  { name: 'Company List', to: '/admin/companies' },
+  { name: 'Send Notification', to: '/admin/notify' },
+  { name: 'Settings', to: '/admin/settings' },
+  { name: 'Cronjob Settings', to: '/admin/cron-settings' },
 ];
 
 interface SidebarLayoutProps {
@@ -26,6 +34,8 @@ const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
   const avatarRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
+
+  const navLinks = company?.role === 'superadmin' ? superAdminNavLinks : userNavLinks;
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -59,10 +69,20 @@ const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
                 className={`flex items-center px-3 py-2 rounded-lg font-medium transition-all duration-150 text-gray-700 hover:bg-indigo-100 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 ${location.pathname === link.to ? 'bg-indigo-600 text-white shadow-lg scale-105' : ''}`}
                 onClick={() => setSidebarOpen(false)}
               >
-                {link.icon}
+                {'icon' in link ? (link as any).icon : null}
                 {link.name}
               </Link>
             ))}
+            {(company?.role === 'admin' || company?.role === 'superadmin') && (
+              <Link
+                to="/admin/compliance-deadlines"
+                className={`flex items-center px-3 py-2 rounded-lg font-medium transition-all duration-150 text-gray-700 hover:bg-indigo-100 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 ${location.pathname === '/admin/compliance-deadlines' ? 'bg-indigo-600 text-white shadow-lg scale-105' : ''}`}
+                onClick={() => setSidebarOpen(false)}
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                Compliance Deadlines
+              </Link>
+            )}
             <button
               onClick={handleLogout}
               className="flex items-center px-3 py-2 rounded-lg font-medium text-gray-700 hover:bg-red-100 hover:text-red-600 transition w-full mt-6 focus:outline-none focus:ring-2 focus:ring-red-200"

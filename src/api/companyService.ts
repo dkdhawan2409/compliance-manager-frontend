@@ -120,6 +120,37 @@ export interface CronjobSettingsInput {
   enabled: boolean;
 }
 
+export interface ComplianceDeadlines {
+  bas: {
+    monthly: string;
+    quarterly: {
+      q1: string;
+      q2: string;
+      q3: string;
+      q4: string;
+    };
+  };
+  annual: {
+    standard: string;
+    noTaxReturn: string;
+  };
+  ias: {
+    monthly: string;
+    quarterly: {
+      q1: string;
+      q2: string;
+      q3: string;
+      q4: string;
+    };
+  };
+  fbt: {
+    annual: {
+      selfLodgement: string;
+      taxAgentElectronic: string;
+    };
+  };
+}
+
 export const companyService = {
   async register(data: CompanyRegistrationData): Promise<AuthResponse> {
     const response = await apiClient.post<AuthResponse>('/companies/register', data);
@@ -226,5 +257,14 @@ export const companyService = {
       { message }
     );
     return response.data;
+  },
+
+  async getComplianceDeadlines(): Promise<ComplianceDeadlines> {
+    const { data } = await apiClient.get<{ success: boolean, data: ComplianceDeadlines }>('/compliance-deadlines');
+    return data.data;
+  },
+  async updateComplianceDeadlines(payload: ComplianceDeadlines): Promise<ComplianceDeadlines> {
+    const { data } = await apiClient.put<ComplianceDeadlines>('/compliance-deadlines', payload);
+    return data;
   },
 };
