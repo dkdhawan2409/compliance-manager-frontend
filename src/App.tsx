@@ -15,6 +15,7 @@ import AdminCompanyList from './pages/AdminCompanyList';
 import AdminNotify from './pages/AdminNotify';
 import AdminSettings from './pages/AdminSettings';
 import AdminCronSettings from './pages/AdminCronSettings';
+import AdminNotificationSettings from './pages/AdminNotificationSettings';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
@@ -89,6 +90,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <AdminCronSettings />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/cronjob-settings"
+                element={
+                  <ProtectedRoute>
+                    <AdminNotificationSettings />
                   </ProtectedRoute>
                 }
               />

@@ -170,7 +170,7 @@ const AdminCronSettings: React.FC = () => {
     <SidebarLayout>
       <div className="max-w-3xl mx-auto py-10 px-4 md:px-0">
         <h1 className="text-3xl md:text-4xl font-extrabold text-indigo-700 mb-2 text-center tracking-tight">Compliance Deadlines</h1>
-        <p className="text-gray-600 text-center mb-8 text-base md:text-lg">Set the statutory due‑dates that will appear in every client dashboard. All dates must be in DD MMM format (e.g., 21 Aug).</p>
+        <p className="text-gray-600 text-center mb-8 text-base md:text-lg">Set the statutory due-dates that will appear in every client dashboard. All dates must be in DD/MM/YYYY format (e.g., 21/08/2024).</p>
         {loading ? (
           <div className="flex justify-center items-center py-20 text-lg text-indigo-600 font-semibold animate-pulse">Loading deadlines...</div>
         ) : (
