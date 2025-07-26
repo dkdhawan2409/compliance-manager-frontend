@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 
+// const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3333/api';
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://compliance-manager-backend.onrender.com/api';
 
 class ApiClient {
@@ -11,11 +12,17 @@ class ApiClient {
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const token = localStorage.getItem('token');
+    console.log('API Client: Making request to:', endpoint);
+    console.log('API Client: Token exists:', !!token);
+    console.log('API Client: Token preview:', token ? token.substring(0, 20) + '...' : 'No token');
+    
     const headers = {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
       ...options.headers,
     };
+
+    console.log('API Client: Final headers:', headers);
 
     try {
       const response = await fetch(`${this.baseURL}${endpoint}`, {

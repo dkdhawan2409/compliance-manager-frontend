@@ -39,6 +39,10 @@ const Login: React.FC = () => {
         };
 
         const response = await companyService.login(loginData);
+        console.log('Login response:', response);
+        console.log('Company data:', response.data.company);
+        console.log('Role:', response.data.company.role);
+        console.log('Superadmin:', response.data.company.superadmin);
         login(response.data.company, response.data.token);
         toast.success('Login successful!');
         navigate('/dashboard');

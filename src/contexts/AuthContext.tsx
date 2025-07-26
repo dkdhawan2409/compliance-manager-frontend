@@ -35,12 +35,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const storedCompany = localStorage.getItem('company');
     if (storedToken && storedCompany) {
       setToken(storedToken);
-      setCompany(JSON.parse(storedCompany));
+      const parsedCompany = JSON.parse(storedCompany);
+      setCompany(parsedCompany);
+      console.log('AuthContext: Restored from localStorage:', {
+        token: storedToken.substring(0, 20) + '...',
+        company: parsedCompany,
+        role: parsedCompany.role,
+        superadmin: parsedCompany.superadmin
+      });
     }
     setLoading(false);
   }, []);
 
   const login = (company: Company, token: string) => {
+    console.log('AuthContext: Login called with:', {
+      company,
+      role: company.role,
+      superadmin: company.superadmin,
+      token: token.substring(0, 20) + '...'
+    });
     setCompany(company);
     setToken(token);
     localStorage.setItem('token', token);

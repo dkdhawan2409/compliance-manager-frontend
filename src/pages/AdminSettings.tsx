@@ -121,10 +121,24 @@ const AdminSettings: React.FC = () => {
       setSettings(settings);
       settings.forEach(s => {
         if (s.type === 'twilio') {
-          setTwilioForm({ type: 'twilio', config: { ...s.config } });
+          setTwilioForm({
+            type: 'twilio',
+            config: {
+              accountSid: s.accountSid || '',
+              authToken: s.authToken || '',
+              fromNumber: s.fromNumber || ''
+            }
+          });
           setTwilioId(s.id);
         } else if (s.type === 'sendgrid') {
-          setSendgridForm({ type: 'sendgrid', config: { ...s.config } });
+          setSendgridForm({
+            type: 'sendgrid',
+            config: {
+              apiKey: s.apiKey || '',
+              fromEmail: s.fromEmail || '',
+              fromName: s.fromName || ''
+            }
+          });
           setSendgridId(s.id);
         }
       });

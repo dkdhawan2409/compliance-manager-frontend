@@ -80,6 +80,10 @@ export interface NotificationTemplate {
   body: string;
   createdAt: string;
   updatedAt: string;
+  // Add new fields for notification types and days
+  notificationTypes?: string[];
+  smsDays?: number[];
+  emailDays?: number[];
 }
 
 export interface NotificationTemplateInput {
@@ -97,6 +101,13 @@ export interface NotificationSetting {
   config: Record<string, any>;
   createdAt: string;
   updatedAt: string;
+  // Add these for backend compatibility
+  accountSid?: string;
+  authToken?: string;
+  fromNumber?: string;
+  apiKey?: string;
+  fromEmail?: string;
+  fromName?: string;
 }
 
 export interface NotificationSettingInput {

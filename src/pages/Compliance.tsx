@@ -133,7 +133,7 @@ const Compliance: React.FC = () => {
           />
         )}
         {error && <div className="text-red-500 mt-4">{error}</div>}
-      </div>
+                </div>
     </SidebarLayout>
   );
 };

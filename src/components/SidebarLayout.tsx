@@ -24,8 +24,12 @@ const adminNavLinks = [
 ];
 
 function getNavLinksForRole(role?: string) {
-  if (role === 'superadmin') return adminNavLinks;
-  if (role === 'admin') return adminNavLinks;
+  console.log('getNavLinksForRole called with role:', role);
+  if (role === 'superadmin') {
+    console.log('Returning adminNavLinks for superadmin');
+    return adminNavLinks;
+  }
+  console.log('Returning userNavLinks for role:', role);
   return userNavLinks;
 }
 
@@ -40,6 +44,10 @@ const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
   const avatarRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
+
+  console.log('SidebarLayout: company:', company);
+  console.log('SidebarLayout: company.role:', company?.role);
+  console.log('SidebarLayout: company.superadmin:', company?.superadmin);
 
   const navLinks = getNavLinksForRole(company?.role);
 
