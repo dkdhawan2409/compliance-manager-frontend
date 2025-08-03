@@ -10,6 +10,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { isAuthenticated, company, loading } = useAuth();
   const location = useLocation();
 
+  console.log('ProtectedRoute:', {
+    pathname: location.pathname,
+    isAuthenticated,
+    companyRole: company?.role,
+    loading
+  });
+
   if (loading) {
     // Optionally, you can return a spinner here
     return null;
@@ -20,7 +27,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   }
 
   // If superadmin is trying to access a non-admin route, redirect to /admin/companies
-  if (company?.role === 'superadmin' && !location.pathname.startsWith('/admin')) {
+  // But allow access to AI tools and assistant
+  if (company?.role === 'superadmin' && 
+      !location.pathname.startsWith('/admin') && 
+      !location.pathname.startsWith('/ai-')) {
     return <Navigate to="/admin/companies" replace />;
   }
 

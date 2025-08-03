@@ -16,6 +16,8 @@ import AdminNotify from './pages/AdminNotify';
 import AdminSettings from './pages/AdminSettings';
 import AdminCronSettings from './pages/AdminCronSettings';
 import AdminNotificationSettings from './pages/AdminNotificationSettings';
+import AiChat from './pages/AiChat';
+import AITools from './pages/AITools';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
@@ -50,6 +52,22 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <Compliance />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/ai-chat"
+                element={
+                  <ProtectedRoute>
+                    <AiChat />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/ai-tools"
+                element={
+                  <ProtectedRoute>
+                    <AITools />
                   </ProtectedRoute>
                 }
               />

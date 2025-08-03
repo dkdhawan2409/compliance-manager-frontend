@@ -93,7 +93,7 @@ export interface NotificationTemplateInput {
   body: string;
 }
 
-export type NotificationSettingType = 'smtp' | 'twilio' | 'sendgrid';
+export type NotificationSettingType = 'smtp' | 'twilio' | 'sendgrid' | 'openai';
 
 export interface NotificationSetting {
   id: number;
@@ -277,5 +277,65 @@ export const companyService = {
   async updateComplianceDeadlines(payload: ComplianceDeadlines): Promise<ComplianceDeadlines> {
     const { data } = await apiClient.put<ComplianceDeadlines>('/compliance-deadlines', payload);
     return data;
+  },
+
+  // AI Chat APIs
+  async getOpenAiSettings(): Promise<any> {
+    const response = await apiClient.get<{ data: any }>('/api/openai-admin/settings');
+    return response.data.data;
+  },
+
+  async saveOpenAiSettings(settings: {
+    apiKey: string;
+    model?: string;
+    maxTokens?: number;
+    temperature?: number;
+  }): Promise<any> {
+    const response = await apiClient.post<{ data: any }>('/api/openai-admin/settings', settings);
+    return response.data.data;
+  },
+
+  async testOpenAiApiKey(apiKey: string): Promise<any> {
+    const response = await apiClient.post<{ data: any }>('/api/openai-admin/test-api-key', { apiKey });
+    return response.data.data;
+  },
+
+  async chatCompletion(prompt: string, model?: string, maxTokens?: number, temperature?: number): Promise<any> {
+    const response = await apiClient.post<{ data: any }>('/api/openai/chat', {
+      prompt,
+      model,
+      maxTokens,
+      temperature
+    });
+    return response.data.data;
+  },
+
+  async generateComplianceText(complianceType: string, companyName: string, daysLeft: number, customPrompt?: string): Promise<any> {
+    const response = await apiClient.post<{ data: any }>('/api/openai/compliance-text', {
+      complianceType,
+      companyName,
+      daysLeft,
+      customPrompt
+    });
+    return response.data.data;
+  },
+
+  async generateTemplate(templateType: string, complianceType: string, tone?: string, customPrompt?: string): Promise<any> {
+    const response = await apiClient.post<{ data: any }>('/api/openai/generate-template', {
+      templateType,
+      complianceType,
+      tone,
+      customPrompt
+    });
+    return response.data.data;
+  },
+
+  async analyzeContent(content: string, analysisType?: string, customPrompt?: string): Promise<any> {
+    const response = await apiClient.post<{ data: any }>('/api/openai/analyze-content', {
+      content,
+      analysisType,
+      customPrompt
+    });
+    return response.data.data;
   },
 };

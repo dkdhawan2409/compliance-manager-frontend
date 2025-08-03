@@ -175,6 +175,34 @@ const AdminCompanyList: React.FC = () => {
     const [mobileNumber, setMobileNumber] = useState(selectedCompany?.mobileNumber || '');
     const [countryCode, setCountryCode] = useState(selectedCompany?.countryCode || '');
     const [isActive, setIsActive] = useState(selectedCompany?.isActive || false);
+    
+    // Compliance form state
+    const [complianceForm, setComplianceForm] = useState({
+      basFrequency: selectedCompliance?.basFrequency || '',
+      fbtApplicable: selectedCompliance?.fbtApplicable || false,
+      nextBasDue: selectedCompliance?.nextBasDue || '',
+      nextFbtDue: selectedCompliance?.nextFbtDue || '',
+      iasRequired: selectedCompliance?.iasRequired || false,
+      iasFrequency: selectedCompliance?.iasFrequency || '',
+      nextIasDue: selectedCompliance?.nextIasDue || '',
+      financialYearEnd: selectedCompliance?.financialYearEnd || ''
+    });
+
+    // Update compliance form when selectedCompliance changes
+    useEffect(() => {
+      if (selectedCompliance) {
+        setComplianceForm({
+          basFrequency: selectedCompliance.basFrequency || '',
+          fbtApplicable: selectedCompliance.fbtApplicable || false,
+          nextBasDue: selectedCompliance.nextBasDue || '',
+          nextFbtDue: selectedCompliance.nextFbtDue || '',
+          iasRequired: selectedCompliance.iasRequired || false,
+          iasFrequency: selectedCompliance.iasFrequency || '',
+          nextIasDue: selectedCompliance.nextIasDue || '',
+          financialYearEnd: selectedCompliance.financialYearEnd || ''
+        });
+      }
+    }, [selectedCompliance]);
 
     if (drawerLoading) {
       return (
@@ -196,6 +224,21 @@ const AdminCompanyList: React.FC = () => {
           countryCode,
           isActive,
         });
+        
+        // Also update compliance data if it exists
+        if (selectedCompliance) {
+          await companyService.updateComplianceDetails({
+            basFrequency: complianceForm.basFrequency as 'Monthly' | 'Quarterly' | 'Annually',
+            nextBasDue: complianceForm.nextBasDue,
+            fbtApplicable: complianceForm.fbtApplicable,
+            nextFbtDue: complianceForm.nextFbtDue,
+            iasRequired: complianceForm.iasRequired,
+            iasFrequency: complianceForm.iasFrequency as 'Monthly' | 'Quarterly' | 'Annually',
+            nextIasDue: complianceForm.nextIasDue,
+            financialYearEnd: complianceForm.financialYearEnd
+          });
+        }
+        
         handleCloseModal();
         window.location.reload();
       } catch {
@@ -240,14 +283,34 @@ const AdminCompanyList: React.FC = () => {
 
             <fieldset className="space-y-4">
               <Legend>Compliance</Legend>
-              <Input label="BAS Frequency" value={selectedCompliance?.basFrequency || ''} disabled />
-              <Input label="FBT Applicable" value={selectedCompliance?.fbtApplicable ? 'Yes' : 'No'} disabled />
-              <Input label="Next BAS Due" value={selectedCompliance?.nextBasDue || ''} disabled />
-              <Input label="Next FBT Due" value={selectedCompliance?.nextFbtDue || ''} disabled />
-              <Input label="IAS Required" value={selectedCompliance?.iasRequired ? 'Yes' : 'No'} disabled />
-              <Input label="IAS Frequency" value={selectedCompliance?.iasFrequency || ''} disabled />
-              <Input label="Next IAS Due" value={selectedCompliance?.nextIasDue || ''} disabled />
-              <Input label="Financial Year End" value={selectedCompliance?.financialYearEnd || ''} disabled />
+              <Input label="BAS Frequency" value={complianceForm.basFrequency} onChange={(v) => setComplianceForm(prev => ({ ...prev, basFrequency: v }))} />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">FBT Applicable</label>
+                <select 
+                  className="w-full rounded border-gray-300 px-3 py-2" 
+                  value={complianceForm.fbtApplicable ? 'Yes' : 'No'}
+                  onChange={(e) => setComplianceForm(prev => ({ ...prev, fbtApplicable: e.target.value === 'Yes' }))}
+                >
+                  <option value="No">No</option>
+                  <option value="Yes">Yes</option>
+                </select>
+              </div>
+              <Input label="Next BAS Due" value={complianceForm.nextBasDue} onChange={(v) => setComplianceForm(prev => ({ ...prev, nextBasDue: v }))} />
+              <Input label="Next FBT Due" value={complianceForm.nextFbtDue} onChange={(v) => setComplianceForm(prev => ({ ...prev, nextFbtDue: v }))} />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">IAS Required</label>
+                <select 
+                  className="w-full rounded border-gray-300 px-3 py-2" 
+                  value={complianceForm.iasRequired ? 'Yes' : 'No'}
+                  onChange={(e) => setComplianceForm(prev => ({ ...prev, iasRequired: e.target.value === 'Yes' }))}
+                >
+                  <option value="No">No</option>
+                  <option value="Yes">Yes</option>
+                </select>
+              </div>
+              <Input label="IAS Frequency" value={complianceForm.iasFrequency} onChange={(v) => setComplianceForm(prev => ({ ...prev, iasFrequency: v }))} />
+              <Input label="Next IAS Due" value={complianceForm.nextIasDue} onChange={(v) => setComplianceForm(prev => ({ ...prev, nextIasDue: v }))} />
+              <Input label="Financial Year End" value={complianceForm.financialYearEnd} onChange={(v) => setComplianceForm(prev => ({ ...prev, financialYearEnd: v }))} />
             </fieldset>
 
             {modalError && <p className="text-red-600 text-sm">{modalError}</p>}
