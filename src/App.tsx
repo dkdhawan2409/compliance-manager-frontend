@@ -22,6 +22,7 @@ import AiChat from './pages/AiChat';
 import AITools from './pages/AITools';
 import XeroIntegration from './pages/XeroIntegration';
 import XeroInvoices from './pages/XeroInvoices';
+import XeroRedirect from './pages/XeroRedirect';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
@@ -100,6 +101,10 @@ function App() {
                     <XeroInvoices />
                   </ProtectedRoute>
                 }
+              />
+              <Route
+                path="/redirecturl"
+                element={<XeroRedirect />}
               />
               <Route
                 path="/admin/companies"
