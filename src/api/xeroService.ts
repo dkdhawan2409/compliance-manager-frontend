@@ -92,7 +92,7 @@ export const handleXeroCallback = async (code: string, state: string): Promise<{
   tenants: XeroTenant[];
   companyId: string;
 }> => {
-  const response = await apiClient.get(`/xero/callback?code=${code}&state=${state}`);
+  const response = await apiClient.post('/xero/callback', { code, state });
   return response.data.data;
 };
 
