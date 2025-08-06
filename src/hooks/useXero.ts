@@ -18,6 +18,7 @@ import {
   type XeroSettings,
 } from '../api/xeroService';
 import toast from 'react-hot-toast';
+import apiClient from '../api/client';
 
 interface UseXeroReturn {
   // State
@@ -75,8 +76,16 @@ export const useXero = (): UseXeroReturn => {
     try {
       setIsLoading(true);
       setError(null);
-      
-      const { authUrl } = await getXeroAuthUrl();
+
+      // 1. Get a secure state from backend
+      const { data: stateData } = await apiClient.post('/xero/create-auth-state');
+      const { state } = stateData.data;
+
+      // 2. Get the Xero auth URL with the state
+      const { data: urlData } = await apiClient.get(`/xero/login?state=${state}`);
+      const { authUrl } = urlData.data;
+
+      // 3. Redirect to Xero
       window.location.href = authUrl;
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || 'Failed to start Xero authorization';
