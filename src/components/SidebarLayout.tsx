@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useUserRole } from '../utils/roleUtils';
 import toast from 'react-hot-toast';
 
 const userNavLinks = [
@@ -19,6 +20,9 @@ const userNavLinks = [
   { name: 'AI Tools', to: '/ai-tools', icon: (
     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
   ) },
+  { name: 'Xero Integration', to: '/integrations/xero', icon: (
+    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+  ), companyOnly: true },
 ];
 
 const adminNavLinks = [
@@ -29,15 +33,27 @@ const adminNavLinks = [
   { name: 'Cronjob Settings', to: '/admin/cronjob-settings' },
   { name: 'AI Assistant', to: '/ai-chat' },
   { name: 'AI Tools', to: '/ai-tools' },
+  // Xero integration removed from admin nav - only for companies
 ];
 
-function getNavLinksForRole(role?: string) {
-  console.log('getNavLinksForRole called with role:', role);
-  if (role === 'superadmin') {
+function getNavLinksForRole(company: any) {
+  console.log('getNavLinksForRole called with company:', company);
+  
+  if (!company) {
+    console.log('No company, returning empty array');
+    return [];
+  }
+
+  const isSuperAdmin = company.superadmin === true;
+  console.log('Is super admin:', isSuperAdmin);
+
+  if (isSuperAdmin) {
     console.log('Returning adminNavLinks for superadmin');
     return adminNavLinks;
   }
-  console.log('Returning userNavLinks for role:', role);
+
+  // For company users, filter out company-only links if needed
+  console.log('Returning userNavLinks for company user');
   return userNavLinks;
 }
 
@@ -47,6 +63,7 @@ interface SidebarLayoutProps {
 
 const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
   const { company, logout } = useAuth();
+  const userRole = useUserRole(company);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [avatarDropdown, setAvatarDropdown] = useState(false);
   const avatarRef = useRef<HTMLDivElement>(null);
@@ -56,8 +73,9 @@ const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
   console.log('SidebarLayout: company:', company);
   console.log('SidebarLayout: company.role:', company?.role);
   console.log('SidebarLayout: company.superadmin:', company?.superadmin);
+  console.log('SidebarLayout: userRole:', userRole);
 
-  const navLinks = getNavLinksForRole(company?.role);
+  const navLinks = getNavLinksForRole(company);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -84,20 +102,28 @@ const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
             <span className="text-xl font-bold text-indigo-600 tracking-tight">Compliance</span>
           </div>
           <nav className="flex-1 px-4 py-4 space-y-1">
-            {navLinks.map(link => (
-              <Link
-                key={link.to}
-                to={link.to}
-                className={`flex items-center px-3 py-2 rounded-lg font-medium transition-all duration-150 text-gray-700 hover:bg-indigo-100 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 ${location.pathname.startsWith(link.to) ? 'bg-indigo-600 text-white shadow-lg scale-105' : ''}`}
-                onClick={() => {
-                  console.log('Navigating to:', link.to);
-                  setSidebarOpen(false);
-                }}
-              >
-                {'icon' in link ? (link as any).icon : null}
-                {link.name}
-              </Link>
-            ))}
+            {navLinks.map(link => {
+              // Skip company-only links for super admins
+              if ('companyOnly' in link && link.companyOnly && userRole.isSuperAdmin) {
+                return null;
+              }
+              
+              return (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  className={`flex items-center px-3 py-2 rounded-lg font-medium transition-all duration-150 text-gray-700 hover:bg-indigo-100 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 ${location.pathname.startsWith(link.to) ? 'bg-indigo-600 text-white shadow-lg scale-105' : ''}`}
+                  onClick={() => {
+                    console.log('Navigating to:', link.to);
+                    console.log('Current location:', location.pathname);
+                    setSidebarOpen(false);
+                  }}
+                >
+                  {'icon' in link ? (link as any).icon : null}
+                  {link.name}
+                </Link>
+              );
+            })}
             <button
               onClick={handleLogout}
               className="flex items-center px-3 py-2 rounded-lg font-medium text-gray-700 hover:bg-red-100 hover:text-red-600 transition w-full mt-6 focus:outline-none focus:ring-2 focus:ring-red-200"
@@ -133,11 +159,18 @@ const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
             {avatarDropdown && (
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-slate-100 py-2 z-50 animate-fade-in">
                 <div className="px-4 py-2 text-gray-700 font-semibold border-b border-slate-100">{company?.companyName}</div>
-                {getNavLinksForRole(company?.role).map(link => (
-                  <Link key={link.to} to={link.to} className="block px-4 py-2 text-gray-700 hover:bg-indigo-50 transition" onClick={() => setAvatarDropdown(false)}>
-                    {link.name}
-                  </Link>
-                ))}
+                {navLinks.map(link => {
+                  // Skip company-only links for super admins in dropdown too
+                  if ('companyOnly' in link && link.companyOnly && userRole.isSuperAdmin) {
+                    return null;
+                  }
+                  
+                  return (
+                    <Link key={link.to} to={link.to} className="block px-4 py-2 text-gray-700 hover:bg-indigo-50 transition" onClick={() => setAvatarDropdown(false)}>
+                      {link.name}
+                    </Link>
+                  );
+                })}
                 <button onClick={handleLogout} className="block w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 transition">Logout</button>
               </div>
             )}

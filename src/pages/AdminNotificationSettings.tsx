@@ -86,7 +86,7 @@ const AdminNotificationSettings: React.FC = () => {
   useEffect(() => {
     const fetchNotificationSettings = async () => {
       try {
-        const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3333/api';
+        const apiBase = import.meta.env.VITE_API_URL || 'https://compliance-manager-backend.onrender.com/api';
         const token = localStorage.getItem('token');
         const response = await fetch(`${apiBase}/companies/notification-settings`, {
           method: 'GET',

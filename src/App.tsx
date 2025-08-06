@@ -3,6 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ThemeProvider } from '@mui/material/styles';
 import { CssBaseline } from '@mui/material';
 import { Toaster } from 'react-hot-toast';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { AuthProvider } from './contexts/AuthContext';
 import { theme } from './theme/theme';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -18,17 +20,29 @@ import AdminCronSettings from './pages/AdminCronSettings';
 import AdminNotificationSettings from './pages/AdminNotificationSettings';
 import AiChat from './pages/AiChat';
 import AITools from './pages/AITools';
+import XeroIntegration from './pages/XeroIntegration';
+import XeroInvoices from './pages/XeroInvoices';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
 function App() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: 2,
+        staleTime: 5 * 60 * 1000, // 5 minutes
+      },
+    },
+  });
+
   return (
-    <ThemeProvider theme={theme}>
-      <LocalizationProvider dateAdapter={AdapterDayjs}>
-        <CssBaseline />
-        <AuthProvider>
-          <Router>
-            <Routes>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider theme={theme}>
+        <LocalizationProvider dateAdapter={AdapterDayjs}>
+          <CssBaseline />
+          <AuthProvider>
+            <Router>
+              <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route
@@ -68,6 +82,22 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <AITools />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/integrations/xero"
+                element={
+                  <ProtectedRoute>
+                    <XeroIntegration />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/xero/:connectionId/invoices"
+                element={
+                  <ProtectedRoute>
+                    <XeroInvoices />
                   </ProtectedRoute>
                 }
               />
@@ -126,6 +156,8 @@ function App() {
         </AuthProvider>
       </LocalizationProvider>
     </ThemeProvider>
+    <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
   );
 }
 

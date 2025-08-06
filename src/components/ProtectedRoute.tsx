@@ -27,10 +27,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   }
 
   // If superadmin is trying to access a non-admin route, redirect to /admin/companies
-  // But allow access to AI tools and assistant
+  // But allow access to AI tools, assistant, and integrations
   if (company?.role === 'superadmin' && 
       !location.pathname.startsWith('/admin') && 
-      !location.pathname.startsWith('/ai-')) {
+      !location.pathname.startsWith('/ai-') &&
+      !location.pathname.startsWith('/integrations/')) {
     return <Navigate to="/admin/companies" replace />;
   }
 

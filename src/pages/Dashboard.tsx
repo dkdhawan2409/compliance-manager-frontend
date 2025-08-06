@@ -82,6 +82,17 @@ const Dashboard: React.FC = () => {
                 <p className="text-gray-500 text-sm mb-4">Update your compliance-related details.</p>
                 <Link to="/compliance" className="block w-full py-2.5 rounded-lg bg-gradient-to-r from-green-500 to-blue-600 text-white font-semibold text-center shadow hover:from-blue-600 hover:to-green-500 transition">Update Compliance</Link>
               </div>
+              
+              <div className="bg-white/90 rounded-xl shadow-md border border-white/60 p-5 hover:shadow-xl hover:-translate-y-1 transition-all duration-200 group cursor-pointer">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                  </div>
+                  <span className="text-lg font-semibold">Xero Integration</span>
+                </div>
+                <p className="text-gray-500 text-sm mb-4">Connect and manage your Xero account.</p>
+                <Link to="/integrations/xero" className="block w-full py-2.5 rounded-lg bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-semibold text-center shadow hover:from-indigo-600 hover:to-purple-500 transition">Go to Xero</Link>
+              </div>
             </div>
             
             {/* Status Cards */}
