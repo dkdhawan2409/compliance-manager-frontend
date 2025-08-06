@@ -2,10 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { useXero } from '../hooks/useXero';
 
 const XeroRedirect: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { handleCallback } = useXero();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,9 +25,12 @@ const XeroRedirect: React.FC = () => {
     if (code && state) {
       // POST code and state to backend
       axios.post('/api/xero/callback', { code, state })
-        .then(res => {
+        .then(() => {
+          // Now update frontend state/context
+          return handleCallback(code, state);
+        })
+        .then(() => {
           toast.success('Xero connected successfully!');
-          // Optionally store tokens, tenants, etc. from res.data
           navigate('/integrations/xero');
         })
         .catch(err => {
@@ -36,7 +41,7 @@ const XeroRedirect: React.FC = () => {
       toast.error('Invalid OAuth callback - missing code or state');
       setLoading(false);
     }
-  }, [location, navigate]);
+  }, [location, navigate, handleCallback]);
 
   return (
     <div className="min-h-screen flex items-center justify-center">
