@@ -47,25 +47,6 @@ const XeroIntegration: React.FC = () => {
     loadSettings();
   }, [loadSettings]);
 
-  // Handle OAuth callback response
-  useEffect(() => {
-    const urlParams = new URLSearchParams(location.search);
-    const success = urlParams.get('success');
-    const error = urlParams.get('error');
-    const errorDetails = urlParams.get('errorDetails');
-
-    if (success === 'true') {
-      toast.success('Xero connected successfully!');
-      // Clear the URL parameters
-      navigate('/integrations/xero', { replace: true });
-    } else if (error) {
-      const errorMessage = errorDetails ? `${error}: ${errorDetails}` : error;
-      toast.error(`Xero connection failed: ${decodeURIComponent(errorMessage)}`);
-      // Clear the URL parameters
-      navigate('/integrations/xero', { replace: true });
-    }
-  }, [location, navigate]);
-
   const handleLoadData = async () => {
     if (!isConnected || !selectedTenant) {
       toast.error('Please connect to Xero first');
