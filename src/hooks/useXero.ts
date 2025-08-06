@@ -76,19 +76,33 @@ export const useXero = (): UseXeroReturn => {
     try {
       setIsLoading(true);
       setError(null);
+      console.log('Starting Xero authorization...');
 
-      // 1. Get a secure state from backend
-      const { data: stateData } = await apiClient.post('/xero/create-auth-state');
-      const { state } = stateData.data;
-
-      // 2. Get the Xero auth URL with the state
-      const { data: urlData } = await apiClient.get(`/xero/login?state=${state}`);
-      const { authUrl } = urlData.data;
-
-      // 3. Redirect to Xero
+      // Use the old flow since new endpoints may not be implemented yet
+      console.log('Using original Xero auth flow...');
+      const { authUrl } = await getXeroAuthUrl();
+      console.log('Auth URL received:', authUrl);
+      
+      // Redirect to Xero
+      console.log('Redirecting to Xero...');
       window.location.href = authUrl;
+      
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message || 'Failed to start Xero authorization';
+      console.error('Xero auth error:', err);
+      console.error('Error response:', err.response);
+      console.error('Error status:', err.response?.status);
+      console.error('Error data:', err.response?.data);
+      
+      let errorMessage = 'Failed to start Xero authorization';
+      
+      if (err.response?.status === 401) {
+        errorMessage = 'Authentication required. Please log in again.';
+      } else if (err.response?.status === 404) {
+        errorMessage = 'Xero integration not available. Please check your settings.';
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      }
+      
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
