@@ -52,13 +52,15 @@ const XeroIntegration: React.FC = () => {
     const urlParams = new URLSearchParams(location.search);
     const success = urlParams.get('success');
     const error = urlParams.get('error');
+    const errorDetails = urlParams.get('errorDetails');
 
     if (success === 'true') {
       toast.success('Xero connected successfully!');
       // Clear the URL parameters
       navigate('/integrations/xero', { replace: true });
     } else if (error) {
-      toast.error(`Xero connection failed: ${decodeURIComponent(error)}`);
+      const errorMessage = errorDetails ? `${error}: ${errorDetails}` : error;
+      toast.error(`Xero connection failed: ${decodeURIComponent(errorMessage)}`);
       // Clear the URL parameters
       navigate('/integrations/xero', { replace: true });
     }

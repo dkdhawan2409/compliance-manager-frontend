@@ -107,6 +107,10 @@ function App() {
                 element={<XeroRedirect />}
               />
               <Route
+                path="/xero-callback"
+                element={<XeroIntegration />}
+              />
+              <Route
                 path="/admin/companies"
                 element={
                   <ProtectedRoute>
