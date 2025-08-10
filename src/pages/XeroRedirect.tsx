@@ -20,10 +20,13 @@ const XeroRedirect: React.FC = () => {
     }
 
     if (code && state) {
-      // Redirect directly to backend callback URL instead of making AJAX request
-      const backendCallbackUrl = `${import.meta.env.VITE_API_URL || 'https://compliance-manager-backend.onrender.com/api'}/xero/callback?code=${code}&state=${state}`;
+      // FIXED: Use direct redirect to backend to avoid CORS issues
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3333/api';
+      const backendCallbackUrl = `${apiBaseUrl}/xero/callback?code=${code}&state=${state}`;
       
       console.log('Redirecting to backend callback:', backendCallbackUrl);
+      
+      // Redirect directly to backend callback
       window.location.href = backendCallbackUrl;
     } else {
       toast.error('Invalid OAuth callback - missing code or state');

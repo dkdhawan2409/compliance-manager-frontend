@@ -8,7 +8,7 @@ export const checkEnvironment = () => {
   // Check API URL
   const apiUrl = import.meta.env.VITE_API_URL;
   if (!apiUrl) {
-    issues.push('VITE_API_URL is not set - using default backend URL: https://compliance-manager-backend.onrender.com/api');
+    issues.push('VITE_API_URL is not set - using default backend URL: http://localhost:3333/api');
   } else {
     info.push(`API URL: ${apiUrl}`);
   }

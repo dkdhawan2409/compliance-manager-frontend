@@ -10,6 +10,9 @@ export interface XeroTokens {
 export interface XeroTenant {
   id: string;
   name: string;
+  organizationName?: string;
+  tenantName?: string;
+  tenantId?: string;
 }
 
 export interface XeroCompanyInfo {
@@ -43,10 +46,37 @@ export interface XeroSettings {
   updatedAt: string;
 }
 
-export interface XeroDataResponse {
+export interface XeroDataResponse<T> {
   success: boolean;
   message: string;
-  data: any;
+  data: T;
+}
+
+export interface XeroDashboardData {
+  summary: {
+    totalInvoices: number;
+    totalContacts: number;
+    totalTransactions: number;
+    totalAccounts: number;
+    totalAmount: string;
+    paidInvoices: number;
+    overdueInvoices: number;
+  };
+  recentInvoices: any[];
+  recentContacts: any[];
+  recentTransactions: any[];
+  accounts: any[];
+  organization: any;
+}
+
+export interface XeroFinancialSummary {
+  totalRevenue: string;
+  paidRevenue: string;
+  outstandingRevenue: string;
+  totalExpenses: string;
+  netIncome: string;
+  invoiceCount: number;
+  transactionCount: number;
 }
 
 // Xero Settings Management
@@ -62,8 +92,26 @@ export const saveXeroSettings = async (settings: {
 };
 
 // Get Xero settings for the authenticated company
-export const getXeroSettings = async (): Promise<XeroSettings> => {
+export const getXeroSettings = async (): Promise<XeroSettings & {
+  isConnected?: boolean;
+  connectionStatus?: string;
+  tenants?: XeroTenant[];
+  hasValidTokens?: boolean;
+}> => {
   const response = await apiClient.get('/xero/settings');
+  return response.data.data;
+};
+
+// Get Xero connection status
+export const getConnectionStatus = async (): Promise<{
+  isConnected: boolean | string;
+  connectionStatus: string;
+  message: string;
+  tenants?: XeroTenant[];
+  tokenRefreshed?: boolean;
+  action?: string;
+}> => {
+  const response = await apiClient.get('/xero/connection-status');
   return response.data.data;
 };
 
@@ -108,16 +156,149 @@ export const refreshXeroToken = async (refreshToken: string, companyId: number):
   return response.data.data;
 };
 
-// Get Xero data for a specific resource type
+// Get Xero data for a specific resource type (backend handles authentication)
 export const getXeroData = async (
   resourceType: string,
-  accessToken: string,
-  tenantId: string
-): Promise<XeroDataResponse> => {
-  const response = await apiClient.post(`/xero/data/${resourceType}`, {
-    accessToken,
-    tenantId,
-  });
+  tenantId?: string
+): Promise<XeroDataResponse<any>> => {
+  // Map resource types to specific backend endpoints that handle authentication internally
+  switch (resourceType) {
+    case 'invoices':
+      return await getAllInvoices();
+    case 'contacts':
+      return await getAllContacts();
+    case 'bank-transactions':
+      return await getAllBankTransactions();
+    case 'accounts':
+      return await getAllAccounts();
+    case 'items':
+      return await getAllItems();
+    case 'tax-rates':
+      return await getAllTaxRates();
+    case 'tracking-categories':
+      return await getAllTrackingCategories();
+    case 'organization':
+      return await getOrganizationDetails();
+    case 'purchase-orders':
+      return await getAllPurchaseOrders();
+    case 'receipts':
+      return await getAllReceipts();
+    case 'credit-notes':
+      return await getAllCreditNotes();
+    case 'manual-journals':
+      return await getAllManualJournals();
+    case 'prepayments':
+      return await getAllPrepayments();
+    case 'overpayments':
+      return await getAllOverpayments();
+    case 'quotes':
+      return await getAllQuotes();
+    case 'reports':
+      return await getReports('BalanceSheet'); // Default to Balance Sheet report
+    default:
+      throw new Error(`Unsupported resource type: ${resourceType}`);
+  }
+};
+
+// New comprehensive data functions
+export const getDashboardData = async (tenantId?: string): Promise<XeroDataResponse<XeroDashboardData>> => {
+  const url = tenantId ? `/xero/dashboard-data?tenantId=${tenantId}` : '/xero/dashboard-data';
+  const response = await apiClient.get(url);
+  return response.data;
+};
+
+export const getFinancialSummary = async (tenantId?: string): Promise<XeroDataResponse<XeroFinancialSummary>> => {
+  const url = tenantId ? `/xero/financial-summary?tenantId=${tenantId}` : '/xero/financial-summary';
+  const response = await apiClient.get(url);
+  return response.data;
+};
+
+export const getAllInvoices = async (page = 1, pageSize = 50, tenantId?: string): Promise<XeroDataResponse<any>> => {
+  const url = tenantId ? `/xero/all-invoices?page=${page}&pageSize=${pageSize}&tenantId=${tenantId}` : `/xero/all-invoices?page=${page}&pageSize=${pageSize}`;
+  const response = await apiClient.get(url);
+  return response.data;
+};
+
+export const getAllContacts = async (page = 1, pageSize = 50, tenantId?: string): Promise<XeroDataResponse<any>> => {
+  const url = tenantId ? `/xero/all-contacts?page=${page}&pageSize=${pageSize}&tenantId=${tenantId}` : `/xero/all-contacts?page=${page}&pageSize=${pageSize}`;
+  const response = await apiClient.get(url);
+  return response.data;
+};
+
+export const getAllBankTransactions = async (page = 1, pageSize = 50, tenantId?: string): Promise<XeroDataResponse<any>> => {
+  const url = tenantId ? `/xero/all-bank-transactions?page=${page}&pageSize=${pageSize}&tenantId=${tenantId}` : `/xero/all-bank-transactions?page=${page}&pageSize=${pageSize}`;
+  const response = await apiClient.get(url);
+  return response.data;
+};
+
+export const getAllAccounts = async (tenantId?: string): Promise<XeroDataResponse<any>> => {
+  const url = tenantId ? `/xero/all-accounts?tenantId=${tenantId}` : '/xero/all-accounts';
+  const response = await apiClient.get(url);
+  return response.data;
+};
+
+export const getAllItems = async (tenantId?: string): Promise<XeroDataResponse<any>> => {
+  const url = tenantId ? `/xero/all-items?tenantId=${tenantId}` : '/xero/all-items';
+  const response = await apiClient.get(url);
+  return response.data;
+};
+
+export const getAllTaxRates = async (tenantId?: string): Promise<XeroDataResponse<any>> => {
+  const url = tenantId ? `/xero/all-tax-rates?tenantId=${tenantId}` : '/xero/all-tax-rates';
+  const response = await apiClient.get(url);
+  return response.data;
+};
+
+export const getAllTrackingCategories = async (tenantId?: string): Promise<XeroDataResponse<any>> => {
+  const url = tenantId ? `/xero/all-tracking-categories?tenantId=${tenantId}` : '/xero/all-tracking-categories';
+  const response = await apiClient.get(url);
+  return response.data;
+};
+
+export const getOrganizationDetails = async (tenantId?: string): Promise<XeroDataResponse<any>> => {
+  const url = tenantId ? `/xero/organization-details?tenantId=${tenantId}` : '/xero/organization-details';
+  const response = await apiClient.get(url);
+  return response.data;
+};
+
+// Additional Xero API endpoints
+export const getAllPurchaseOrders = async (page = 1, pageSize = 50): Promise<XeroDataResponse<any>> => {
+  const response = await apiClient.get(`/xero/all-purchase-orders?page=${page}&pageSize=${pageSize}`);
+  return response.data;
+};
+
+export const getAllReceipts = async (page = 1, pageSize = 50): Promise<XeroDataResponse<any>> => {
+  const response = await apiClient.get(`/xero/all-receipts?page=${page}&pageSize=${pageSize}`);
+  return response.data;
+};
+
+export const getAllCreditNotes = async (page = 1, pageSize = 50): Promise<XeroDataResponse<any>> => {
+  const response = await apiClient.get(`/xero/all-credit-notes?page=${page}&pageSize=${pageSize}`);
+  return response.data;
+};
+
+export const getAllManualJournals = async (page = 1, pageSize = 50): Promise<XeroDataResponse<any>> => {
+  const response = await apiClient.get(`/xero/all-manual-journals?page=${page}&pageSize=${pageSize}`);
+  return response.data;
+};
+
+export const getAllPrepayments = async (page = 1, pageSize = 50): Promise<XeroDataResponse<any>> => {
+  const response = await apiClient.get(`/xero/all-prepayments?page=${page}&pageSize=${pageSize}`);
+  return response.data;
+};
+
+export const getAllOverpayments = async (page = 1, pageSize = 50): Promise<XeroDataResponse<any>> => {
+  const response = await apiClient.get(`/xero/all-overpayments?page=${page}&pageSize=${pageSize}`);
+  return response.data;
+};
+
+export const getAllQuotes = async (page = 1, pageSize = 50): Promise<XeroDataResponse<any>> => {
+  const response = await apiClient.get(`/xero/all-quotes?page=${page}&pageSize=${pageSize}`);
+  return response.data;
+};
+
+export const getReports = async (reportID: string): Promise<XeroDataResponse<any>> => {
+  const response = await apiClient.get(`/xero/reports?reportID=${reportID}`);
   return response.data;
 };
 
@@ -131,6 +312,14 @@ export const XERO_RESOURCE_TYPES = [
   'tax-rates',
   'tracking-categories',
   'organization',
+  'purchase-orders',
+  'receipts',
+  'credit-notes',
+  'manual-journals',
+  'prepayments',
+  'overpayments',
+  'quotes',
+  'reports',
 ] as const;
 
 export type XeroResourceType = typeof XERO_RESOURCE_TYPES[number]; 

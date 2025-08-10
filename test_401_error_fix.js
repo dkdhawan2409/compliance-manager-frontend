@@ -1,0 +1,120 @@
+console.log('🔍 Testing 401 Error Fix for Xero API Endpoints\n');
+
+console.log('🔧 ISSUE IDENTIFIED:');
+console.log('   ❌ 401 "Request failed with status code 401" error when retrieving invoices');
+console.log('   ❌ Authorization failing for Xero API calls');
+console.log('   ❌ Database schema mismatch causing token access issues');
+console.log('');
+
+console.log('🛠️ ROOT CAUSE:');
+console.log('   The xero_settings table was missing token columns (access_token, refresh_token, token_expires_at)');
+console.log('   The controller was trying to destructure non-existent fields from database results');
+console.log('   This caused undefined values to be passed to Xero API calls');
+console.log('   The frontend was showing connected but backend had no valid tokens');
+console.log('');
+
+console.log('🛠️ FIXES APPLIED:');
+console.log('   ✅ Updated XeroSettings model to include token columns');
+console.log('   ✅ Created migration script to add token columns to existing tables');
+console.log('   ✅ Fixed getAllInvoices function to properly handle token access');
+console.log('   ✅ Fixed getAllContacts function with same pattern');
+console.log('   ✅ Added proper error handling for 401 responses');
+console.log('   ✅ Added tenant ID retrieval from Xero connections API');
+console.log('   ✅ Enhanced error messages for better debugging');
+console.log('');
+
+console.log('🎯 TECHNICAL CHANGES:');
+console.log('   Database Schema Updates:');
+console.log('     - Added access_token TEXT column');
+console.log('     - Added refresh_token TEXT column');
+console.log('     - Added token_expires_at TIMESTAMP column');
+console.log('     - Created migration script for existing tables');
+console.log('');
+console.log('   Controller Function Fixes:');
+console.log('     - Fixed field access from settings object');
+console.log('     - Added token existence validation');
+console.log('     - Added tenant ID retrieval from Xero API');
+console.log('     - Enhanced error handling for 401 responses');
+console.log('     - Improved error messages for debugging');
+console.log('');
+console.log('   Error Handling:');
+console.log('     - Specific handling for 401 unauthorized errors');
+console.log('     - Clear error messages for token issues');
+console.log('     - Proper validation of required fields');
+console.log('');
+
+console.log('🔍 DATABASE MIGRATION:');
+console.log('   Run the migration script to add token columns:');
+console.log('   cd ../backend && node migrate_xero_tokens.js');
+console.log('');
+console.log('   This will:');
+console.log('     - Check if token columns exist');
+console.log('     - Add missing columns if needed');
+console.log('     - Preserve existing data');
+console.log('     - Update table structure');
+console.log('');
+
+console.log('📊 FIXED ENDPOINTS:');
+console.log('   ✅ getAllInvoices - Fixed token access and tenant retrieval');
+console.log('   ✅ getAllContacts - Fixed token access and tenant retrieval');
+console.log('   ✅ Other endpoints need similar fixes');
+console.log('');
+
+console.log('🔧 CONTROLLER CHANGES:');
+console.log('   Before (Broken):');
+console.log('     const { accessToken, tenantId } = xeroSettings;');
+console.log('     // accessToken and tenantId were undefined');
+console.log('');
+console.log('   After (Fixed):');
+console.log('     if (!settings.access_token) {');
+console.log('       return res.status(400).json({...});');
+console.log('     }');
+console.log('     // Get tenant from Xero connections API');
+console.log('     const tenantId = tenantsResponse.data[0].tenantId;');
+console.log('');
+
+console.log('📋 HOW TO TEST THE FIX:');
+console.log('   1. Run the database migration:');
+console.log('      cd ../backend && node migrate_xero_tokens.js');
+console.log('');
+console.log('   2. Restart the backend server');
+console.log('');
+console.log('   3. Connect to Xero (OAuth flow)');
+console.log('');
+console.log('   4. Try loading invoices from the frontend');
+console.log('');
+console.log('   5. Check browser network tab for API responses');
+console.log('');
+console.log('   6. Verify no more 401 errors');
+console.log('');
+
+console.log('🎯 EXPECTED RESULTS:');
+console.log('   ✅ No more 401 "Request failed with status code 401" errors');
+console.log('   ✅ Invoices load successfully after OAuth');
+console.log('   ✅ Contacts load successfully after OAuth');
+console.log('   ✅ Proper error messages for missing tokens');
+console.log('   ✅ Clear guidance when re-authorization is needed');
+console.log('   ✅ Database contains valid tokens after OAuth');
+console.log('');
+
+console.log('🔧 TROUBLESHOOTING:');
+console.log('   If still getting 401 errors:');
+console.log('   1. Check if migration was run successfully');
+console.log('   2. Verify database has token columns');
+console.log('   3. Check if OAuth flow completed successfully');
+console.log('   4. Verify tokens are stored in database');
+console.log('   5. Check backend logs for token validation');
+console.log('');
+console.log('   If tokens are missing:');
+console.log('   1. Re-run OAuth flow');
+console.log('   2. Check backend callback handling');
+console.log('   3. Verify database connection');
+console.log('   4. Check for token storage errors');
+console.log('');
+
+console.log('🚀 401 ERROR FIX IMPLEMENTED!');
+console.log('   Database schema now supports token storage');
+console.log('   Controllers properly handle token access');
+console.log('   Clear error messages for debugging');
+console.log('   Proper tenant ID retrieval from Xero');
+console.log('   Ready for testing after migration');

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { useXero } from '../contexts/XeroContext';
 
 interface XeroTenant {
   id: string;
@@ -16,53 +17,61 @@ const XeroCallback: React.FC = () => {
   const [tenants, setTenants] = useState<XeroTenant[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
+  const { handleCallback } = useXero();
 
   useEffect(() => {
-    const processCallback = () => {
+    const processCallback = async () => {
       try {
-        // Extract all parameters from URL
-        const successParam = searchParams.get('success');
-        const companyIdParam = searchParams.get('companyId');
-        const tenantsParam = searchParams.get('tenants');
+        // Extract parameters from URL
+        const code = searchParams.get('code');
+        const state = searchParams.get('state');
         const errorParam = searchParams.get('error');
         const errorDetailsParam = searchParams.get('errorDetails');
 
-        // Set state based on parameters
-        setSuccess(successParam === 'true');
-        setCompanyId(companyIdParam);
-        setError(errorParam);
-        setErrorDetails(errorDetailsParam);
+        console.log('Processing callback with params:', {
+          code: code ? 'present' : 'missing',
+          state: state ? 'present' : 'missing',
+          error: errorParam,
+          errorDetails: errorDetailsParam
+        });
 
-        // Parse tenants if available
-        if (tenantsParam) {
-          try {
-            const parsedTenants = JSON.parse(decodeURIComponent(tenantsParam));
-            setTenants(parsedTenants);
-          } catch (e) {
-            console.error('Failed to parse tenants:', e);
-          }
-        }
-
-        // Show appropriate toast message
-        if (successParam === 'true') {
-          toast.success('Xero connected successfully!');
-        } else if (errorParam) {
+        // Handle error case
+        if (errorParam) {
           const errorMessage = errorDetailsParam 
             ? `${errorParam}: ${errorDetailsParam}` 
             : errorParam;
+          setError(errorParam);
+          setErrorDetails(errorDetailsParam);
+          setSuccess(false);
           toast.error(`Xero connection failed: ${decodeURIComponent(errorMessage)}`);
+          setIsProcessing(false);
+          return;
+        }
+
+        // Handle success case with code and state
+        if (code && state) {
+          console.log('🔄 Processing successful callback with code and state');
+          await handleCallback(code, state);
+          setSuccess(true);
+          // The handleCallback function will handle the redirect
+        } else {
+          console.error('❌ Missing code or state in callback');
+          setError('Invalid callback parameters');
+          setSuccess(false);
+          toast.error('Invalid callback parameters. Please try again.');
         }
 
         setIsProcessing(false);
       } catch (err) {
         console.error('Error processing callback:', err);
         setError('Failed to process callback');
+        setSuccess(false);
         setIsProcessing(false);
       }
     };
 
     processCallback();
-  }, [searchParams]);
+  }, [searchParams, handleCallback]);
 
   const handleNavigateToDashboard = () => {
     navigate('/dashboard');

@@ -6,6 +6,7 @@ import { Toaster } from 'react-hot-toast';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { AuthProvider } from './contexts/AuthContext';
+import { XeroProvider } from './contexts/XeroContext';
 import { theme } from './theme/theme';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
@@ -43,7 +44,8 @@ function App() {
         <LocalizationProvider dateAdapter={AdapterDayjs}>
           <CssBaseline />
           <AuthProvider>
-            <Router>
+            <XeroProvider>
+              <Router>
               <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
@@ -163,7 +165,8 @@ function App() {
             </Routes>
           </Router>
           <Toaster position="top-right" />
-        </AuthProvider>
+            </XeroProvider>
+          </AuthProvider>
       </LocalizationProvider>
     </ThemeProvider>
     <ReactQueryDevtools initialIsOpen={false} />

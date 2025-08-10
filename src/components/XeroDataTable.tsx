@@ -12,6 +12,50 @@ const XeroDataTable: React.FC<XeroDataTableProps> = ({ data, resourceType }) => 
     return String(value);
   };
 
+  const getResourceIcon = (type: string): string => {
+    const icons: Record<string, string> = {
+      'invoices': '📄',
+      'contacts': '👥',
+      'bank-transactions': '🏦',
+      'accounts': '📊',
+      'items': '📦',
+      'tax-rates': '💰',
+      'tracking-categories': '🏷️',
+      'organization': '🏢',
+      'purchase-orders': '🛒',
+      'receipts': '🧾',
+      'credit-notes': '📝',
+      'manual-journals': '📔',
+      'prepayments': '💳',
+      'overpayments': '💸',
+      'quotes': '💬',
+      'reports': '📈'
+    };
+    return icons[type] || '📋';
+  };
+
+  const getResourceDisplayName = (type: string): string => {
+    const names: Record<string, string> = {
+      'invoices': 'Invoices',
+      'contacts': 'Contacts',
+      'bank-transactions': 'Bank Transactions',
+      'accounts': 'Accounts',
+      'items': 'Items',
+      'tax-rates': 'Tax Rates',
+      'tracking-categories': 'Tracking Categories',
+      'organization': 'Organization',
+      'purchase-orders': 'Purchase Orders',
+      'receipts': 'Receipts',
+      'credit-notes': 'Credit Notes',
+      'manual-journals': 'Manual Journals',
+      'prepayments': 'Prepayments',
+      'overpayments': 'Overpayments',
+      'quotes': 'Quotes',
+      'reports': 'Reports'
+    };
+    return names[type] || type.charAt(0).toUpperCase() + type.slice(1).replace('-', ' ');
+  };
+
   const renderTable = () => {
     if (!data || !Array.isArray(data)) {
       return (
@@ -79,14 +123,29 @@ const XeroDataTable: React.FC<XeroDataTableProps> = ({ data, resourceType }) => 
     if (!data || !Array.isArray(data)) return null;
 
     return (
-      <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-        <h3 className="text-sm font-medium text-blue-800 mb-2">Summary</h3>
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <span className="font-medium text-blue-700">Total Records:</span> {data.length}
+      <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+        <div className="flex items-center gap-3 mb-3">
+          <span className="text-2xl">{getResourceIcon(resourceType)}</span>
+          <h3 className="text-lg font-semibold text-blue-800">
+            {getResourceDisplayName(resourceType)} Summary
+          </h3>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div className="bg-white p-3 rounded border">
+            <div className="font-medium text-blue-700">Total Records</div>
+            <div className="text-2xl font-bold text-blue-900">{data.length}</div>
           </div>
-          <div>
-            <span className="font-medium text-blue-700">Resource Type:</span> {resourceType}
+          <div className="bg-white p-3 rounded border">
+            <div className="font-medium text-blue-700">Resource Type</div>
+            <div className="text-lg font-semibold text-blue-900">{getResourceDisplayName(resourceType)}</div>
+          </div>
+          <div className="bg-white p-3 rounded border">
+            <div className="font-medium text-blue-700">Data Type</div>
+            <div className="text-lg font-semibold text-blue-900">Array</div>
+          </div>
+          <div className="bg-white p-3 rounded border">
+            <div className="font-medium text-blue-700">Status</div>
+            <div className="text-lg font-semibold text-green-600">✓ Loaded</div>
           </div>
         </div>
       </div>
