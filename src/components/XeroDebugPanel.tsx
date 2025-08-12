@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { logEnvironmentInfo } from '../utils/envChecker';
+import { logEnvironmentInfo, getApiUrl } from '../utils/envChecker';
 import toast from 'react-hot-toast';
 
 interface XeroDebugPanelProps {
@@ -35,7 +35,8 @@ const XeroDebugPanel: React.FC<XeroDebugPanelProps> = ({ onTestOAuth }) => {
       // Test 2: Backend Health
       console.log('🏥 Test 2: Backend Health Check');
       try {
-        const healthResponse = await fetch('http://localhost:3333/api/health');
+        const apiUrl = getApiUrl();
+        const healthResponse = await fetch(`${apiUrl}/health`);
         const healthData = await healthResponse.json();
         results.tests.backendHealth = {
           success: healthResponse.ok,
@@ -62,7 +63,8 @@ const XeroDebugPanel: React.FC<XeroDebugPanelProps> = ({ onTestOAuth }) => {
       console.log('⚙️ Test 4: Xero Settings Endpoint');
       if (token) {
         try {
-          const settingsResponse = await fetch('http://localhost:3333/api/xero/settings', {
+          const apiUrl = getApiUrl();
+          const settingsResponse = await fetch(`${apiUrl}/xero/settings`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
           results.tests.xeroSettings = {
@@ -92,7 +94,8 @@ const XeroDebugPanel: React.FC<XeroDebugPanelProps> = ({ onTestOAuth }) => {
       console.log('🔗 Test 5: OAuth Login Endpoint');
       if (token) {
         try {
-          const oauthResponse = await fetch('http://localhost:3333/api/xero/login', {
+          const apiUrl = getApiUrl();
+          const oauthResponse = await fetch(`${apiUrl}/xero/login`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
           results.tests.oauthLogin = {
@@ -134,7 +137,8 @@ const XeroDebugPanel: React.FC<XeroDebugPanelProps> = ({ onTestOAuth }) => {
       console.log('🔄 Test 6: OAuth Callback Endpoint Simulation');
       if (token) {
         try {
-          const callbackResponse = await fetch('http://localhost:3333/api/xero/callback', {
+          const apiUrl = getApiUrl();
+          const callbackResponse = await fetch(`${apiUrl}/xero/callback`, {
             method: 'POST',
             headers: { 
               'Authorization': `Bearer ${token}`,

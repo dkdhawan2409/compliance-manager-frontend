@@ -1,7 +1,8 @@
 // Test script to verify OpenAI API endpoints
 const axios = require('axios');
 
-const API_BASE_URL = 'http://localhost:3333/api';
+// Use environment variable for API URL or fallback to production URL
+const API_BASE_URL = process.env.API_BASE_URL || 'https://compliance-manager-backend.onrender.com/api';
 
 // Test data
 const testSettings = {

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { getApiUrl } from '../utils/envChecker';
 import toast from 'react-hot-toast';
 
 const XeroRedirect: React.FC = () => {
@@ -20,8 +21,8 @@ const XeroRedirect: React.FC = () => {
     }
 
     if (code && state) {
-      // FIXED: Use direct redirect to backend to avoid CORS issues
-      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3333/api';
+      // FIXED: Use dynamic API URL instead of hardcoded localhost
+      const apiBaseUrl = getApiUrl();
       const backendCallbackUrl = `${apiBaseUrl}/xero/callback?code=${code}&state=${state}`;
       
       console.log('Redirecting to backend callback:', backendCallbackUrl);

@@ -64,3 +64,19 @@ export const logEnvironmentInfo = () => {
   
   return env;
 }; 
+
+// Utility functions for domain and API URL management
+export const getCurrentDomain = (): string => {
+  if (typeof window !== 'undefined') {
+    return window.location.origin;
+  }
+  return import.meta.env.VITE_FRONTEND_URL || 'https://yourdomain.com';
+};
+
+export const getApiUrl = (): string => {
+  return import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://compliance-manager-backend.onrender.com/api' : 'http://localhost:3333/api');
+};
+
+export const getRedirectUrl = (): string => {
+  return `${getCurrentDomain()}/redirecturl`;
+}; 

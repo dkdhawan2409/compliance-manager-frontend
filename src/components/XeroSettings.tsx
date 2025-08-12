@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useXero } from '../hooks/useXero';
-import { logEnvironmentInfo } from '../utils/envChecker';
+import { logEnvironmentInfo, getCurrentDomain, getApiUrl } from '../utils/envChecker';
 import toast from 'react-hot-toast';
 
 const XeroSettings: React.FC<{ onSettingsSaved?: () => void }> = ({ onSettingsSaved }) => {
   const { settings, isLoading, error, saveSettings, loadSettings } = useXero();
   const [showDebug, setShowDebug] = useState(false);
+  
   const [formData, setFormData] = useState({
     clientId: '',
     clientSecret: '',
-    redirectUri: 'http://localhost:3001/redirecturl'
+    redirectUri: getCurrentDomain() + '/redirecturl'
   });
 
   useEffect(() => {
@@ -17,7 +18,7 @@ const XeroSettings: React.FC<{ onSettingsSaved?: () => void }> = ({ onSettingsSa
       setFormData({
         clientId: settings.clientId || '',
         clientSecret: '',
-        redirectUri: settings.redirectUri || 'http://localhost:3001/redirecturl'
+        redirectUri: settings.redirectUri || getCurrentDomain() + '/redirecturl'
       });
     }
   }, [settings]);
@@ -43,15 +44,16 @@ const XeroSettings: React.FC<{ onSettingsSaved?: () => void }> = ({ onSettingsSa
       console.log('🧪 Testing Xero connection...');
       logEnvironmentInfo();
       
-      // Test backend connectivity
-      const response = await fetch('http://localhost:3333/api/health');
+      // Test backend connectivity using API client instead of hardcoded URL
+      const apiUrl = getApiUrl();
+      const response = await fetch(`${apiUrl}/health`);
       const healthData = await response.json();
       console.log('🏥 Backend health:', healthData);
       
       // Test OAuth endpoint
       const token = localStorage.getItem('token');
       if (token) {
-        const oauthResponse = await fetch('http://localhost:3333/api/xero/login', {
+        const oauthResponse = await fetch(`${apiUrl}/xero/login`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         console.log('🔐 OAuth endpoint status:', oauthResponse.status);
@@ -87,7 +89,7 @@ const XeroSettings: React.FC<{ onSettingsSaved?: () => void }> = ({ onSettingsSa
           <h4 className="font-medium text-gray-900 mb-2">🔧 Debug Information</h4>
           <div className="space-y-2 text-sm">
             <div>
-              <span className="font-medium">API URL:</span> {import.meta.env.VITE_API_URL || 'http://localhost:3333/api'}
+              <span className="font-medium">API URL:</span> {getApiUrl()}
             </div>
             <div>
               <span className="font-medium">Environment:</span> {import.meta.env.DEV ? 'Development' : 'Production'}
@@ -161,7 +163,7 @@ const XeroSettings: React.FC<{ onSettingsSaved?: () => void }> = ({ onSettingsSa
             value={formData.redirectUri}
             onChange={(e) => setFormData({ ...formData, redirectUri: e.target.value })}
             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            placeholder="http://localhost:3333/api/xero/callback"
+            placeholder={getCurrentDomain() + '/redirecturl'}
           />
           <p className="text-xs text-gray-500 mt-1">
             Must match the redirect URI configured in your Xero app
@@ -199,7 +201,7 @@ const XeroSettings: React.FC<{ onSettingsSaved?: () => void }> = ({ onSettingsSa
         <h4 className="font-medium text-blue-900 mb-2">📋 Setup Instructions</h4>
         <ol className="text-sm text-blue-800 space-y-1">
           <li>1. Create a Xero app in the <a href="https://developer.xero.com/" target="_blank" rel="noopener noreferrer" className="underline">Xero Developer Portal</a></li>
-          <li>2. Set the redirect URI to: <code className="bg-blue-100 px-1 rounded">http://localhost:3333/api/xero/callback</code></li>
+          <li>2. Set the redirect URI to: <code className="bg-blue-100 px-1 rounded">{getCurrentDomain()}/redirecturl</code></li>
           <li>3. Copy your Client ID and Client Secret</li>
           <li>4. Save the settings above</li>
           <li>5. Test the connection using the debug panel</li>
