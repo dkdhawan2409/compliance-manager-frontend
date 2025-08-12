@@ -1,9 +1,15 @@
 import axios from 'axios';
 
-// Get API URL from environment or use default local backend
+// Get API URL from environment or use production backend
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://compliance-manager-backend.onrender.com/api' : 'http://localhost:3333/api');
 
 console.log('🔧 API Client initialized with URL:', API_URL);
+
+// Production safety check
+if (import.meta.env.PROD && API_URL.includes('localhost')) {
+  console.error('❌ CRITICAL: Production build contains localhost URL:', API_URL);
+  throw new Error('Production build cannot contain localhost URLs. Please set VITE_API_URL environment variable.');
+}
 
 const apiClient = axios.create({
   baseURL: API_URL,

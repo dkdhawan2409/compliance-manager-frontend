@@ -70,13 +70,54 @@ export const getCurrentDomain = (): string => {
   if (typeof window !== 'undefined') {
     return window.location.origin;
   }
+  // For production, use environment variable or a default production domain
   return import.meta.env.VITE_FRONTEND_URL || 'https://yourdomain.com';
 };
 
 export const getApiUrl = (): string => {
-  return import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://compliance-manager-backend.onrender.com/api' : 'http://localhost:3333/api');
+  // In production, always use the environment variable or production URL
+  if (import.meta.env.PROD) {
+    return import.meta.env.VITE_API_URL || 'https://compliance-manager-backend.onrender.com/api';
+  }
+  // In development, allow localhost fallback
+  return import.meta.env.VITE_API_URL || 'http://localhost:3333/api';
 };
 
 export const getRedirectUrl = (): string => {
   return `${getCurrentDomain()}/redirecturl`;
+}; 
+
+// Production-safe environment checker
+export const checkProductionEnvironment = () => {
+  const issues: string[] = [];
+  const warnings: string[] = [];
+  const info: string[] = [];
+
+  // Check if we're in production
+  if (import.meta.env.PROD) {
+    info.push('Running in production mode');
+    
+    // Ensure API URL is set for production
+    if (!import.meta.env.VITE_API_URL) {
+      warnings.push('VITE_API_URL not set - using default production backend URL');
+    }
+    
+    // Check for any localhost references
+    const currentDomain = getCurrentDomain();
+    if (currentDomain.includes('localhost')) {
+      issues.push('Current domain contains localhost - this should not happen in production');
+    }
+    
+    const apiUrl = getApiUrl();
+    if (apiUrl.includes('localhost')) {
+      issues.push('API URL contains localhost - this should not happen in production');
+    }
+  } else {
+    info.push('Running in development mode');
+    if (!import.meta.env.VITE_API_URL) {
+      info.push('VITE_API_URL is not set - using default development backend URL: http://localhost:3333/api');
+    }
+  }
+
+  return { issues, warnings, info };
 }; 
