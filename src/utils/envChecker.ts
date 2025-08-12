@@ -67,11 +67,26 @@ export const logEnvironmentInfo = () => {
 
 // Utility functions for domain and API URL management
 export const getCurrentDomain = (): string => {
-  if (typeof window !== 'undefined') {
-    return window.location.origin;
+  // In production, prioritize environment variable
+  if (import.meta.env.PROD) {
+    const envDomain = import.meta.env.VITE_FRONTEND_URL;
+    if (envDomain) {
+      console.log('🔧 Using environment domain:', envDomain);
+      return envDomain;
+    }
   }
-  // For production, use environment variable or a default production domain
-  return import.meta.env.VITE_FRONTEND_URL || 'https://yourdomain.com';
+  
+  // Fallback to window.location.origin
+  if (typeof window !== 'undefined') {
+    const windowDomain = window.location.origin;
+    console.log('🔧 Using window domain:', windowDomain);
+    return windowDomain;
+  }
+  
+  // Final fallback
+  const fallbackDomain = import.meta.env.VITE_FRONTEND_URL || 'https://yourdomain.com';
+  console.log('🔧 Using fallback domain:', fallbackDomain);
+  return fallbackDomain;
 };
 
 export const getApiUrl = (): string => {

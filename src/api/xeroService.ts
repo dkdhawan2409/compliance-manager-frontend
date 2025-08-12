@@ -130,8 +130,19 @@ export const getAllXeroSettings = async (): Promise<XeroSettings[]> => {
 
 // Get authorization URL for Xero login
 export const getXeroAuthUrl = async (): Promise<{ authUrl: string; state: string }> => {
-  // Send the current domain to the backend so it can generate the correct redirect URI
-  const currentDomain = typeof window !== 'undefined' ? window.location.origin : '';
+  // Get the current domain with fallback to environment variable in production
+  let currentDomain: string;
+  
+  if (import.meta.env.PROD) {
+    // In production, prioritize environment variable
+    currentDomain = import.meta.env.VITE_FRONTEND_URL || window.location.origin;
+  } else {
+    // In development, use window.location.origin
+    currentDomain = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+  }
+  
+  console.log('🔧 Generating OAuth URL with domain:', currentDomain);
+  
   const response = await apiClient.get('/xero/login', {
     params: {
       redirect_uri: `${currentDomain}/redirecturl`
@@ -146,8 +157,19 @@ export const handleXeroCallback = async (code: string, state: string): Promise<{
   tenants: XeroTenant[];
   companyId: string;
 }> => {
-  // Send the current domain as redirect_uri to ensure backend uses the correct URI
-  const currentDomain = typeof window !== 'undefined' ? window.location.origin : '';
+  // Get the current domain with fallback to environment variable in production
+  let currentDomain: string;
+  
+  if (import.meta.env.PROD) {
+    // In production, prioritize environment variable
+    currentDomain = import.meta.env.VITE_FRONTEND_URL || window.location.origin;
+  } else {
+    // In development, use window.location.origin
+    currentDomain = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+  }
+  
+  console.log('🔧 Handling OAuth callback with domain:', currentDomain);
+  
   const response = await apiClient.post('/xero/callback', { 
     code, 
     state,

@@ -105,6 +105,18 @@ const XeroSettings: React.FC<{ onSettingsSaved?: () => void }> = ({ onSettingsSa
                 <span className="font-medium">Client ID:</span> {settings.clientId ? 'Configured' : 'Missing'}
               </div>
             )}
+            <div>
+              <span className="font-medium">Window Location:</span> {typeof window !== 'undefined' ? window.location.origin : 'N/A'}
+            </div>
+            <div>
+              <span className="font-medium">Environment Domain:</span> {import.meta.env.VITE_FRONTEND_URL || 'Not set'}
+            </div>
+            <div>
+              <span className="font-medium">Detected Domain:</span> {getCurrentDomain()}
+            </div>
+            <div>
+              <span className="font-medium">Redirect URI:</span> {getCurrentDomain() + '/redirecturl'}
+            </div>
           </div>
           <button
             type="button"
