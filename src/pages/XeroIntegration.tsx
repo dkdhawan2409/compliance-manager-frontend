@@ -121,11 +121,23 @@ const XeroIntegration: React.FC = () => {
     }
   }, [isConnected, showDashboard]);
 
-  // Automatically select the first tenant when available
+  // Automatically select the best tenant when available (prioritize Demo Company Global)
   useEffect(() => {
     if (tenants.length > 0 && !selectedTenant) {
-      console.log('🔧 Auto-selecting first tenant:', tenants[0]);
-      selectTenant(tenants[0].id);
+      // Try to find "Demo Company (Global)" first
+      const demoCompany = tenants.find(tenant => 
+        tenant.name === "Demo Company (Global)" || 
+        tenant.organizationName === "Demo Company (Global)" ||
+        tenant.tenantName === "Demo Company (Global)"
+      );
+      
+      if (demoCompany) {
+        console.log('🔧 Auto-selecting Demo Company (Global):', demoCompany);
+        selectTenant(demoCompany.id);
+      } else {
+        console.log('🔧 Auto-selecting first tenant:', tenants[0]);
+        selectTenant(tenants[0].id);
+      }
     }
   }, [tenants, selectedTenant, selectTenant]);
 
@@ -246,18 +258,42 @@ const XeroIntegration: React.FC = () => {
                   onChange={(e) => handleTenantChange(e.target.value)}
                   className="w-full p-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                 >
-                  {tenants.map((tenant) => (
-                    <option key={tenant.id} value={tenant.id}>
-                      {tenant.name || tenant.organizationName || tenant.tenantName || `Organization ${tenant.id}`}
-                    </option>
-                  ))}
+                  {tenants.map((tenant) => {
+                    const isDemoCompany = tenant.name === "Demo Company (Global)" || 
+                                        tenant.organizationName === "Demo Company (Global)" ||
+                                        tenant.tenantName === "Demo Company (Global)";
+                    const displayName = tenant.name || tenant.organizationName || tenant.tenantName || `Organization ${tenant.id}`;
+                    
+                    return (
+                      <option key={tenant.id} value={tenant.id}>
+                        {isDemoCompany ? `✅ ${displayName} (Has Data)` : `❌ ${displayName} (No Data)`}
+                      </option>
+                    );
+                  })}
                 </select>
                 
                 {selectedTenant && (
                   <div className="mt-3 p-3 bg-white border border-blue-200 rounded-lg">
-                    <p className="text-sm text-blue-800">
-                      <strong>Selected:</strong> {selectedTenant.name || selectedTenant.organizationName || selectedTenant.tenantName || `Organization ${selectedTenant.id}`}
-                    </p>
+                    {(() => {
+                      const isDemoCompany = selectedTenant.name === "Demo Company (Global)" || 
+                                          selectedTenant.organizationName === "Demo Company (Global)" ||
+                                          selectedTenant.tenantName === "Demo Company (Global)";
+                      const displayName = selectedTenant.name || selectedTenant.organizationName || selectedTenant.tenantName || `Organization ${selectedTenant.id}`;
+                      
+                      return (
+                        <div className="text-sm">
+                          <p className="text-blue-800">
+                            <strong>Selected:</strong> {displayName}
+                          </p>
+                          <p className={`mt-1 ${isDemoCompany ? 'text-green-600' : 'text-red-600'}`}>
+                            {isDemoCompany ? '✅ Has Data (70 invoices, 50 contacts, etc.)' : '❌ No Data (Empty organization)'}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Tenant ID: {selectedTenant.id}
+                          </p>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>

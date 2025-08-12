@@ -17,22 +17,33 @@ const userNavLinks = [
   { name: 'AI Assistant', to: '/ai-chat', icon: (
     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
   ) },
-  { name: 'AI Tools', to: '/ai-tools', icon: (
-    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
-  ) },
   { name: 'Xero Integration', to: '/integrations/xero', icon: (
     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
   ), companyOnly: true },
 ];
 
 const adminNavLinks = [
-  { name: 'Company List', to: '/admin/companies' },
-  { name: 'Send Notification', to: '/admin/notify' },
-  { name: 'Settings', to: '/admin/settings' },
-  { name: 'Compliance Deadlines', to: '/admin/cron-settings' },
-  { name: 'Cronjob Settings', to: '/admin/cronjob-settings' },
-  { name: 'AI Assistant', to: '/ai-chat' },
-  { name: 'AI Tools', to: '/ai-tools' },
+  { name: 'Company List', to: '/admin/companies', icon: (
+    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+  ) },
+  { name: 'Send Notification', to: '/admin/notify', icon: (
+    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-5 5v-5zM4 19h6a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+  ) },
+  { name: 'Settings', to: '/admin/settings', icon: (
+    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+  ) },
+  { name: 'Compliance Deadlines', to: '/admin/cron-settings', icon: (
+    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+  ) },
+  { name: 'Cronjob Settings', to: '/admin/cronjob-settings', icon: (
+    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+  ) },
+  { name: 'AI Assistant', to: '/ai-chat', icon: (
+    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+  ) },
+  { name: 'AI Tools', to: '/ai-tools', superAdminOnly: true, icon: (
+    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
+  ) },
   // Xero integration removed from admin nav - only for companies
 ];
 
@@ -44,8 +55,9 @@ function getNavLinksForRole(company: any) {
     return [];
   }
 
-  const isSuperAdmin = company.superadmin === true;
-  console.log('Is super admin:', isSuperAdmin);
+  // More robust super admin detection
+  const isSuperAdmin = company.superadmin === true || company.role === 'superadmin' || company.role === 'admin';
+  console.log('Is super admin:', isSuperAdmin, 'superadmin:', company.superadmin, 'role:', company.role);
 
   if (isSuperAdmin) {
     console.log('Returning adminNavLinks for superadmin');
@@ -76,6 +88,7 @@ const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
   console.log('SidebarLayout: userRole:', userRole);
 
   const navLinks = getNavLinksForRole(company);
+  console.log('SidebarLayout: navLinks:', navLinks);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -103,8 +116,17 @@ const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
           </div>
           <nav className="flex-1 px-4 py-4 space-y-1">
             {navLinks.map(link => {
+              console.log('Rendering link:', link.name, 'superAdminOnly:', 'superAdminOnly' in link ? link.superAdminOnly : false, 'userRole.isSuperAdmin:', userRole.isSuperAdmin);
+              
               // Skip company-only links for super admins
               if ('companyOnly' in link && link.companyOnly && userRole.isSuperAdmin) {
+                console.log('Skipping company-only link for super admin:', link.name);
+                return null;
+              }
+              
+              // Skip super admin only links for non-super admins
+              if ('superAdminOnly' in link && link.superAdminOnly && !userRole.isSuperAdmin) {
+                console.log('Skipping super admin only link for non-super admin:', link.name);
                 return null;
               }
               
@@ -162,6 +184,11 @@ const SidebarLayout: React.FC<SidebarLayoutProps> = ({ children }) => {
                 {navLinks.map(link => {
                   // Skip company-only links for super admins in dropdown too
                   if ('companyOnly' in link && link.companyOnly && userRole.isSuperAdmin) {
+                    return null;
+                  }
+                  
+                  // Skip super admin only links for non-super admins in dropdown too
+                  if ('superAdminOnly' in link && link.superAdminOnly && !userRole.isSuperAdmin) {
                     return null;
                   }
                   

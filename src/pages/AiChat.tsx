@@ -14,7 +14,7 @@ interface Message {
 const AiChat: React.FC = () => {
   console.log('AiChat component rendered');
   
-  const { user } = useAuth();
+  const { company } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -36,7 +36,9 @@ const AiChat: React.FC = () => {
       try {
         setIsLoadingKey(true);
         const settings = await companyService.getOpenAiSettings();
-        setOpenAiKey(settings.isActive ? 'configured' : ''); // Just check if AI is active
+        // Check if API key exists and is valid
+        setOpenAiKey(settings.apiKey ? 'configured' : '');
+        console.log('AI Configuration status:', settings.apiKey ? 'Configured' : 'Not configured');
       } catch (error) {
         console.error('Failed to check AI configuration:', error);
         setOpenAiKey(''); // No configuration available
@@ -55,7 +57,7 @@ const AiChat: React.FC = () => {
     }
 
     if (!openAiKey.trim()) {
-      toast.error('AI configuration not available. Please contact your administrator.');
+      toast.error('Global AI configuration not available. Please contact your super admin to configure the OpenAI API key.');
       return;
     }
 
@@ -151,12 +153,12 @@ const AiChat: React.FC = () => {
               ) : openAiKey ? (
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-sm text-gray-600">AI Assistant ready</span>
+                  <span className="text-sm text-gray-600">Global AI Assistant ready</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                  <span className="text-sm text-red-600">AI configuration not available</span>
+                  <span className="text-sm text-red-600">Global AI configuration not available</span>
                 </div>
               )}
             </div>

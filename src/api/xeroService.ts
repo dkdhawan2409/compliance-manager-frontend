@@ -164,35 +164,35 @@ export const getXeroData = async (
   // Map resource types to specific backend endpoints that handle authentication internally
   switch (resourceType) {
     case 'invoices':
-      return await getAllInvoices();
+      return await getAllInvoices(1, 50, tenantId);
     case 'contacts':
-      return await getAllContacts();
+      return await getAllContacts(1, 50, tenantId);
     case 'bank-transactions':
-      return await getAllBankTransactions();
+      return await getAllBankTransactions(1, 50, tenantId);
     case 'accounts':
-      return await getAllAccounts();
+      return await getAllAccounts(tenantId);
     case 'items':
-      return await getAllItems();
+      return await getAllItems(tenantId);
     case 'tax-rates':
-      return await getAllTaxRates();
+      return await getAllTaxRates(tenantId);
     case 'tracking-categories':
-      return await getAllTrackingCategories();
+      return await getAllTrackingCategories(tenantId);
     case 'organization':
-      return await getOrganizationDetails();
+      return await getOrganizationDetails(tenantId);
     case 'purchase-orders':
-      return await getAllPurchaseOrders();
+      return await getAllPurchaseOrders(1, 50, tenantId);
     case 'receipts':
-      return await getAllReceipts();
+      return await getAllReceipts(1, 50, tenantId);
     case 'credit-notes':
-      return await getAllCreditNotes();
+      return await getAllCreditNotes(1, 50, tenantId);
     case 'manual-journals':
-      return await getAllManualJournals();
+      return await getAllManualJournals(1, 50, tenantId);
     case 'prepayments':
-      return await getAllPrepayments();
+      return await getAllPrepayments(1, 50, tenantId);
     case 'overpayments':
-      return await getAllOverpayments();
+      return await getAllOverpayments(1, 50, tenantId);
     case 'quotes':
-      return await getAllQuotes();
+      return await getAllQuotes(1, 50, tenantId);
     case 'reports':
       return await getReports('BalanceSheet'); // Default to Balance Sheet report
     default:
@@ -262,38 +262,45 @@ export const getOrganizationDetails = async (tenantId?: string): Promise<XeroDat
 };
 
 // Additional Xero API endpoints
-export const getAllPurchaseOrders = async (page = 1, pageSize = 50): Promise<XeroDataResponse<any>> => {
-  const response = await apiClient.get(`/xero/all-purchase-orders?page=${page}&pageSize=${pageSize}`);
+export const getAllPurchaseOrders = async (page = 1, pageSize = 50, tenantId?: string): Promise<XeroDataResponse<any>> => {
+  const url = tenantId ? `/xero/all-purchase-orders?page=${page}&pageSize=${pageSize}&tenantId=${tenantId}` : `/xero/all-purchase-orders?page=${page}&pageSize=${pageSize}`;
+  const response = await apiClient.get(url);
   return response.data;
 };
 
-export const getAllReceipts = async (page = 1, pageSize = 50): Promise<XeroDataResponse<any>> => {
-  const response = await apiClient.get(`/xero/all-receipts?page=${page}&pageSize=${pageSize}`);
+export const getAllReceipts = async (page = 1, pageSize = 50, tenantId?: string): Promise<XeroDataResponse<any>> => {
+  const url = tenantId ? `/xero/all-receipts?page=${page}&pageSize=${pageSize}&tenantId=${tenantId}` : `/xero/all-receipts?page=${page}&pageSize=${pageSize}`;
+  const response = await apiClient.get(url);
   return response.data;
 };
 
-export const getAllCreditNotes = async (page = 1, pageSize = 50): Promise<XeroDataResponse<any>> => {
-  const response = await apiClient.get(`/xero/all-credit-notes?page=${page}&pageSize=${pageSize}`);
+export const getAllCreditNotes = async (page = 1, pageSize = 50, tenantId?: string): Promise<XeroDataResponse<any>> => {
+  const url = tenantId ? `/xero/all-credit-notes?page=${page}&pageSize=${pageSize}&tenantId=${tenantId}` : `/xero/all-credit-notes?page=${page}&pageSize=${pageSize}`;
+  const response = await apiClient.get(url);
   return response.data;
 };
 
-export const getAllManualJournals = async (page = 1, pageSize = 50): Promise<XeroDataResponse<any>> => {
-  const response = await apiClient.get(`/xero/all-manual-journals?page=${page}&pageSize=${pageSize}`);
+export const getAllManualJournals = async (page = 1, pageSize = 50, tenantId?: string): Promise<XeroDataResponse<any>> => {
+  const url = tenantId ? `/xero/all-manual-journals?page=${page}&pageSize=${pageSize}&tenantId=${tenantId}` : `/xero/all-manual-journals?page=${page}&pageSize=${pageSize}`;
+  const response = await apiClient.get(url);
   return response.data;
 };
 
-export const getAllPrepayments = async (page = 1, pageSize = 50): Promise<XeroDataResponse<any>> => {
-  const response = await apiClient.get(`/xero/all-prepayments?page=${page}&pageSize=${pageSize}`);
+export const getAllPrepayments = async (page = 1, pageSize = 50, tenantId?: string): Promise<XeroDataResponse<any>> => {
+  const url = tenantId ? `/xero/all-prepayments?page=${page}&pageSize=${pageSize}&tenantId=${tenantId}` : `/xero/all-prepayments?page=${page}&pageSize=${pageSize}`;
+  const response = await apiClient.get(url);
   return response.data;
 };
 
-export const getAllOverpayments = async (page = 1, pageSize = 50): Promise<XeroDataResponse<any>> => {
-  const response = await apiClient.get(`/xero/all-overpayments?page=${page}&pageSize=${pageSize}`);
+export const getAllOverpayments = async (page = 1, pageSize = 50, tenantId?: string): Promise<XeroDataResponse<any>> => {
+  const url = tenantId ? `/xero/all-overpayments?page=${page}&pageSize=${pageSize}&tenantId=${tenantId}` : `/xero/all-overpayments?page=${page}&pageSize=${pageSize}`;
+  const response = await apiClient.get(url);
   return response.data;
 };
 
-export const getAllQuotes = async (page = 1, pageSize = 50): Promise<XeroDataResponse<any>> => {
-  const response = await apiClient.get(`/xero/all-quotes?page=${page}&pageSize=${pageSize}`);
+export const getAllQuotes = async (page = 1, pageSize = 50, tenantId?: string): Promise<XeroDataResponse<any>> => {
+  const url = tenantId ? `/xero/all-quotes?page=${page}&pageSize=${pageSize}&tenantId=${tenantId}` : `/xero/all-quotes?page=${page}&pageSize=${pageSize}`;
+  const response = await apiClient.get(url);
   return response.data;
 };
 

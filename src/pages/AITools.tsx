@@ -1,17 +1,47 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Navigate } from 'react-router-dom';
 import AppNavbar from '../components/AppNavbar';
 import SidebarLayout from '../components/SidebarLayout';
-import OpenAISettings from '../components/OpenAISettings';
+import GlobalOpenAISettings from '../components/GlobalOpenAISettings';
 import ComplianceTextGenerator from '../components/ComplianceTextGenerator';
 import TemplateGenerator from '../components/TemplateGenerator';
 import ContentAnalyzer from '../components/ContentAnalyzer';
 import { OpenAISettingsData } from '../api/openaiService';
+import { useAuth } from '../contexts/AuthContext';
+import { useUserRole, requireAIToolsAccess } from '../utils/roleUtils';
+import { companyService } from '../api/companyService';
 
 const AITools: React.FC = () => {
   console.log('AITools component rendered');
   
+  const { company } = useAuth();
+  const userRole = useUserRole(company);
+  
+  // Additional protection - redirect if not super admin
+  if (!requireAIToolsAccess(company)) {
+    console.log('Access denied to AI Tools: User does not have access');
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // Load global OpenAI settings on component mount
+  useEffect(() => {
+    loadGlobalOpenAISettings();
+  }, []);
+
+  const loadGlobalOpenAISettings = async () => {
+    try {
+      const settings = await companyService.getOpenAiSettings();
+      setGlobalOpenAISettings(settings);
+      console.log('Global OpenAI settings loaded:', settings);
+    } catch (error) {
+      console.error('Failed to load global OpenAI settings:', error);
+      setGlobalOpenAISettings(null);
+    }
+  };
+  
   const [activeTab, setActiveTab] = useState('settings');
   const [openAISettings, setOpenAISettings] = useState<OpenAISettingsData | null>(null);
+  const [globalOpenAISettings, setGlobalOpenAISettings] = useState<any>(null);
   const [generatedText, setGeneratedText] = useState('');
   const [generatedTemplate, setGeneratedTemplate] = useState('');
   const [templateType, setTemplateType] = useState('');
@@ -26,6 +56,8 @@ const AITools: React.FC = () => {
 
   const handleSettingsChange = (settings: OpenAISettingsData | null) => {
     setOpenAISettings(settings);
+    // Reload global settings after any changes
+    loadGlobalOpenAISettings();
   };
 
   const handleTextGenerated = (text: string) => {
@@ -47,7 +79,7 @@ const AITools: React.FC = () => {
     switch (activeTab) {
       case 'settings':
         return (
-          <OpenAISettings onSettingsChange={handleSettingsChange} />
+          <GlobalOpenAISettings onSettingsChange={handleSettingsChange} />
         );
       case 'generator':
         return (
@@ -93,28 +125,33 @@ const AITools: React.FC = () => {
           </div>
 
           {/* Status Banner */}
-          {!openAISettings && (
+          {!globalOpenAISettings?.apiKey && (
             <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
               <div className="flex items-center gap-2">
                 <span className="text-yellow-600">⚠️</span>
                 <div>
-                  <h3 className="text-sm font-medium text-yellow-800">OpenAI Not Configured</h3>
+                  <h3 className="text-sm font-medium text-yellow-800">Global OpenAI Not Configured</h3>
                   <p className="text-sm text-yellow-700">
-                    Please configure your OpenAI API key in the Settings tab to use AI features.
+                    Please configure the global OpenAI API key in the Settings tab. This key will be used by all companies for AI features.
                   </p>
                 </div>
               </div>
             </div>
           )}
 
-          {openAISettings && (
+          {globalOpenAISettings?.apiKey && (
             <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
               <div className="flex items-center gap-2">
                 <span className="text-green-600">✅</span>
                 <div>
-                  <h3 className="text-sm font-medium text-green-800">OpenAI Configured</h3>
+                  <h3 className="text-sm font-medium text-green-800">Global OpenAI Configured</h3>
                   <p className="text-sm text-green-700">
-                    AI features are ready to use. Your API key is securely stored.
+                    Global AI features are ready to use. API key is securely stored and will be used by all companies.
+                  </p>
+                  <p className="text-xs text-green-600 mt-1">
+                    Model: {globalOpenAISettings.model || 'gpt-3.5-turbo'} | 
+                    Max Tokens: {globalOpenAISettings.maxTokens || 1000} | 
+                    Temperature: {globalOpenAISettings.temperature || 0.7}
                   </p>
                 </div>
               </div>
@@ -143,7 +180,7 @@ const AITools: React.FC = () => {
           </div>
 
           {/* Quick Actions */}
-          {openAISettings && (
+          {globalOpenAISettings?.apiKey && (
             <div className="mt-8 p-6 bg-gray-50 rounded-lg">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

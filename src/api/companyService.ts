@@ -296,7 +296,7 @@ export const companyService = {
   },
 
   async testOpenAiApiKey(apiKey: string): Promise<any> {
-    const response = await apiClient.post<{ data: any }>('/api/openai-admin/test-api-key', { apiKey });
+    const response = await apiClient.post<{ data: any }>('/api/openai-admin/test-key', { apiKey });
     return response.data.data;
   },
 

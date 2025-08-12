@@ -76,7 +76,7 @@ const XeroDashboard: React.FC<XeroDashboardProps> = ({ className }) => {
     }
   }, [isConnected, selectedTenant, isAuthenticated, company]);
 
-  const loadDashboardData = async () => {
+    const loadDashboardData = async () => {
     try {
       setLoading(true);
       
@@ -105,48 +105,73 @@ const XeroDashboard: React.FC<XeroDashboardProps> = ({ className }) => {
         setFinancialSummary(financialResponse.data);
       }
 
-      // Load detailed data
+      // Load detailed data sequentially to avoid rate limiting
       console.log('📊 Loading detailed data...');
       
-      const [
-        invoicesResponse,
-        contactsResponse,
-        transactionsResponse,
-        accountsResponse,
-        itemsResponse,
-        taxRatesResponse,
-        trackingResponse,
-        orgResponse
-      ] = await Promise.all([
-        getAllInvoices(1, 100, selectedTenant?.id),
-        getAllContacts(1, 100, selectedTenant?.id),
-        getAllBankTransactions(1, 100, selectedTenant?.id),
-        getAllAccounts(selectedTenant?.id),
-        getAllItems(selectedTenant?.id),
-        getAllTaxRates(selectedTenant?.id),
-        getAllTrackingCategories(selectedTenant?.id),
-        getOrganizationDetails(selectedTenant?.id)
-      ]);
-
+      // Helper function to add delay between requests
+      const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+      
+      // Load essential data first (invoices and contacts)
+      console.log('📊 Loading invoices...');
+      const invoicesResponse = await getAllInvoices(1, 50, selectedTenant?.id);
+      await delay(1000); // 1 second delay
+      
+      console.log('📊 Loading contacts...');
+      const contactsResponse = await getAllContacts(1, 50, selectedTenant?.id);
+      await delay(1000); // 1 second delay
+      
+      console.log('📊 Loading transactions...');
+      const transactionsResponse = await getAllBankTransactions(1, 50, selectedTenant?.id);
+      await delay(1000); // 1 second delay
+      
+      console.log('📊 Loading accounts...');
+      const accountsResponse = await getAllAccounts(selectedTenant?.id);
+      await delay(1000); // 1 second delay
+      
+      console.log('📊 Loading organization details...');
+      const orgResponse = await getOrganizationDetails(selectedTenant?.id);
+      
       console.log('📊 Detailed data responses:', {
         invoices: invoicesResponse.success,
         contacts: contactsResponse.success,
         transactions: transactionsResponse.success,
         accounts: accountsResponse.success,
-        items: itemsResponse.success,
-        taxRates: taxRatesResponse.success,
-        tracking: trackingResponse.success,
         organization: orgResponse.success
       });
 
-      if (invoicesResponse.success) setAllInvoices(invoicesResponse.data.invoices || []);
-      if (contactsResponse.success) setAllContacts(contactsResponse.data.contacts || []);
-      if (transactionsResponse.success) setAllTransactions(transactionsResponse.data.bankTransactions || []);
-      if (accountsResponse.success) setAllAccounts(accountsResponse.data.accounts || []);
-      if (itemsResponse.success) setAllItems(itemsResponse.data.items || []);
-      if (taxRatesResponse.success) setAllTaxRates(taxRatesResponse.data.taxRates || []);
-      if (trackingResponse.success) setAllTrackingCategories(trackingResponse.data.trackingCategories || []);
-      if (orgResponse.success) setOrganization(orgResponse.data.organizations?.[0] || null);
+      if (invoicesResponse.success) {
+        const invoices = invoicesResponse.data.Invoices || invoicesResponse.data.invoices || [];
+        setAllInvoices(invoices);
+        console.log('📊 Loaded invoices:', invoices.length, 'First invoice:', invoices[0]);
+      }
+      if (contactsResponse.success) {
+        const contacts = contactsResponse.data.Contacts || contactsResponse.data.contacts || [];
+        setAllContacts(contacts);
+        console.log('📊 Loaded contacts:', contacts.length, 'First contact:', contacts[0]);
+      }
+      if (transactionsResponse.success) setAllTransactions(transactionsResponse.data.BankTransactions || transactionsResponse.data.bankTransactions || []);
+      if (accountsResponse.success) setAllAccounts(accountsResponse.data.Accounts || accountsResponse.data.accounts || []);
+      if (orgResponse.success) setOrganization(orgResponse.data.Organizations?.[0] || orgResponse.data.organizations?.[0] || null);
+      
+      // Load additional data only if needed (with more delays)
+      console.log('📊 Loading additional data...');
+      await delay(2000); // 2 second delay before additional requests
+      
+      try {
+        const itemsResponse = await getAllItems(selectedTenant?.id);
+        if (itemsResponse.success) setAllItems(itemsResponse.data.Items || itemsResponse.data.items || []);
+        await delay(1000);
+        
+        const taxRatesResponse = await getAllTaxRates(selectedTenant?.id);
+        if (taxRatesResponse.success) setAllTaxRates(taxRatesResponse.data.TaxRates || taxRatesResponse.data.taxRates || []);
+        await delay(1000);
+        
+        const trackingResponse = await getAllTrackingCategories(selectedTenant?.id);
+        if (trackingResponse.success) setAllTrackingCategories(trackingResponse.data.TrackingCategories || trackingResponse.data.trackingCategories || []);
+      } catch (additionalError) {
+        console.warn('⚠️ Some additional data failed to load:', additionalError);
+        // Don't fail the entire load for non-essential data
+      }
 
       toast.success('Xero data loaded successfully!');
     } catch (error) {
@@ -365,23 +390,29 @@ const XeroDashboard: React.FC<XeroDashboardProps> = ({ className }) => {
             <div className="bg-white rounded-lg shadow-lg p-6 border">
               <h3 className="text-lg font-semibold flex items-center mb-4">
                 <FileText className="w-5 h-5 mr-2" />
-                Recent Invoices
+                Recent Invoices ({allInvoices.length} total)
               </h3>
               <div className="space-y-3">
-                {dashboardData?.recentInvoices.slice(0, 5).map((invoice: any) => (
-                  <div key={invoice.invoiceID} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div>
-                      <div className="font-medium">{invoice.contact?.name || 'Unknown Contact'}</div>
-                      <div className="text-sm text-gray-600">#{invoice.invoiceNumber}</div>
+                {allInvoices.length > 0 ? (
+                  allInvoices.slice(0, 5).map((invoice: any) => (
+                    <div key={invoice.InvoiceID || invoice.invoiceID} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div>
+                        <div className="font-medium">{invoice.Contact?.Name || invoice.contact?.name || 'Unknown Contact'}</div>
+                        <div className="text-sm text-gray-600">#{invoice.InvoiceNumber || invoice.invoiceNumber}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-medium">{formatCurrency(invoice.Total || invoice.total || 0)}</div>
+                        <span className={`inline-block px-2 py-1 text-xs rounded-full ${getStatusBadge(invoice.Status || invoice.status)}`}>
+                          {invoice.Status || invoice.status}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <div className="font-medium">{formatCurrency(invoice.total)}</div>
-                      <span className={`inline-block px-2 py-1 text-xs rounded-full ${getStatusBadge(invoice.status)}`}>
-                        {invoice.status}
-                      </span>
-                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-4 text-gray-500">
+                    No invoices found
                   </div>
-                ))}
+                )}
               </div>
             </div>
 
@@ -389,20 +420,28 @@ const XeroDashboard: React.FC<XeroDashboardProps> = ({ className }) => {
             <div className="bg-white rounded-lg shadow-lg p-6 border">
               <h3 className="text-lg font-semibold flex items-center mb-4">
                 <Users className="w-5 h-5 mr-2" />
-                Recent Contacts
+                Recent Contacts ({allContacts.length} total)
               </h3>
               <div className="space-y-3">
-                {dashboardData?.recentContacts.slice(0, 5).map((contact: any) => (
-                  <div key={contact.contactID} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div>
-                      <div className="font-medium">{contact.name}</div>
-                      <div className="text-sm text-gray-600">{contact.emailAddress}</div>
+                {allContacts.length > 0 ? (
+                  allContacts.slice(0, 5).map((contact: any) => (
+                    <div key={contact.ContactID || contact.contactID} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div>
+                        <div className="font-medium">{contact.Name || contact.name}</div>
+                        <div className="text-sm text-gray-600">{contact.EmailAddress || contact.emailAddress || 'No email'}</div>
+                      </div>
+                      <div className="text-right">
+                        <span className="inline-block px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
+                          {contact.ContactStatus || contact.contactStatus}
+                        </span>
+                      </div>
                     </div>
-                    <span className="inline-block px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
-                      {contact.contactStatus}
-                    </span>
+                  ))
+                ) : (
+                  <div className="text-center py-4 text-gray-500">
+                    No contacts found
                   </div>
-                ))}
+                )}
               </div>
             </div>
           </div>
@@ -428,14 +467,14 @@ const XeroDashboard: React.FC<XeroDashboardProps> = ({ className }) => {
                 </thead>
                 <tbody>
                   {allInvoices.map((invoice: any) => (
-                    <tr key={invoice.invoiceID} className="border-b">
-                      <td className="p-2">{invoice.invoiceNumber}</td>
-                      <td className="p-2">{invoice.contact?.name}</td>
-                      <td className="p-2">{formatDate(invoice.date)}</td>
-                      <td className="p-2">{formatCurrency(invoice.total)}</td>
+                    <tr key={invoice.InvoiceID || invoice.invoiceID} className="border-b">
+                      <td className="p-2">{invoice.InvoiceNumber || invoice.invoiceNumber}</td>
+                      <td className="p-2">{invoice.Contact?.Name || invoice.contact?.name || 'Unknown'}</td>
+                      <td className="p-2">{formatDate(invoice.Date || invoice.date)}</td>
+                      <td className="p-2">{formatCurrency(invoice.Total || invoice.total || 0)}</td>
                       <td className="p-2">
-                        <span className={`inline-block px-2 py-1 text-xs rounded-full ${getStatusBadge(invoice.status)}`}>
-                          {invoice.status}
+                        <span className={`inline-block px-2 py-1 text-xs rounded-full ${getStatusBadge(invoice.Status || invoice.status)}`}>
+                          {invoice.Status || invoice.status}
                         </span>
                       </td>
                     </tr>
@@ -465,13 +504,13 @@ const XeroDashboard: React.FC<XeroDashboardProps> = ({ className }) => {
                 </thead>
                 <tbody>
                   {allContacts.map((contact: any) => (
-                    <tr key={contact.contactID} className="border-b">
-                      <td className="p-2">{contact.name}</td>
-                      <td className="p-2">{contact.emailAddress}</td>
-                      <td className="p-2">{contact.phones?.[0]?.phoneNumber || '-'}</td>
+                    <tr key={contact.ContactID || contact.contactID} className="border-b">
+                      <td className="p-2">{contact.Name || contact.name}</td>
+                      <td className="p-2">{contact.EmailAddress || contact.emailAddress || '-'}</td>
+                      <td className="p-2">{contact.Phones?.[0]?.PhoneNumber || contact.phones?.[0]?.phoneNumber || '-'}</td>
                       <td className="p-2">
                         <span className="inline-block px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
-                          {contact.contactStatus}
+                          {contact.ContactStatus || contact.contactStatus}
                         </span>
                       </td>
                     </tr>
