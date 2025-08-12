@@ -9,31 +9,73 @@ const XeroRedirect: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const urlParams = new URLSearchParams(location.search);
-    const code = urlParams.get('code');
-    const state = urlParams.get('state');
-    const error = urlParams.get('error');
+    const handleOAuthCallback = async () => {
+      const urlParams = new URLSearchParams(location.search);
+      const code = urlParams.get('code');
+      const state = urlParams.get('state');
+      const error = urlParams.get('error');
 
-    if (error) {
-      toast.error(`Xero authorization failed: ${error}`);
-      setLoading(false);
-      return;
-    }
+      if (error) {
+        toast.error(`Xero authorization failed: ${error}`);
+        setLoading(false);
+        navigate('/integrations/xero');
+        return;
+      }
 
-    if (code && state) {
-      // FIXED: Use dynamic API URL instead of hardcoded localhost
-      const apiBaseUrl = getApiUrl();
-      const backendCallbackUrl = `${apiBaseUrl}/xero/callback?code=${code}&state=${state}`;
-      
-      console.log('Redirecting to backend callback:', backendCallbackUrl);
-      
-      // Redirect directly to backend callback
-      window.location.href = backendCallbackUrl;
-    } else {
-      toast.error('Invalid OAuth callback - missing code or state');
-      setLoading(false);
-    }
-  }, [location]);
+      if (!code || !state) {
+        toast.error('Invalid OAuth callback - missing code or state');
+        setLoading(false);
+        navigate('/integrations/xero');
+        return;
+      }
+
+      try {
+        // Make API call to backend to handle the OAuth callback
+        const apiUrl = getApiUrl();
+        const token = localStorage.getItem('token');
+        
+        if (!token) {
+          toast.error('Authentication token not found. Please log in again.');
+          setLoading(false);
+          navigate('/login');
+          return;
+        }
+
+        const response = await fetch(`${apiUrl}/xero/callback`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            code,
+            state,
+            redirect_uri: `${window.location.origin}/redirecturl`
+          })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          toast.success('Xero connection successful!');
+          console.log('Xero OAuth successful:', result);
+          navigate('/integrations/xero');
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Xero OAuth failed:', errorData);
+          toast.error(`Xero authorization failed: ${errorData.message || 'Unknown error'}`);
+          navigate('/integrations/xero');
+        }
+      } catch (error) {
+        console.error('Xero OAuth error:', error);
+        toast.error('Failed to complete Xero authorization. Please try again.');
+        navigate('/integrations/xero');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    handleOAuthCallback();
+  }, [location, navigate]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-100 to-slate-50">
