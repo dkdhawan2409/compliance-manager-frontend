@@ -130,7 +130,13 @@ export const getAllXeroSettings = async (): Promise<XeroSettings[]> => {
 
 // Get authorization URL for Xero login
 export const getXeroAuthUrl = async (): Promise<{ authUrl: string; state: string }> => {
-  const response = await apiClient.get('/xero/login');
+  // Send the current domain to the backend so it can generate the correct redirect URI
+  const currentDomain = typeof window !== 'undefined' ? window.location.origin : '';
+  const response = await apiClient.get('/xero/login', {
+    params: {
+      redirect_uri: `${currentDomain}/redirecturl`
+    }
+  });
   return response.data.data;
 };
 
@@ -140,7 +146,13 @@ export const handleXeroCallback = async (code: string, state: string): Promise<{
   tenants: XeroTenant[];
   companyId: string;
 }> => {
-  const response = await apiClient.post('/xero/callback', { code, state });
+  // Send the current domain as redirect_uri to ensure backend uses the correct URI
+  const currentDomain = typeof window !== 'undefined' ? window.location.origin : '';
+  const response = await apiClient.post('/xero/callback', { 
+    code, 
+    state,
+    redirect_uri: `${currentDomain}/redirecturl`
+  });
   return response.data.data;
 };
 
