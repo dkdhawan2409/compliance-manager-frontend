@@ -1,4 +1,5 @@
 import apiClient from './client';
+import { getForcedRedirectUri } from '../utils/envChecker';
 
 export interface XeroTokens {
   accessToken: string;
@@ -130,22 +131,14 @@ export const getAllXeroSettings = async (): Promise<XeroSettings[]> => {
 
 // Get authorization URL for Xero login
 export const getXeroAuthUrl = async (): Promise<{ authUrl: string; state: string }> => {
-  // Get the current domain with fallback to environment variable in production
-  let currentDomain: string;
+  // Use forced redirect URI to ensure correct domain
+  const redirectUri = getForcedRedirectUri();
   
-  if (import.meta.env.PROD) {
-    // In production, prioritize environment variable
-    currentDomain = import.meta.env.VITE_FRONTEND_URL || window.location.origin;
-  } else {
-    // In development, use window.location.origin
-    currentDomain = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-  }
-  
-  console.log('🔧 Generating OAuth URL with domain:', currentDomain);
+  console.log('🔧 Generating OAuth URL with forced redirect URI:', redirectUri);
   
   const response = await apiClient.get('/xero/login', {
     params: {
-      redirect_uri: `${currentDomain}/redirecturl`
+      redirect_uri: redirectUri
     }
   });
   return response.data.data;
@@ -157,23 +150,15 @@ export const handleXeroCallback = async (code: string, state: string): Promise<{
   tenants: XeroTenant[];
   companyId: string;
 }> => {
-  // Get the current domain with fallback to environment variable in production
-  let currentDomain: string;
+  // Use forced redirect URI to ensure correct domain
+  const redirectUri = getForcedRedirectUri();
   
-  if (import.meta.env.PROD) {
-    // In production, prioritize environment variable
-    currentDomain = import.meta.env.VITE_FRONTEND_URL || window.location.origin;
-  } else {
-    // In development, use window.location.origin
-    currentDomain = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-  }
-  
-  console.log('🔧 Handling OAuth callback with domain:', currentDomain);
+  console.log('🔧 Handling OAuth callback with forced redirect URI:', redirectUri);
   
   const response = await apiClient.post('/xero/callback', { 
     code, 
     state,
-    redirect_uri: `${currentDomain}/redirecturl`
+    redirect_uri: redirectUri
   });
   return response.data.data;
 };

@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+import { DOMAIN_CONFIG } from '../config/domainConfig';
+
 export const checkEnvironment = () => {
   const issues: string[] = [];
   const warnings: string[] = [];
@@ -101,6 +103,13 @@ export const getApiUrl = (): string => {
 export const getRedirectUrl = (): string => {
   return `${getCurrentDomain()}/redirecturl`;
 }; 
+
+// Force correct redirect URI for OAuth flow
+export const getForcedRedirectUri = (): string => {
+  const redirectUri = DOMAIN_CONFIG.getRedirectUri();
+  console.log('🔧 Forced redirect URI:', redirectUri);
+  return redirectUri;
+};
 
 // Production-safe environment checker
 export const checkProductionEnvironment = () => {

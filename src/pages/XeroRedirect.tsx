@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { getApiUrl } from '../utils/envChecker';
+import { getApiUrl, getForcedRedirectUri } from '../utils/envChecker';
 import toast from 'react-hot-toast';
 
 const XeroRedirect: React.FC = () => {
@@ -41,6 +41,11 @@ const XeroRedirect: React.FC = () => {
           return;
         }
 
+        // Use forced redirect URI to ensure correct domain
+        const redirectUri = getForcedRedirectUri();
+
+        console.log('🔧 Making OAuth callback with forced redirect URI:', redirectUri);
+
         const response = await fetch(`${apiUrl}/xero/callback`, {
           method: 'POST',
           headers: {
@@ -50,7 +55,7 @@ const XeroRedirect: React.FC = () => {
           body: JSON.stringify({
             code,
             state,
-            redirect_uri: `${window.location.origin}/redirecturl`
+            redirect_uri: redirectUri
           })
         });
 
