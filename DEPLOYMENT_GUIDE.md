@@ -1,84 +1,291 @@
-# Production Deployment Guide
+# 🚀 Production Deployment Guide
 
-## 🚀 Pre-Deployment Checklist
+## 📋 **Overview**
 
-### 1. Environment Variables
-Set these environment variables in your production environment:
+This guide will help you deploy the AI Compliance Management System to production with proper configuration and optimization.
+
+## 🔧 **Prerequisites**
+
+### **System Requirements**
+- **Node.js**: Version 18 or higher
+- **npm**: Version 8 or higher
+- **Web Server**: Nginx, Apache, or cloud hosting platform
+- **SSL Certificate**: For HTTPS (required for production)
+
+### **API Keys Required**
+- **OpenAI API Key**: For AI functionality
+- **Xero App Credentials**: For Xero integration (optional)
+
+## 🎯 **Quick Deployment Options**
+
+### **Option 1: Vercel (Recommended)**
+```bash
+# Install Vercel CLI
+npm install -g vercel
+
+# Deploy
+vercel --prod
+```
+
+### **Option 2: Netlify**
+```bash
+# Build the project
+npm run build
+
+# Deploy to Netlify
+# Drag and drop the 'dist' folder to Netlify
+```
+
+### **Option 3: Traditional Server**
+```bash
+# Build the project
+npm run build
+
+# Copy dist folder to web server
+sudo cp -r dist/* /var/www/html/
+```
+
+## ⚙️ **Environment Configuration**
+
+### **Required Environment Variables**
+
+Create a `.env` file in your project root or set these in your hosting platform:
 
 ```bash
-# REQUIRED: Backend API URL
+# API Configuration
 VITE_API_URL=https://your-backend-domain.com/api
-
-# OPTIONAL: Frontend URL (will auto-detect if not set)
 VITE_FRONTEND_URL=https://your-frontend-domain.com
 
-# Environment
-NODE_ENV=production
+# OpenAI Configuration (CRITICAL)
+VITE_OPENAI_API_KEY=sk-your-openai-api-key-here
+
+# Xero Configuration (Optional)
+VITE_XERO_CLIENT_ID=your-xero-client-id
+VITE_XERO_CLIENT_SECRET=your-xero-client-secret
 ```
 
-### 2. Build Commands
-Use the production build command:
+### **Hosting Platform Setup**
 
+#### **Vercel**
+1. Go to Project Settings → Environment Variables
+2. Add `VITE_OPENAI_API_KEY` with your OpenAI API key
+3. Add other environment variables as needed
+
+#### **Netlify**
+1. Go to Site Settings → Environment Variables
+2. Add `VITE_OPENAI_API_KEY` with your OpenAI API key
+3. Add other environment variables as needed
+
+#### **Traditional Server**
+1. Create `.env` file in project root
+2. Add environment variables
+3. Ensure file is not committed to git
+
+## 🔒 **Security Configuration**
+
+### **SSL Certificate**
+- **Required**: HTTPS for production
+- **Options**: Let's Encrypt (free), paid certificates
+- **Auto-renewal**: Set up automatic renewal
+
+### **Security Headers**
+The application includes security headers, but ensure your server adds:
+```nginx
+add_header X-Frame-Options "SAMEORIGIN";
+add_header X-XSS-Protection "1; mode=block";
+add_header X-Content-Type-Options "nosniff";
+add_header Strict-Transport-Security "max-age=31536000";
+```
+
+### **API Key Security**
+- **Never commit API keys** to version control
+- **Use environment variables** for all sensitive data
+- **Rotate keys regularly** for security
+
+## 📦 **Build Process**
+
+### **Local Build**
 ```bash
-# Clean production build
-npm run build:prod
+# Install dependencies
+npm install
 
-# Or standard build (will use production defaults)
+# Build for production
 npm run build
+
+# Preview build
+npm run preview
 ```
 
-### 3. Verify No Localhost URLs
-The build process will automatically:
-- ✅ Use production API URLs
-- ✅ Auto-detect frontend domain
-- ✅ Throw errors if localhost URLs are found in production
-- ✅ Use dynamic OAuth redirect URLs
+### **Build Output**
+- **Location**: `dist/` folder
+- **Size**: ~1.3MB (gzipped)
+- **Files**: HTML, CSS, JS, assets
 
-### 4. Xero App Configuration
-Update your Xero app in the developer portal:
-- Redirect URI: `https://your-domain.com/redirecturl`
-- Remove any localhost redirect URIs
+### **Build Optimization**
+- **Code splitting**: Automatic
+- **Tree shaking**: Enabled
+- **Minification**: Enabled
+- **Gzip compression**: Enabled
 
-### 5. Deployment Steps
+## 🌐 **Domain Configuration**
 
-1. **Set Environment Variables** in your hosting platform
-2. **Run Production Build**: `npm run build:prod`
-3. **Deploy** the `dist/` folder
-4. **Verify** OAuth redirects work with your domain
+### **Custom Domain Setup**
+1. **DNS Configuration**: Point domain to hosting provider
+2. **SSL Certificate**: Install SSL certificate
+3. **Redirects**: Set up www to non-www redirects
 
-### 6. Verification Commands
+### **Subdomain Setup**
+- **app.yourdomain.com**: Main application
+- **api.yourdomain.com**: Backend API (if separate)
 
+## 🔄 **Deployment Process**
+
+### **Step 1: Prepare Environment**
 ```bash
-# Check for any remaining localhost references
-grep -r "localhost" dist/
+# Clone repository
+git clone <your-repo>
+cd compliance-management-system/frontend
 
-# Should return no results for production builds
+# Install dependencies
+npm install
 ```
 
-### 7. Common Issues
+### **Step 2: Configure Environment**
+```bash
+# Create environment file
+cp env.production.example .env
 
-❌ **Error**: "Production build cannot contain localhost URLs"
-- **Solution**: Set `VITE_API_URL` environment variable
+# Edit environment variables
+nano .env
+```
 
-❌ **Error**: OAuth redirects to localhost
-- **Solution**: Update Xero app redirect URI to your production domain
+### **Step 3: Build and Deploy**
+```bash
+# Build for production
+npm run build
 
-❌ **Error**: API calls fail
-- **Solution**: Ensure `VITE_API_URL` points to your production backend
+# Deploy (choose your method)
+# - Upload dist/ folder to hosting
+# - Use hosting platform CLI
+# - Use CI/CD pipeline
+```
 
-## 🔧 Development vs Production
+### **Step 4: Verify Deployment**
+1. **Check website**: Visit your domain
+2. **Test AI chat**: Verify OpenAI integration works
+3. **Check console**: No errors in browser console
+4. **Test features**: All functionality working
 
-| Feature | Development | Production |
-|---------|-------------|------------|
-| API URL | `http://localhost:3333/api` | `https://your-backend.com/api` |
-| Frontend | `http://localhost:3000` | `https://your-domain.com` |
-| OAuth Redirect | `http://localhost:3000/redirecturl` | `https://your-domain.com/redirecturl` |
-| Build Command | `npm run dev` | `npm run build:prod` |
+## 🚨 **Troubleshooting**
 
-## 🛡️ Safety Features
+### **Common Issues**
 
-The application includes automatic safety checks:
-- ✅ Production builds cannot contain localhost URLs
-- ✅ Environment variables are validated
-- ✅ OAuth redirects use current domain
-- ✅ API URLs are environment-aware
+#### **"Global AI configuration not available"**
+**Solution**: Set `VITE_OPENAI_API_KEY` environment variable
+```bash
+# Check if environment variable is set
+echo $VITE_OPENAI_API_KEY
+
+# Set environment variable
+export VITE_OPENAI_API_KEY=sk-your-key-here
+```
+
+#### **Build Failures**
+**Solution**: Check Node.js version and dependencies
+```bash
+# Check Node.js version
+node --version
+
+# Clear cache and reinstall
+rm -rf node_modules package-lock.json
+npm install
+```
+
+#### **API Connection Issues**
+**Solution**: Verify backend URL and CORS settings
+```bash
+# Check API URL in environment
+echo $VITE_API_URL
+
+# Test API endpoint
+curl https://your-backend-domain.com/api/health
+```
+
+#### **Xero Integration Issues**
+**Solution**: Verify Xero app configuration
+1. Check Xero app settings
+2. Verify redirect URIs
+3. Ensure OAuth scopes are correct
+
+### **Performance Issues**
+- **Enable gzip compression**
+- **Use CDN for static assets**
+- **Optimize images**
+- **Enable browser caching**
+
+## 📊 **Monitoring and Maintenance**
+
+### **Health Checks**
+- **Website**: Regular uptime monitoring
+- **API**: Backend health monitoring
+- **SSL**: Certificate expiration monitoring
+
+### **Performance Monitoring**
+- **Page load times**: Monitor Core Web Vitals
+- **API response times**: Monitor backend performance
+- **Error rates**: Monitor application errors
+
+### **Security Monitoring**
+- **SSL certificate**: Monitor expiration
+- **API usage**: Monitor OpenAI API usage
+- **Access logs**: Monitor for suspicious activity
+
+## 🔄 **Updates and Maintenance**
+
+### **Regular Updates**
+```bash
+# Update dependencies
+npm update
+
+# Check for security vulnerabilities
+npm audit
+
+# Fix vulnerabilities
+npm audit fix
+```
+
+### **Deployment Updates**
+1. **Pull latest code**: `git pull origin main`
+2. **Update dependencies**: `npm install`
+3. **Build**: `npm run build`
+4. **Deploy**: Upload new build
+5. **Test**: Verify functionality
+
+## 📞 **Support**
+
+### **Getting Help**
+- **Documentation**: Check project README
+- **Issues**: Create GitHub issue
+- **Community**: Check project discussions
+
+### **Emergency Contacts**
+- **Hosting Provider**: Contact hosting support
+- **Domain Provider**: Contact domain registrar
+- **SSL Provider**: Contact certificate provider
+
+---
+
+## ✅ **Deployment Checklist**
+
+- [ ] Environment variables configured
+- [ ] SSL certificate installed
+- [ ] Domain configured
+- [ ] Build successful
+- [ ] Website accessible
+- [ ] AI chat working
+- [ ] Xero integration working (if applicable)
+- [ ] Error monitoring set up
+- [ ] Performance monitoring set up
+- [ ] Backup strategy in place
+
+**Your AI Compliance Management System is now ready for production! 🎉**
