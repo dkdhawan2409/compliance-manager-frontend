@@ -129,12 +129,21 @@ const AiChat: React.FC = () => {
     setIsLoading(true);
 
     try {
-      console.log('🔧 Sending chat message...');
+      console.log('🔑 AI Key Check for Chat Message:');
+      console.log('  - Environment Key Available:', AI_CONFIG.hasEnvironmentKey());
+      console.log('  - Environment Key Length:', AI_CONFIG.getApiKey() ? AI_CONFIG.getApiKey()!.length : 0);
+      console.log('  - Environment Key Preview:', AI_CONFIG.getApiKey() ? `${AI_CONFIG.getApiKey()!.substring(0, 10)}...${AI_CONFIG.getApiKey()!.substring(AI_CONFIG.getApiKey()!.length - 4)}` : 'None');
       
       // Check if we have environment variable API key
       const envApiKey = AI_CONFIG.getApiKey();
       if (envApiKey) {
         console.log('🔧 Using environment variable API key for direct OpenAI call');
+        console.log('  - Key Source: VITE_OPENAI_API_KEY environment variable');
+        console.log(envApiKey,'  - API Endpoint: https://api.openai.com/v1/chat/completions');
+        console.log('  - Model: gpt-3.5-turbo');
+        console.log('  - Max Tokens: 1000');
+        console.log('  - Temperature: 0.7');
+        
         // Make direct OpenAI API call
         const settings = AI_CONFIG.getDefaultSettings();
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -151,11 +160,22 @@ const AiChat: React.FC = () => {
           })
         });
 
+        console.log('📡 OpenAI API Response Status:', response.status);
+        console.log('📡 OpenAI API Response Headers:', Object.fromEntries(response.headers.entries()));
+
         if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ OpenAI API Error Response:', errorText);
           throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
         }
 
         const data = await response.json();
+        console.log('✅ OpenAI API Success Response:', {
+          model: data.model,
+          usage: data.usage,
+          choices: data.choices?.length || 0
+        });
+        
         const assistantMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
@@ -168,6 +188,9 @@ const AiChat: React.FC = () => {
         return;
       }
       
+      console.log('🔄 Environment key not available, falling back to backend services');
+      console.log('  - Trying openaiService first...');
+      
       // Fallback to backend services
       let response;
       try {
@@ -175,8 +198,10 @@ const AiChat: React.FC = () => {
           prompt: inputMessage
         });
         console.log('✅ OpenAI Service response:', response);
+        console.log('  - Key Source: Backend openaiService');
       } catch (openaiError) {
         console.log('⚠️ openaiService failed, trying companyService:', openaiError);
+        console.log('  - Key Source: Backend companyService');
         // Fallback to companyService
         response = await companyService.chatCompletion(inputMessage);
         console.log('✅ Company Service response:', response);
@@ -313,8 +338,19 @@ Focus on practical, actionable insights that can help improve the business's fin
       
       // Check if we have environment variable API key
       const envApiKey = AI_CONFIG.getApiKey();
+      console.log('🔑 AI Key Check for Financial Analysis:');
+      console.log('  - Environment Key Available:', !!envApiKey);
+      console.log('  - Environment Key Length:', envApiKey ? envApiKey.length : 0);
+      console.log('  - Environment Key Preview:', envApiKey ? `${envApiKey.substring(0, 10)}...${envApiKey.substring(envApiKey.length - 4)}` : 'None');
+      
       if (envApiKey) {
         console.log('🔧 Using environment variable API key for financial analysis');
+        console.log('  - Key Source: VITE_OPENAI_API_KEY environment variable');
+        console.log('  - API Endpoint: https://api.openai.com/v1/chat/completions');
+        console.log('  - Model: gpt-3.5-turbo');
+        console.log('  - Max Tokens: 2000');
+        console.log('  - Temperature: 0.3');
+        
         const settings = AI_CONFIG.getDefaultSettings();
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
@@ -330,11 +366,22 @@ Focus on practical, actionable insights that can help improve the business's fin
           })
         });
 
+        console.log('📡 OpenAI API Response Status:', response.status);
+        console.log('📡 OpenAI API Response Headers:', Object.fromEntries(response.headers.entries()));
+
         if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ OpenAI API Error Response:', errorText);
           throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
         }
 
         const data = await response.json();
+        console.log('✅ OpenAI API Success Response:', {
+          model: data.model,
+          usage: data.usage,
+          choices: data.choices?.length || 0
+        });
+        
         const content = data.choices[0].message.content;
         
         // Try to parse JSON from the response
@@ -343,10 +390,12 @@ Focus on practical, actionable insights that can help improve the business's fin
           const jsonMatch = content.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             analysis = JSON.parse(jsonMatch[0]);
+            console.log('✅ JSON Parsing Successful:', Object.keys(analysis));
           } else {
             throw new Error('No JSON found in response');
           }
         } catch (parseError) {
+          console.warn('⚠️ JSON Parsing Failed, using fallback:', parseError);
           // If JSON parsing fails, create a structured response
           analysis = {
             Cashflow_Projection: { Month_1: 0, Month_2: 0, Month_3: 0 },
@@ -369,6 +418,9 @@ Focus on practical, actionable insights that can help improve the business's fin
         return;
       }
       
+      console.log('🔄 Environment key not available, falling back to backend services');
+      console.log('  - Trying openaiService first...');
+      
       // Fallback to backend services
       let response;
       try {
@@ -376,8 +428,10 @@ Focus on practical, actionable insights that can help improve the business's fin
           prompt: analysisPrompt
         });
         console.log('✅ OpenAI Service response:', response);
+        console.log('  - Key Source: Backend openaiService');
       } catch (openaiError) {
         console.log('⚠️ openaiService failed, trying companyService:', openaiError);
+        console.log('  - Key Source: Backend companyService');
         response = await companyService.chatCompletion(analysisPrompt);
         console.log('✅ Company Service response:', response);
       }
@@ -388,10 +442,12 @@ Focus on practical, actionable insights that can help improve the business's fin
         const jsonMatch = response.response.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           analysis = JSON.parse(jsonMatch[0]);
+          console.log('✅ Backend JSON Parsing Successful:', Object.keys(analysis));
         } else {
           throw new Error('No JSON found in response');
         }
       } catch (parseError) {
+        console.warn('⚠️ Backend JSON Parsing Failed, using fallback:', parseError);
         analysis = {
           Cashflow_Projection: { Month_1: 0, Month_2: 0, Month_3: 0 },
           GST_Estimate_Next_Period: 0,
