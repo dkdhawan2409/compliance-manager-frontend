@@ -18,6 +18,12 @@ export interface TestApiKeyResponse {
   error: string | null;
 }
 
+export interface ApiKeyResponse {
+  apiKey: string;
+  isValid: boolean;
+  model?: string;
+}
+
 export interface ChatCompletionRequest {
   prompt: string;
 }
@@ -117,6 +123,11 @@ class OpenAIService {
 
   async testApiKey(apiKey: string): Promise<TestApiKeyResponse> {
     const response = await apiClient.post<TestApiKeyResponse>(`${this.baseURL}/test-api-key`, { apiKey });
+    return response.data;
+  }
+
+  async getApiKey(): Promise<ApiKeyResponse> {
+    const response = await apiClient.get<ApiKeyResponse>('/api/openai-admin/api-key');
     return response.data;
   }
 

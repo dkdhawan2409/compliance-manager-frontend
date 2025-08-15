@@ -169,25 +169,6 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
   const [lastApiCall, setLastApiCall] = useState<number>(0);
   const API_RATE_LIMIT_MS = 2000; // 2 seconds between API calls
 
-  // Load settings on mount (only once)
-  useEffect(() => {
-    if (!isInitialized) {
-      loadSettings();
-      setIsInitialized(true);
-    }
-  }, [isInitialized]);
-
-  // Persist connection status to localStorage
-  useEffect(() => {
-    if (state.isConnected) {
-      localStorage.setItem('xero_authorized', 'true');
-      localStorage.setItem('xero_auth_timestamp', Date.now().toString());
-    } else {
-      localStorage.removeItem('xero_authorized');
-      localStorage.removeItem('xero_auth_timestamp');
-    }
-  }, [state.isConnected]);
-
   const loadSettings = async () => {
     // Prevent multiple simultaneous calls
     if (state.isLoading) {
@@ -261,6 +242,27 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
+
+  // Load settings on mount (only once)
+  useEffect(() => {
+    if (!isInitialized) {
+      loadSettings();
+      setIsInitialized(true);
+    }
+  }, [isInitialized]);
+
+  // Persist connection status to localStorage
+  useEffect(() => {
+    if (state.isConnected) {
+      localStorage.setItem('xero_authorized', 'true');
+      localStorage.setItem('xero_auth_timestamp', Date.now().toString());
+    } else {
+      localStorage.removeItem('xero_authorized');
+      localStorage.removeItem('xero_auth_timestamp');
+    }
+  }, [state.isConnected]);
+
+
 
   const startAuth = async () => {
     try {
@@ -522,6 +524,8 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
   const clearError = () => {
     dispatch({ type: 'SET_ERROR', payload: null });
   };
+
+
 
   const value: XeroContextType = {
     state,
