@@ -1,0 +1,23 @@
+[
+  {"amount": 100, "frequency": 1, "location": "Sydney"},
+  {"amount": 5000, "frequency": 1, "location": "Melbourne"},
+  {"amount": 150, "frequency": 1, "location": "Brisbane"},
+  {"amount": 200, "frequency": 2, "location": "Perth"},
+  {"amount": 300, "frequency": 1, "location": "Adelaide"},
+  {"amount": 50000, "frequency": 1, "location": "Sydney"},
+  {"amount": 75, "frequency": 3, "location": "Melbourne"},
+  {"amount": 250, "frequency": 1, "location": "Brisbane"},
+  {"amount": 180, "frequency": 2, "location": "Perth"},
+  {"amount": 120, "frequency": 1, "location": "Adelaide"},
+  {"amount": 80000, "frequency": 1, "location": "Sydney"},
+  {"amount": 90, "frequency": 1, "location": "Melbourne"},
+  {"amount": 400, "frequency": 1, "location": "Brisbane"},
+  {"amount": 160, "frequency": 1, "location": "Perth"},
+  {"amount": 220, "frequency": 2, "location": "Adelaide"},
+  {"amount": 100000, "frequency": 1, "location": "Sydney"},
+  {"amount": 110, "frequency": 1, "location": "Melbourne"},
+  {"amount": 280, "frequency": 1, "location": "Brisbane"},
+  {"amount": 190, "frequency": 1, "location": "Perth"},
+  {"amount": 140, "frequency": 1, "location": "Adelaide"}
+]
+

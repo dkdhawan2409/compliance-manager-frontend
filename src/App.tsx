@@ -26,6 +26,7 @@ import XeroIntegration from './pages/XeroIntegration';
 import XeroInvoices from './pages/XeroInvoices';
 import XeroRedirect from './pages/XeroRedirect';
 import XeroCallback from './pages/XeroCallback';
+import AnomalyDetection from './pages/AnomalyDetection';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
@@ -113,6 +114,14 @@ function App() {
               <Route
                 path="/xero-callback"
                 element={<XeroCallback />}
+              />
+              <Route
+                path="/anomaly-detection"
+                element={
+                  <ProtectedRoute>
+                    <AnomalyDetection />
+                  </ProtectedRoute>
+                }
               />
               <Route
                 path="/admin/companies"
