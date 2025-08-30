@@ -21,6 +21,9 @@ const emptyTemplate: NotificationTemplateInput = {
   name: '',
   subject: '',
   body: '',
+  notificationTypes: ['BAS'],
+  smsDays: [],
+  emailDays: []
 };
 
 // Add type for notification settings days
@@ -74,10 +77,12 @@ const AdminNotify: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await companyService.getTemplates();
+      // Use the new template service for backward compatibility
+      const { templateService } = await import('../api/templateService');
+      const data = await templateService.getTemplatesLegacy();
       setTemplates(data);
-    } catch {
-      setError('Failed to fetch templates.');
+    } catch (error: any) {
+      setError(error.response?.data?.message || 'Failed to fetch templates.');
     } finally {
       setLoading(false);
     }
@@ -144,7 +149,15 @@ const AdminNotify: React.FC = () => {
   const openAdd = () => { setEditId(null); setForm(emptyTemplate); setNotifTypes({ BAS: false, FBT: false, IAS: false, FYEND: false }); setShowDrawer(true); };
   const openEdit = async (tpl: NotificationTemplate) => { 
     setEditId(tpl.id); 
-    setForm({ type: tpl.type, name: tpl.name, subject: tpl.subject, body: tpl.body }); 
+    setForm({ 
+      type: tpl.type, 
+      name: tpl.name, 
+      subject: tpl.subject, 
+      body: tpl.body,
+      notificationTypes: tpl.notificationTypes || ['BAS'],
+      smsDays: tpl.smsDays || [],
+      emailDays: tpl.emailDays || []
+    }); 
     
     // Fetch template details by ID to get notification types and days
     try {

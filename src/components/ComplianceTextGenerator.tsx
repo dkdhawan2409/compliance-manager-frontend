@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
 import openAIService, { GenerateComplianceTextRequest } from '../api/openaiService';
+import TemplateDataCollector from './TemplateDataCollector';
+import { NotificationTemplate } from '../api/templateService';
 
 interface ComplianceTextGeneratorProps {
   onTextGenerated?: (text: string) => void;
   defaultCompanyName?: string;
+  useTemplateDataCollector?: boolean;
 }
 
 const ComplianceTextGenerator: React.FC<ComplianceTextGeneratorProps> = ({ 
   onTextGenerated, 
-  defaultCompanyName = '' 
+  defaultCompanyName = '',
+  useTemplateDataCollector = false
 }) => {
   const [formData, setFormData] = useState({
     complianceType: '',
@@ -73,6 +77,32 @@ const ComplianceTextGenerator: React.FC<ComplianceTextGeneratorProps> = ({
       onTextGenerated?.(generatedText);
     }
   };
+
+  const handleTemplateDataCollected = (template: NotificationTemplate, data: any, processedTemplate: string) => {
+    onTextGenerated?.(processedTemplate);
+  };
+
+  const handleAIGenerated = (aiResponse: string) => {
+    onTextGenerated?.(aiResponse);
+  };
+
+  // If using template data collector, render that instead
+  if (useTemplateDataCollector) {
+    return (
+      <div className="compliance-generator bg-white rounded-lg border border-gray-200 p-6">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-gray-900">Template with Xero Data</h2>
+          <p className="text-gray-600 mt-2">
+            Select a template and automatically collect data from Xero to generate personalized compliance text.
+          </p>
+        </div>
+        <TemplateDataCollector
+          onDataCollected={handleTemplateDataCollected}
+          onAIGenerated={handleAIGenerated}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="compliance-generator bg-white rounded-lg border border-gray-200 p-6">

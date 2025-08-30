@@ -133,23 +133,23 @@ class OpenAIService {
 
   // OpenAI API Endpoints
   async chatCompletion(request: ChatCompletionRequest): Promise<ChatCompletionResponse> {
-    const response = await apiClient.post<ChatCompletionResponse>(`${this.baseURL}/chat`, request);
-    return response.data;
+    const response = await apiClient.post<{success: boolean, message: string, data: ChatCompletionResponse}>(`${this.baseURL}/chat`, request);
+    return response.data.data;
   }
 
   async generateComplianceText(request: GenerateComplianceTextRequest): Promise<GenerateComplianceTextResponse> {
-    const response = await apiClient.post<GenerateComplianceTextResponse>(`${this.baseURL}/generate-compliance-text`, request);
-    return response.data;
+    const response = await apiClient.post<{success: boolean, message: string, data: GenerateComplianceTextResponse}>(`${this.baseURL}/compliance-text`, request);
+    return response.data.data;
   }
 
   async generateTemplate(request: GenerateTemplateRequest): Promise<GenerateTemplateResponse> {
-    const response = await apiClient.post<GenerateTemplateResponse>(`${this.baseURL}/generate-template`, request);
-    return response.data;
+    const response = await apiClient.post<{success: boolean, message: string, data: GenerateTemplateResponse}>(`${this.baseURL}/generate-template`, request);
+    return response.data.data;
   }
 
   async analyzeContent(request: AnalyzeContentRequest): Promise<AnalyzeContentResponse> {
-    const response = await apiClient.post<AnalyzeContentResponse>(`${this.baseURL}/analyze-content`, request);
-    return response.data;
+    const response = await apiClient.post<{success: boolean, message: string, data: AnalyzeContentResponse}>(`${this.baseURL}/analyze-content`, request);
+    return response.data.data;
   }
 }
 

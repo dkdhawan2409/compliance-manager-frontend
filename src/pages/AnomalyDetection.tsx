@@ -196,7 +196,7 @@ const AnomalyDetection: React.FC = () => {
     }
 
     try {
-      await exportResults(results.results, 'anomaly_results.csv');
+      await exportResults(results.results || [], 'anomaly_results.csv');
       toast.success('Results exported successfully!');
     } catch (err) {
       toast.error('Failed to export results');
@@ -614,28 +614,28 @@ const AnomalyDetection: React.FC = () => {
           Anomaly Detection Results
         </DialogTitle>
         <DialogContent className="pt-6">
-          {results && (
+          {results ? (
             <Box>
                              <div className="grid grid-cols-4 gap-4 mb-6">
                  <Paper sx={{ p: 3, textAlign: 'center', bgcolor: 'primary.light', color: 'white' }}>
-                   <Typography variant="h4" className="font-bold">{results.totalSamples}</Typography>
+                   <Typography variant="h4" className="font-bold">{results.totalSamples || 0}</Typography>
                    <Typography variant="body2">Total Samples</Typography>
                  </Paper>
                  <Paper sx={{ p: 3, textAlign: 'center', bgcolor: 'error.light', color: 'white' }}>
                    <Typography variant="h4" className="font-bold">
-                     {results.anomaliesDetected}
+                     {results.anomaliesDetected || 0}
                    </Typography>
                    <Typography variant="body2">Anomalies Detected</Typography>
                  </Paper>
                  <Paper sx={{ p: 3, textAlign: 'center', bgcolor: 'warning.light', color: 'white' }}>
                    <Typography variant="h4" className="font-bold">
-                     {(results.summary.anomalyRate * 100).toFixed(2)}%
+                     {results.summary?.anomalyRate ? (results.summary.anomalyRate * 100).toFixed(2) : '0.00'}%
                    </Typography>
                    <Typography variant="body2">Anomaly Rate</Typography>
                  </Paper>
                  <Paper sx={{ p: 3, textAlign: 'center', bgcolor: 'info.light', color: 'white' }}>
                    <Typography variant="h4" className="font-bold">
-                     {results.summary.meanScore.toFixed(4)}
+                     {results.summary?.meanScore ? results.summary.meanScore.toFixed(4) : '0.0000'}
                    </Typography>
                    <Typography variant="body2">Mean Score</Typography>
                  </Paper>
@@ -651,10 +651,10 @@ const AnomalyDetection: React.FC = () => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {results.results.map((result: any, index: number) => (
+                    {(results.results || []).map((result: any, index: number) => (
                       <TableRow key={index} className="hover:bg-gray-50">
-                        <TableCell className="font-medium">{result.index}</TableCell>
-                        <TableCell className="font-mono">{result.score.toFixed(4)}</TableCell>
+                        <TableCell className="font-medium">{result.index || index}</TableCell>
+                        <TableCell className="font-mono">{result.score ? result.score.toFixed(4) : '0.0000'}</TableCell>
                         <TableCell>
                           <Chip
                             label={result.isAnomaly ? 'Yes' : 'No'}
@@ -668,6 +668,12 @@ const AnomalyDetection: React.FC = () => {
                   </TableBody>
                 </Table>
               </TableContainer>
+            </Box>
+          ) : (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <Typography variant="body1" color="text.secondary">
+                No results available
+              </Typography>
             </Box>
           )}
         </DialogContent>

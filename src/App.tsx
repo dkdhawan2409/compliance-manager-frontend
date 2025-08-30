@@ -27,6 +27,10 @@ import XeroInvoices from './pages/XeroInvoices';
 import XeroRedirect from './pages/XeroRedirect';
 import XeroCallback from './pages/XeroCallback';
 import AnomalyDetection from './pages/AnomalyDetection';
+import SuperAdminTemplates from './pages/SuperAdminTemplates';
+import TemplateWithXeroData from './pages/TemplateWithXeroData';
+import BASProcessing from './pages/BASProcessing';
+import FASProcessing from './pages/FASProcessing';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
@@ -169,6 +173,38 @@ function App() {
                   <ProtectedRoute>
                     <AdminNotificationSettings />
                   </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/custom-templates"
+                element={
+                  <SuperAdminRoute>
+                    <SuperAdminTemplates />
+                  </SuperAdminRoute>
+                }
+              />
+              <Route
+                path="/bas-processing"
+                element={
+                  <ProtectedRoute>
+                    <BASProcessing />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/fas-processing"
+                element={
+                  <ProtectedRoute>
+                    <FASProcessing />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/template-with-xero-data"
+                element={
+                  <SuperAdminRoute>
+                    <TemplateWithXeroData />
+                  </SuperAdminRoute>
                 }
               />
               <Route path="/" element={<Navigate to="/dashboard" replace />} />

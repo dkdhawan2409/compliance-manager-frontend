@@ -76,7 +76,7 @@ export interface NotificationTemplate {
   id: number;
   type: 'email' | 'sms';
   name: string;
-  subject: string;
+  subject?: string;
   body: string;
   createdAt: string;
   updatedAt: string;
@@ -89,8 +89,11 @@ export interface NotificationTemplate {
 export interface NotificationTemplateInput {
   type: 'email' | 'sms';
   name: string;
-  subject: string;
+  subject?: string;
   body: string;
+  notificationTypes: string[];
+  smsDays?: number[];
+  emailDays?: number[];
 }
 
 export type NotificationSettingType = 'smtp' | 'twilio' | 'sendgrid' | 'openai';
@@ -189,27 +192,33 @@ export const companyService = {
   },
 
   async createTemplate(data: NotificationTemplateInput): Promise<NotificationTemplate> {
-    const response = await apiClient.post<{ data: NotificationTemplate }>('/companies/templates', data);
-    return response.data.data;
+    // Use the new template service for backward compatibility
+    const { templateService } = await import('./templateService');
+    return templateService.createTemplate(data);
   },
 
   async getTemplates(): Promise<NotificationTemplate[]> {
-    const response = await apiClient.get<{ data: NotificationTemplate[] }>('/companies/templates');
-    return response.data.data;
+    // Use the new template service for backward compatibility
+    const { templateService } = await import('./templateService');
+    return templateService.getTemplatesLegacy();
   },
 
   async getTemplateById(id: number): Promise<NotificationTemplate> {
-    const response = await apiClient.get<{ data: NotificationTemplate }>(`/companies/templates/${id}`);
-    return response.data.data;
+    // Use the new template service for backward compatibility
+    const { templateService } = await import('./templateService');
+    return templateService.getTemplateById(id);
   },
 
   async updateTemplate(id: number, data: NotificationTemplateInput): Promise<NotificationTemplate> {
-    const response = await apiClient.put<{ data: NotificationTemplate }>(`/companies/templates/${id}`, data);
-    return response.data.data;
+    // Use the new template service for backward compatibility
+    const { templateService } = await import('./templateService');
+    return templateService.updateTemplate(id, data);
   },
 
   async deleteTemplate(id: number): Promise<void> {
-    await apiClient.delete(`/companies/templates/${id}`);
+    // Use the new template service for backward compatibility
+    const { templateService } = await import('./templateService');
+    return templateService.deleteTemplate(id);
   },
 
   async createSetting(data: NotificationSettingInput): Promise<NotificationSetting> {

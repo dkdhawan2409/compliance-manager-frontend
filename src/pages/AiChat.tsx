@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import SidebarLayout from '../components/SidebarLayout';
 import toast from 'react-hot-toast';
@@ -6,7 +7,9 @@ import openaiService from '../api/openaiService';
 import { companyService } from '../api/companyService';
 import { AI_CONFIG } from '../config/aiConfig';
 import FinancialAnalysisDisplay from '../components/FinancialAnalysisDisplay';
+import TemplateSelector from '../components/TemplateSelector';
 import { withXeroData, WithXeroDataProps } from '../hocs/withXeroData';
+import { NotificationTemplate } from '../api/templateService';
 
 interface Message {
   id: string;
@@ -37,6 +40,7 @@ const AiChat: React.FC<AiChatProps> = ({
   console.log('AiChat component rendered');
   
   const { company } = useAuth();
+  const navigate = useNavigate();
   
   // Destructure from HOC props
   const {
@@ -55,6 +59,8 @@ const AiChat: React.FC<AiChatProps> = ({
   const [analysisMode, setAnalysisMode] = useState<'chat' | 'financial'>('chat');
   const [xeroAnalysisData, setXeroAnalysisData] = useState<any>(null);
   const [isLoadingXeroData, setIsLoadingXeroData] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<NotificationTemplate | null>(null);
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -365,8 +371,213 @@ const AiChat: React.FC<AiChatProps> = ({
     }
   };
 
+  const handleTemplateSelect = (template: NotificationTemplate) => {
+    setSelectedTemplate(template);
+    setShowTemplateSelector(false);
+    
+    // Create a message with the template content
+    const templateMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: `I want to use the ${template.name} template for ${template.notificationTypes?.join(', ')} compliance. Here's the template content:\n\n${template.body}`,
+      timestamp: new Date(),
+    };
+
+    setMessages(prev => [...prev, templateMessage]);
+    
+    // Auto-send the message with template context
+    setTimeout(() => {
+      handleSendMessageWithTemplate(template);
+    }, 500);
+  };
+
+  const handleSendMessageWithTemplate = async (template: NotificationTemplate) => {
+    if (!openAiKey.trim()) {
+      toast.error('Global AI configuration not available. Please contact your super admin to configure the OpenAI API key.');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      // Create a context-aware prompt using the template
+      const templateContext = `
+Template Information:
+- Name: ${template.name}
+- Type: ${template.type}
+- Compliance Types: ${template.notificationTypes?.join(', ')}
+- Template Content: ${template.body}
+
+Please help me with the following:
+1. Explain how to use this template effectively
+2. Provide guidance on when to use this template
+3. Suggest any modifications or improvements
+4. Answer any questions about the compliance requirements for ${template.notificationTypes?.join(', ')}
+`;
+
+      console.log('🔑 AI Key Check for Template Message:');
+      
+      // Try to get API key from backend first
+      let apiKey = null;
+      let keySource = 'backend';
+      
+      try {
+        console.log('🔄 Getting API key from backend for template message...');
+        const apiKeyResponse = await openaiService.getApiKey();
+        console.log('🔍 Full API Key Response for Template Message:', apiKeyResponse);
+        
+        if (apiKeyResponse && apiKeyResponse.apiKey) {
+          apiKey = apiKeyResponse.apiKey;
+          console.log('✅ Retrieved API key from backend for template message');
+        } else {
+          console.log('❌ No API key available from backend for template message');
+        }
+      } catch (backendError) {
+        console.log('❌ Failed to get API key from backend for template message:', backendError);
+        // Fallback to environment variable if backend fails
+        apiKey = AI_CONFIG.getApiKey();
+        keySource = 'environment';
+        console.log('🔄 Falling back to environment variable for template message');
+      }
+      
+      if (apiKey) {
+        console.log('🔧 Using API key for template message');
+        
+        // Validate API key format
+        if (!apiKey.startsWith('sk-')) {
+          console.error('❌ Invalid API key format - should start with "sk-"');
+          throw new Error('Invalid API key format. Key should start with "sk-"');
+        }
+        
+        // Make direct OpenAI API call
+        const settings = AI_CONFIG.getDefaultSettings();
+        const requestBody = {
+          model: settings.model,
+          messages: [{ role: 'user', content: templateContext }],
+          max_tokens: settings.maxTokens,
+          temperature: settings.temperature
+        };
+        
+        console.log('📤 Template Message Request body:', requestBody);
+        
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify(requestBody)
+        });
+
+        console.log('📡 OpenAI API Response Status:', response.status);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ OpenAI API Error Response:', errorText);
+          throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log('✅ OpenAI API Success Response:', {
+          model: data.model,
+          usage: data.usage,
+          choices: data.choices?.length || 0
+        });
+        
+        // Extract content from OpenAI API response
+        let content = '';
+        if (data.choices && data.choices.length > 0 && data.choices[0].message) {
+          content = data.choices[0].message.content;
+        } else {
+          console.warn('⚠️ Unexpected OpenAI API response structure:', data);
+          content = 'Sorry, I received an unexpected response format. Please try again.';
+        }
+        
+        console.log('📝 OpenAI API response content:', content);
+        
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: content,
+          timestamp: new Date(),
+        };
+
+        setMessages(prev => [...prev, assistantMessage]);
+        toast.success('Template guidance received!');
+        return;
+      }
+      
+      console.log('🔄 No API key available, falling back to backend services for template message');
+      
+      // Fallback to backend services
+      let response;
+      try {
+        response = await openaiService.chatCompletion({
+          prompt: templateContext
+        });
+        console.log('✅ OpenAI Service response for template:', response);
+      } catch (openaiError) {
+        console.log('⚠️ openaiService failed, trying companyService for template:', openaiError);
+        response = await companyService.chatCompletion(templateContext);
+        console.log('✅ Company Service response for template:', response);
+      }
+      
+      // Extract the response content properly
+      let responseContent = '';
+      if (response && typeof response === 'object') {
+        if (response.data && response.data.response) {
+          responseContent = response.data.response;
+        } else if (response.response) {
+          responseContent = response.response;
+        } else if (response.content) {
+          responseContent = response.content;
+        } else if (response.message) {
+          responseContent = response.message;
+        } else if (typeof response === 'string') {
+          responseContent = response;
+        } else {
+          console.warn('⚠️ Unexpected response structure for template:', response);
+          responseContent = JSON.stringify(response);
+        }
+      } else if (typeof response === 'string') {
+        responseContent = response;
+      } else {
+        console.warn('⚠️ Invalid response for template:', response);
+        responseContent = 'Sorry, I received an invalid response. Please try again.';
+      }
+      
+      console.log('📝 Extracted response content for template:', responseContent);
+      
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: responseContent,
+        timestamp: new Date(),
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
+      toast.success('Template guidance received!');
+    } catch (error: any) {
+      console.error('❌ Template message error:', error);
+      const errorMessage = error.message || 'Failed to get response. Please try again.';
+      toast.error(errorMessage);
+      
+      const errorResponse: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: `Sorry, I encountered an error: ${errorMessage}`,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, errorResponse]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const clearChat = () => {
     setMessages([]);
+    setSelectedTemplate(null);
+    setShowTemplateSelector(false);
     toast.success('Chat cleared!');
   };
 
@@ -860,6 +1071,36 @@ Return this exact JSON structure with calculated values:
                 </button>
               </div>
               
+              {/* Template Selector Button - Only show in chat mode */}
+              {analysisMode === 'chat' && (
+                <button
+                  onClick={() => setShowTemplateSelector(!showTemplateSelector)}
+                  className={`px-3 sm:px-4 py-2 text-xs sm:text-sm rounded-lg transition-all duration-300 whitespace-nowrap border ${
+                    showTemplateSelector
+                      ? 'bg-white text-indigo-900 shadow-lg transform scale-105 border-white'
+                      : 'text-white hover:bg-white/10 border-white/20'
+                  }`}
+                >
+                  📋 Templates
+                </button>
+              )}
+              
+              {/* BAS Processing Button - Show in both modes */}
+              <button
+                onClick={() => navigate('/bas-processing')}
+                className="px-3 sm:px-4 py-2 text-xs sm:text-sm bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-lg hover:from-orange-600 hover:to-red-700 transition-all duration-300 whitespace-nowrap shadow-lg"
+              >
+                📊 BAS Processing
+              </button>
+              
+              {/* FAS Processing Button - Show in both modes */}
+              <button
+                onClick={() => navigate('/fas-processing')}
+                className="px-3 sm:px-4 py-2 text-xs sm:text-sm bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg hover:from-purple-600 hover:to-pink-700 transition-all duration-300 whitespace-nowrap shadow-lg"
+              >
+                📊 FAS Processing
+              </button>
+              
               {/* Financial Analysis Actions */}
               {analysisMode === 'financial' && (
                 <div className="flex items-center gap-2">
@@ -934,6 +1175,40 @@ Return this exact JSON structure with calculated values:
 
         {/* Chat Container */}
         <div className="flex-1 flex flex-col max-w-6xl mx-auto w-full relative z-10 px-4 sm:px-6 min-h-0">
+          {/* Template Selector Dropdown */}
+          {showTemplateSelector && analysisMode === 'chat' && (
+            <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-xl p-4 mb-4 shadow-xl">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-white font-semibold text-sm sm:text-base">Select a Template</h3>
+                <button
+                  onClick={() => setShowTemplateSelector(false)}
+                  className="text-white/70 hover:text-white transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <TemplateSelector
+                onTemplateSelect={handleTemplateSelect}
+                selectedTemplate={selectedTemplate}
+                placeholder="Choose a compliance template..."
+                className="bg-white/90 backdrop-blur-sm"
+              />
+              {selectedTemplate && (
+                <div className="mt-3 p-3 bg-white/20 rounded-lg">
+                  <div className="text-white text-sm">
+                    <strong>Selected:</strong> {selectedTemplate.name}
+                    <br />
+                    <span className="text-white/80">
+                      Type: {selectedTemplate.type} • Compliance: {selectedTemplate.notificationTypes?.join(', ')}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          
           {/* Messages */}
           <div className="flex-1 overflow-y-auto py-4 space-y-4 sm:space-y-6 min-h-0">
             {messages.length === 0 ? (
@@ -955,7 +1230,7 @@ Return this exact JSON structure with calculated values:
                 <p className="text-indigo-200 max-w-md mx-auto text-sm sm:text-lg leading-relaxed px-4">
                   {analysisMode === 'financial' 
                     ? 'Connect to Xero and click "Run Analysis" to generate comprehensive financial insights including cashflow projections, GST estimates, and actionable recommendations.'
-                    : 'Ask me anything about compliance, tax regulations, business requirements, or financial reporting. I\'m here to help you stay compliant and informed.'
+                    : 'Ask me anything about compliance, tax regulations, business requirements, or financial reporting. You can also select templates from the Templates button above to get specific guidance on compliance templates like BAS, FBT, IAS, and more.'
                   }
                 </p>
                 
