@@ -124,12 +124,9 @@ const AdminSettings: React.FC = () => {
         return;
       }
 
-      // Save the settings
+      // Save the settings - only send apiKey as backend only accepts that field
       await companyService.saveOpenAiSettings({
-        apiKey: openaiForm.config.apiKey,
-        model: openaiForm.config.model || 'gpt-3.5-turbo',
-        maxTokens: openaiForm.config.maxTokens || 1000,
-        temperature: openaiForm.config.temperature || 0.7
+        apiKey: openaiForm.config.apiKey
       });
 
       toast.success('OpenAI settings saved successfully!');

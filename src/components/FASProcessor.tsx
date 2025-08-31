@@ -498,13 +498,7 @@ A9: ${finalFASData.FAS_Fields.A9}`;
               </div>
             </div>
             
-            {/* Raw JSON */}
-            <div className="mt-6">
-              <h4 className="font-medium text-gray-900 mb-2">Raw JSON Data</h4>
-              <pre className="bg-gray-50 p-4 rounded border text-sm overflow-x-auto">
-                {JSON.stringify(finalFASData, null, 2)}
-              </pre>
-            </div>
+
           </div>
         </div>
       )}

@@ -91,10 +91,7 @@ const GlobalOpenAISettings: React.FC<GlobalOpenAISettingsProps> = ({ onSettingsC
     try {
       console.log('🔧 Saving global OpenAI settings...', { apiKey: apiKey.substring(0, 10) + '...', model, maxTokens, temperature });
       const settings = await companyService.saveOpenAiSettings({
-        apiKey,
-        model,
-        maxTokens,
-        temperature
+        apiKey
       });
       console.log('✅ Global OpenAI settings saved:', settings);
       setCurrentSettings(settings);
@@ -125,10 +122,7 @@ const GlobalOpenAISettings: React.FC<GlobalOpenAISettingsProps> = ({ onSettingsC
     setMessage('');
     try {
       const settings = await companyService.saveOpenAiSettings({
-        apiKey,
-        model,
-        maxTokens,
-        temperature
+        apiKey
       });
       setCurrentSettings(settings);
       setIsValid(true);

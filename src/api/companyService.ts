@@ -300,7 +300,8 @@ export const companyService = {
     maxTokens?: number;
     temperature?: number;
   }): Promise<any> {
-    const response = await apiClient.post<{ data: any }>('/api/openai-admin/settings', settings);
+    // Only send apiKey to backend as that's what the validation schema expects
+    const response = await apiClient.post<{ data: any }>('/api/openai-admin/settings', { apiKey: settings.apiKey });
     return response.data.data;
   },
 

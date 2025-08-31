@@ -4,12 +4,9 @@ const axios = require('axios');
 // Use environment variable for API URL or fallback to production URL
 const API_BASE_URL = process.env.API_BASE_URL || 'https://compliance-manager-backend.onrender.com/api';
 
-// Test data
+// Test data - only apiKey is accepted by backend validation
 const testSettings = {
-  apiKey: 'sk-test-key-for-testing',
-  model: 'gpt-3.5-turbo',
-  maxTokens: 1000,
-  temperature: 0.7
+  apiKey: 'sk-test-key-for-testing'
 };
 
 // You'll need to get a valid token by logging in first
