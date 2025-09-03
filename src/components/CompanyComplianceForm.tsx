@@ -23,11 +23,12 @@ export type CompanyComplianceFormValues = {
 const basOptions = ['Monthly', 'Quarterly', 'Yearly'] as const;
 const iasOptions = ['Monthly', 'Quarterly'] as const;
 
-export default function CompanyComplianceForm({ onSubmit, defaultValues, deadlines, onAutoFill }: {
+export default function CompanyComplianceForm({ onSubmit, defaultValues, deadlines, onAutoFill, loading = false }: {
   onSubmit: (data: CompanyComplianceFormValues) => void,
   defaultValues?: Partial<CompanyComplianceFormValues>,
   deadlines?: any,
   onAutoFill?: (values: CompanyComplianceFormValues, setValue: (name: keyof CompanyComplianceFormValues, value: any) => void) => void,
+  loading?: boolean,
 }) {
   const {
     register,
@@ -253,10 +254,20 @@ export default function CompanyComplianceForm({ onSubmit, defaultValues, deadlin
               <label className="block font-medium mb-1">FBT Applicable? <span className="text-red-500">*</span></label>
               <div className="flex gap-4">
                 <label>
-                  <input type="radio" value="true" {...register('fbtApplicable', { required: 'Required' })} /> Yes
+                  <input 
+                    type="radio" 
+                    value="true" 
+                    checked={Boolean(fbtApplicable)}
+                    {...register('fbtApplicable', { required: 'Required' })} 
+                  /> Yes
                 </label>
                 <label>
-                  <input type="radio" value="false" {...register('fbtApplicable', { required: 'Required' })} /> No
+                  <input 
+                    type="radio" 
+                    value="false" 
+                    checked={!Boolean(fbtApplicable)}
+                    {...register('fbtApplicable', { required: 'Required' })} 
+                  /> No
                 </label>
               </div>
               {errors.fbtApplicable && <p className="text-red-500 text-sm">{errors.fbtApplicable.message}</p>}
@@ -341,10 +352,20 @@ export default function CompanyComplianceForm({ onSubmit, defaultValues, deadlin
               <label className="block font-medium mb-1">IAS Required? <span className="text-red-500">*</span></label>
               <div className="flex gap-4">
                 <label>
-                  <input type="radio" value="true" {...register('iasRequired', { required: 'Required' })} /> Yes
+                  <input 
+                    type="radio" 
+                    value="true" 
+                    checked={Boolean(iasRequired)}
+                    {...register('iasRequired', { required: 'Required' })} 
+                  /> Yes
                 </label>
                 <label>
-                  <input type="radio" value="false" {...register('iasRequired', { required: 'Required' })} /> No
+                  <input 
+                    type="radio" 
+                    value="false" 
+                    checked={!Boolean(iasRequired)}
+                    {...register('iasRequired', { required: 'Required' })} 
+                  /> No
                 </label>
               </div>
               {errors.iasRequired && <p className="text-red-500 text-sm">{errors.iasRequired.message}</p>}
@@ -431,7 +452,13 @@ export default function CompanyComplianceForm({ onSubmit, defaultValues, deadlin
             <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 ml-auto">Next</button>
           )}
           {tabIndex === tabLabels.length - 1 && (
-            <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 ml-auto">Save</button>
+            <button 
+              type="submit" 
+              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 ml-auto disabled:opacity-50 disabled:cursor-not-allowed" 
+              disabled={loading}
+            >
+              {loading ? 'Saving...' : 'Save'}
+            </button>
           )}
         </div>
       </form>

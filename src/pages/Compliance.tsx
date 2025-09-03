@@ -37,35 +37,44 @@ const Compliance: React.FC = () => {
   const [formDefaults, setFormDefaults] = useState<CompanyComplianceFormValues | undefined>(undefined);
   const [deadlines, setDeadlines] = useState<ComplianceDeadlines | null>(null);
 
-  useEffect(() => {
-    const fetchCompliance = async () => {
-      if (!company?.id) return;
-      setLoading(true);
-      try {
-        const [companyRes, deadlinesRes] = await Promise.all([
-          companyService.getCompanyById(company.id),
-          companyService.getComplianceDeadlines(),
-        ]);
-        const compliance = companyRes.data?.compliance;
-        setDeadlines(deadlinesRes);
-        if (compliance) {
-          setFormDefaults({
-            basFrequency: compliance.basFrequency || 'Quarterly',
-            nextBasDue: compliance.nextBasDue ? new Date(compliance.nextBasDue) : null,
-            fbtApplicable: compliance.fbtApplicable ?? false,
-            nextFbtDue: compliance.nextFbtDue ? new Date(compliance.nextFbtDue) : null,
-            iasRequired: compliance.iasRequired ?? false,
-            iasFrequency: compliance.iasFrequency || 'Quarterly',
-            nextIasDue: compliance.nextIasDue ? new Date(compliance.nextIasDue) : null,
-            financialEndDate: compliance.financialYearEnd ? new Date(compliance.financialYearEnd) : null,
-          });
-        }
-      } catch (e) {
-        setError('Failed to load compliance data');
-      } finally {
-        setLoading(false);
+  // Function to fetch compliance data
+  const fetchCompliance = async () => {
+    if (!company?.id) return;
+    setLoading(true);
+    try {
+      const [companyRes, deadlinesRes] = await Promise.all([
+        companyService.getCompanyById(company.id),
+        companyService.getComplianceDeadlines(),
+      ]);
+      
+      // Fix: The API response has a nested data structure
+      const compliance = companyRes.data?.data?.compliance || companyRes.data?.compliance;
+      setDeadlines(deadlinesRes);
+      
+      if (compliance) {
+        console.log('Fetched compliance data:', compliance); // Debug log
+        setFormDefaults({
+          basFrequency: compliance.basFrequency || 'Quarterly',
+          nextBasDue: compliance.nextBasDue ? new Date(compliance.nextBasDue) : null,
+          fbtApplicable: compliance.fbtApplicable ?? false,
+          nextFbtDue: compliance.nextFbtDue ? new Date(compliance.nextFbtDue) : null,
+          iasRequired: compliance.iasRequired ?? false,
+          iasFrequency: compliance.iasFrequency || 'Quarterly',
+          nextIasDue: compliance.nextIasDue ? new Date(compliance.nextIasDue) : null,
+          financialEndDate: compliance.financialYearEnd ? new Date(compliance.financialYearEnd) : null,
+        });
+      } else {
+        console.log('No compliance data found in response:', companyRes); // Debug log
       }
-    };
+    } catch (e) {
+      console.error('Error fetching compliance:', e); // Debug log
+      setError('Failed to load compliance data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchCompliance();
   }, [company?.id]);
 
@@ -113,9 +122,58 @@ const Compliance: React.FC = () => {
     // You can add similar logic for FBT if needed
   };
 
-  const handleSubmit = (data: CompanyComplianceFormValues) => {
-    // For now, just log the data. Replace with API call as needed.
-    console.log('Compliance form submitted:', data);
+  const handleSubmit = async (data: CompanyComplianceFormValues) => {
+    if (!company?.id) {
+      toast.error('Company information not available');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Transform the data to match the backend ComplianceData interface
+      const complianceData = {
+        basFrequency: data.basFrequency as 'Monthly' | 'Quarterly' | 'Annually',
+        nextBasDue: data.nextBasDue ? 
+          (typeof data.nextBasDue === 'string' ? new Date().toISOString() : data.nextBasDue.toISOString()) : 
+          new Date().toISOString(), // Ensure we always have a valid date
+        fbtApplicable: data.fbtApplicable,
+        nextFbtDue: data.fbtApplicable && data.nextFbtDue ? 
+          (typeof data.nextFbtDue === 'string' ? new Date().toISOString() : data.nextFbtDue.toISOString()) : 
+          undefined,
+        iasRequired: data.iasRequired,
+        iasFrequency: data.iasRequired && data.iasFrequency ? (data.iasFrequency as 'Monthly' | 'Quarterly' | 'Annually') : undefined,
+        nextIasDue: data.iasRequired && data.nextIasDue ? 
+          (typeof data.nextIasDue === 'string' ? new Date().toISOString() : data.nextIasDue.toISOString()) : 
+          undefined,
+        financialYearEnd: data.financialEndDate ? 
+          (typeof data.financialEndDate === 'string' ? new Date().toISOString() : data.financialEndDate.toISOString()) : 
+          new Date(new Date().getFullYear(), 5, 30).toISOString(), // Default to June 30th of current year
+      };
+
+      const response = await companyService.updateCompliance(complianceData);
+      
+      if (response.success) {
+        toast.success('Compliance data saved successfully!');
+        // Update the company context with new compliance data
+        if (updateCompany) {
+          updateCompany({
+            ...company,
+            ...response.data
+          });
+        }
+        // Reload compliance data to ensure form shows updated values
+        await fetchCompliance();
+      } else {
+        toast.error(response.message || 'Failed to save compliance data');
+      }
+    } catch (error: any) {
+      console.error('Error saving compliance data:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to save compliance data';
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -130,6 +188,7 @@ const Compliance: React.FC = () => {
             defaultValues={formDefaults}
             deadlines={deadlines}
             onAutoFill={handleAutoFill}
+            loading={loading}
           />
         )}
         {error && <div className="text-red-500 mt-4">{error}</div>}
