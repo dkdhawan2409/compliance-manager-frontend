@@ -1,5 +1,5 @@
 import apiClient from './client';
-import { getForcedRedirectUri } from '../utils/envChecker';
+import { getForcedRedirectUri, getProductionSafeRedirectUri, getRenderRedirectUri } from '../utils/envChecker';
 import { xeroOAuthHelper } from '../utils/xeroOAuthHelper';
 
 export interface XeroTokens {
@@ -133,14 +133,20 @@ export const getAllXeroSettings = async (): Promise<XeroSettings[]> => {
 // Get authorization URL for Xero login
 export const getXeroAuthUrl = async (): Promise<{ authUrl: string; state: string }> => {
   try {
-    // Use OAuth helper to manage the flow
-    const { redirectUri, state } = xeroOAuthHelper.startOAuth();
+    // Always use Render redirect URI when deployed (no localhost)
+    const redirectUri = getRenderRedirectUri();
+    const state = xeroOAuthHelper.generateState();
     
-    console.log('🔧 Generating OAuth URL with redirect URI:', redirectUri);
+    // Store the OAuth state
+    xeroOAuthHelper.startOAuth();
+    
+    console.log('🔧 Generating OAuth URL with RENDER redirect URI:', redirectUri);
     console.log('🔧 Current window location:', window.location.origin);
     console.log('🔧 Environment:', import.meta.env.PROD ? 'Production' : 'Development');
     console.log('🔧 VITE_FRONTEND_URL:', import.meta.env.VITE_FRONTEND_URL);
     console.log('🔧 Generated state:', state);
+    console.log('🔧 Hostname:', window.location.hostname);
+    console.log('🔧 NO LOCALHOST - Using Render domain only');
     
     const response = await apiClient.get('/xero/login', {
       params: {
@@ -178,14 +184,16 @@ export const handleXeroCallback = async (code: string, state: string): Promise<{
       throw new Error('Invalid or expired OAuth state');
     }
     
-    // Get the redirect URI used in the OAuth flow
-    const redirectUri = xeroOAuthHelper.getDisplayRedirectUri();
+    // Always use Render redirect URI for callback (no localhost)
+    const redirectUri = getRenderRedirectUri();
     
-    console.log('🔧 Handling OAuth callback with redirect URI:', redirectUri);
+    console.log('🔧 Handling OAuth callback with RENDER redirect URI:', redirectUri);
     console.log('🔧 Current window location:', window.location.origin);
     console.log('🔧 Environment:', import.meta.env.PROD ? 'Production' : 'Development');
     console.log('🔧 VITE_FRONTEND_URL:', import.meta.env.VITE_FRONTEND_URL);
     console.log('🔧 Callback data:', { code: code.substring(0, 10) + '...', state });
+    console.log('🔧 Hostname:', window.location.hostname);
+    console.log('🔧 NO LOCALHOST - Using Render domain only');
     
     const response = await apiClient.post('/xero/callback', { 
       code, 

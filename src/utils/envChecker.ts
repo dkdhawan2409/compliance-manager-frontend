@@ -133,19 +133,38 @@ export const getForcedRedirectUri = (): string => {
 export const getProductionSafeRedirectUri = (): string => {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
+    const origin = window.location.origin;
     console.log('🔧 Production safe - Current hostname:', hostname);
+    console.log('🔧 Production safe - Current origin:', origin);
+    console.log('🔧 Production safe - Environment:', import.meta.env.PROD ? 'Production' : 'Development');
     
-    // If we're on a production domain, force use it
+    // If we're on a production domain (Render, Vercel, Netlify), force use it
     if (hostname.includes('onrender.com') || hostname.includes('vercel.app') || hostname.includes('netlify.app')) {
       const productionDomain = `https://${hostname}`;
       const redirectUri = `${productionDomain}/redirecturl`;
       console.log('🔧 Production safe - Using production domain:', redirectUri);
       return redirectUri;
     }
+    
+    // If we're on localhost but in production build, use Render domain
+    if (hostname.includes('localhost') && import.meta.env.PROD) {
+      const renderDomain = 'https://compliance-manager-frontend.onrender.com';
+      const redirectUri = `${renderDomain}/redirecturl`;
+      console.log('🔧 Production safe - Using Render domain for localhost in production:', redirectUri);
+      return redirectUri;
+    }
   }
   
   // Fallback to normal domain detection
   return getForcedRedirectUri();
+};
+
+// Render-specific redirect URI (always use Render domain when deployed)
+export const getRenderRedirectUri = (): string => {
+  const renderDomain = 'https://compliance-manager-frontend.onrender.com';
+  const redirectUri = `${renderDomain}/redirecturl`;
+  console.log('🔧 Render redirect URI:', redirectUri);
+  return redirectUri;
 };
 
 // Production-safe environment checker

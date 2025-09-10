@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { getApiUrl, getForcedRedirectUri } from '../utils/envChecker';
+import { getApiUrl, getRenderRedirectUri } from '../utils/envChecker';
 import toast from 'react-hot-toast';
 
 const XeroRedirect: React.FC = () => {
@@ -41,10 +41,11 @@ const XeroRedirect: React.FC = () => {
           return;
         }
 
-        // Use forced redirect URI to ensure correct domain
-        const redirectUri = getForcedRedirectUri();
+        // Use Render redirect URI (no localhost)
+        const redirectUri = getRenderRedirectUri();
 
-        console.log('🔧 Making OAuth callback with forced redirect URI:', redirectUri);
+        console.log('🔧 Making OAuth callback with RENDER redirect URI:', redirectUri);
+        console.log('🔧 NO LOCALHOST - Using Render domain only');
 
         const response = await fetch(`${apiUrl}/xero/callback`, {
           method: 'POST',

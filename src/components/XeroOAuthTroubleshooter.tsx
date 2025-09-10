@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { xeroOAuthHelper } from '../utils/xeroOAuthHelper';
-import { getCurrentDomain, getProductionSafeRedirectUri } from '../utils/envChecker';
+import { getCurrentDomain, getProductionSafeRedirectUri, getRenderRedirectUri } from '../utils/envChecker';
 import toast from 'react-hot-toast';
 
 const XeroOAuthTroubleshooter: React.FC = () => {
@@ -29,6 +29,29 @@ const XeroOAuthTroubleshooter: React.FC = () => {
       toast.success('Production-safe redirect URI applied');
     } catch (error) {
       toast.error('Failed to apply production URI');
+    }
+  };
+
+  const handleForceRenderUri = () => {
+    try {
+      const renderUri = getRenderRedirectUri();
+      setRedirectUri(renderUri);
+      toast.success('Render redirect URI applied (NO LOCALHOST)');
+    } catch (error) {
+      toast.error('Failed to apply Render URI');
+    }
+  };
+
+  const handleTestOAuthFlow = async () => {
+    try {
+      // Test the OAuth flow generation
+      const { getXeroAuthUrl } = await import('../api/xeroService');
+      const result = await getXeroAuthUrl();
+      console.log('🔧 Test OAuth flow result:', result);
+      toast.success('OAuth flow test completed - check console for details');
+    } catch (error) {
+      console.error('❌ OAuth flow test failed:', error);
+      toast.error('OAuth flow test failed - check console for details');
     }
   };
 
@@ -96,10 +119,16 @@ const XeroOAuthTroubleshooter: React.FC = () => {
                   🔄 Refresh URI
                 </button>
                 <button
+                  onClick={handleForceRenderUri}
+                  className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700 transition-colors"
+                >
+                  🚀 Force Render URI (NO LOCALHOST)
+                </button>
+                <button
                   onClick={handleForceProductionUri}
                   className="px-3 py-1 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 transition-colors"
                 >
-                  🚀 Force Production URI
+                  🔧 Force Production URI
                 </button>
               </div>
             </div>
@@ -147,12 +176,18 @@ const XeroOAuthTroubleshooter: React.FC = () => {
           {/* Actions */}
           <div className="bg-white border border-gray-200 rounded p-3">
             <h5 className="font-medium text-gray-800 mb-2">Actions</h5>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <button
                 onClick={handleResetOAuth}
                 className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700 transition-colors"
               >
                 🔄 Reset OAuth Flow
+              </button>
+              <button
+                onClick={handleTestOAuthFlow}
+                className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
+              >
+                🧪 Test OAuth Flow
               </button>
               <button
                 onClick={() => window.location.reload()}
