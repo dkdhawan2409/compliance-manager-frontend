@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useXero } from '../hooks/useXero';
-import { logEnvironmentInfo, getCurrentDomain, getApiUrl } from '../utils/envChecker';
+import { logEnvironmentInfo, getCurrentDomain, getApiUrl, getRenderRedirectUri } from '../utils/envChecker';
 import toast from 'react-hot-toast';
 
 const XeroSettings: React.FC<{ onSettingsSaved?: () => void }> = ({ onSettingsSaved }) => {
@@ -9,7 +9,7 @@ const XeroSettings: React.FC<{ onSettingsSaved?: () => void }> = ({ onSettingsSa
   const [formData, setFormData] = useState({
     clientId: '',
     clientSecret: '',
-    redirectUri: getCurrentDomain() + '/redirecturl'
+    redirectUri: getRenderRedirectUri()
   });
 
   useEffect(() => {
@@ -17,7 +17,7 @@ const XeroSettings: React.FC<{ onSettingsSaved?: () => void }> = ({ onSettingsSa
       setFormData({
         clientId: settings.clientId || '',
         clientSecret: '',
-        redirectUri: settings.redirectUri || getCurrentDomain() + '/redirecturl'
+        redirectUri: settings.redirectUri || getRenderRedirectUri()
       });
     }
   }, [settings]);
@@ -123,7 +123,7 @@ const XeroSettings: React.FC<{ onSettingsSaved?: () => void }> = ({ onSettingsSa
             value={formData.redirectUri}
             onChange={(e) => setFormData({ ...formData, redirectUri: e.target.value })}
             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            placeholder={getCurrentDomain() + '/redirecturl'}
+            placeholder={getRenderRedirectUri()}
           />
           <p className="text-xs text-gray-500 mt-1">
             Must match the redirect URI configured in your Xero app
@@ -133,11 +133,11 @@ const XeroSettings: React.FC<{ onSettingsSaved?: () => void }> = ({ onSettingsSa
             <p className="text-blue-700">Domain: {getCurrentDomain()}</p>
             <p className="text-blue-700">Environment: {import.meta.env.PROD ? 'Production' : 'Development'}</p>
             <p className="text-blue-700">VITE_FRONTEND_URL: {import.meta.env.VITE_FRONTEND_URL || 'Not set'}</p>
-            <p className="text-blue-700">Generated Redirect URI: {getCurrentDomain()}/redirecturl</p>
+            <p className="text-blue-700">Generated Redirect URI: {getRenderRedirectUri()}</p>
             <div className="mt-2">
               <button
                 onClick={() => {
-                  const redirectUri = `${getCurrentDomain()}/redirecturl`;
+                  const redirectUri = getRenderRedirectUri();
                   navigator.clipboard.writeText(redirectUri);
                   toast.success('Redirect URI copied to clipboard!');
                 }}

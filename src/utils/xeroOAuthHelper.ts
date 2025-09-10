@@ -1,5 +1,5 @@
 // Xero OAuth Helper - Comprehensive OAuth flow management
-import { getCurrentDomain, getProductionSafeRedirectUri } from './envChecker';
+import { getCurrentDomain, getRenderRedirectUri } from './envChecker';
 import toast from 'react-hot-toast';
 
 export interface OAuthState {
@@ -35,14 +35,15 @@ export class XeroOAuthHelper {
 
   // Get the correct redirect URI for current environment
   getRedirectUri(): string {
-    // Use production-safe redirect URI to prevent localhost issues
-    const redirectUri = getProductionSafeRedirectUri();
+    // Always use Render redirect URI (no localhost)
+    const redirectUri = getRenderRedirectUri();
     this.state.redirectUri = redirectUri;
     
     console.log('🔧 OAuth Helper - Generated redirect URI:', redirectUri);
     console.log('🔧 OAuth Helper - Current domain:', getCurrentDomain());
     console.log('🔧 OAuth Helper - Environment:', import.meta.env.PROD ? 'Production' : 'Development');
     console.log('🔧 OAuth Helper - Window hostname:', typeof window !== 'undefined' ? window.location.hostname : 'Not available');
+    console.log('🔧 OAuth Helper - NO LOCALHOST - Using Render domain only');
     
     return redirectUri;
   }

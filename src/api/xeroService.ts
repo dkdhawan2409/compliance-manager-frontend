@@ -147,6 +147,8 @@ export const getXeroAuthUrl = async (): Promise<{ authUrl: string; state: string
     console.log('🔧 Generated state:', state);
     console.log('🔧 Hostname:', window.location.hostname);
     console.log('🔧 NO LOCALHOST - Using Render domain only');
+    console.log('🔧 DEBUG - Redirect URI being sent to backend:', redirectUri);
+    console.log('🔧 DEBUG - Full URL:', window.location.href);
     
     const response = await apiClient.get('/xero/login', {
       params: {
@@ -156,6 +158,22 @@ export const getXeroAuthUrl = async (): Promise<{ authUrl: string; state: string
     });
     
     console.log('🔧 Backend response:', response.data);
+    console.log('🔧 DEBUG - Auth URL from backend:', response.data.data?.authUrl);
+    
+    // Check if the auth URL contains the correct redirect URI
+    if (response.data.data?.authUrl) {
+      const authUrl = response.data.data.authUrl;
+      console.log('🔧 DEBUG - Checking auth URL for redirect URI...');
+      if (authUrl.includes('localhost')) {
+        console.error('❌ ERROR: Backend returned auth URL with localhost!');
+        console.error('❌ Auth URL:', authUrl);
+      } else if (authUrl.includes('compliance-manager-frontend.onrender.com')) {
+        console.log('✅ SUCCESS: Auth URL contains correct Render domain');
+      } else {
+        console.warn('⚠️ WARNING: Auth URL does not contain expected domain');
+        console.warn('⚠️ Auth URL:', authUrl);
+      }
+    }
     
     if (!response.data.data?.authUrl) {
       throw new Error('No authorization URL received from backend');
