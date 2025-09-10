@@ -18,14 +18,22 @@ const XeroRedirect: React.FC = () => {
       if (error) {
         toast.error(`Xero authorization failed: ${error}`);
         setLoading(false);
-        navigate('/integrations/xero');
+        // Use full URL to ensure we stay on Render domain
+        const currentOrigin = window.location.origin;
+        const redirectUrl = `${currentOrigin}/integrations/xero`;
+        console.log('🔧 Redirecting to:', redirectUrl);
+        window.location.href = redirectUrl;
         return;
       }
 
       if (!code || !state) {
         toast.error('Invalid OAuth callback - missing code or state');
         setLoading(false);
-        navigate('/integrations/xero');
+        // Use full URL to ensure we stay on Render domain
+        const currentOrigin = window.location.origin;
+        const redirectUrl = `${currentOrigin}/integrations/xero`;
+        console.log('🔧 Redirecting to:', redirectUrl);
+        window.location.href = redirectUrl;
         return;
       }
 
@@ -37,7 +45,11 @@ const XeroRedirect: React.FC = () => {
         if (!token) {
           toast.error('Authentication token not found. Please log in again.');
           setLoading(false);
-          navigate('/login');
+          // Use full URL to ensure we stay on Render domain
+          const currentOrigin = window.location.origin;
+          const redirectUrl = `${currentOrigin}/login`;
+          console.log('🔧 Redirecting to:', redirectUrl);
+          window.location.href = redirectUrl;
           return;
         }
 
@@ -64,17 +76,32 @@ const XeroRedirect: React.FC = () => {
           const result = await response.json();
           toast.success('Xero connection successful!');
           console.log('Xero OAuth successful:', result);
-          navigate('/integrations/xero');
+          
+          // Use full URL to ensure we stay on Render domain
+          const currentOrigin = window.location.origin;
+          const redirectUrl = `${currentOrigin}/integrations/xero`;
+          console.log('🔧 Redirecting to:', redirectUrl);
+          window.location.href = redirectUrl;
         } else {
           const errorData = await response.json().catch(() => ({}));
           console.error('Xero OAuth failed:', errorData);
           toast.error(`Xero authorization failed: ${errorData.message || 'Unknown error'}`);
-          navigate('/integrations/xero');
+          
+          // Use full URL to ensure we stay on Render domain
+          const currentOrigin = window.location.origin;
+          const redirectUrl = `${currentOrigin}/integrations/xero`;
+          console.log('🔧 Redirecting to:', redirectUrl);
+          window.location.href = redirectUrl;
         }
       } catch (error) {
         console.error('Xero OAuth error:', error);
         toast.error('Failed to complete Xero authorization. Please try again.');
-        navigate('/integrations/xero');
+        
+        // Use full URL to ensure we stay on Render domain
+        const currentOrigin = window.location.origin;
+        const redirectUrl = `${currentOrigin}/integrations/xero`;
+        console.log('🔧 Redirecting to:', redirectUrl);
+        window.location.href = redirectUrl;
       } finally {
         setLoading(false);
       }

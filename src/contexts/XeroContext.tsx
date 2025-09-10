@@ -363,8 +363,11 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
 
       toast.success('Successfully connected to Xero!');
       
-      // Redirect to dashboard
-      window.location.href = '/integrations/xero?showDashboard=true';
+      // Redirect to dashboard using full URL to stay on Render domain
+      const currentOrigin = window.location.origin;
+      const redirectUrl = `${currentOrigin}/integrations/xero?showDashboard=true`;
+      console.log('🔧 XeroContext redirecting to:', redirectUrl);
+      window.location.href = redirectUrl;
       
     } catch (err: any) {
       console.error('❌ Callback error:', err);
