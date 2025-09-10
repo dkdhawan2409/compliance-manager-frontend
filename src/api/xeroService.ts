@@ -1,5 +1,6 @@
 import apiClient from './client';
 import { getForcedRedirectUri } from '../utils/envChecker';
+import { xeroOAuthHelper } from '../utils/xeroOAuthHelper';
 
 export interface XeroTokens {
   accessToken: string;
@@ -131,17 +132,38 @@ export const getAllXeroSettings = async (): Promise<XeroSettings[]> => {
 
 // Get authorization URL for Xero login
 export const getXeroAuthUrl = async (): Promise<{ authUrl: string; state: string }> => {
-  // Use forced redirect URI to ensure correct domain
-  const redirectUri = getForcedRedirectUri();
-  
-  console.log('🔧 Generating OAuth URL with forced redirect URI:', redirectUri);
-  
-  const response = await apiClient.get('/xero/login', {
-    params: {
-      redirect_uri: redirectUri
+  try {
+    // Use OAuth helper to manage the flow
+    const { redirectUri, state } = xeroOAuthHelper.startOAuth();
+    
+    console.log('🔧 Generating OAuth URL with redirect URI:', redirectUri);
+    console.log('🔧 Current window location:', window.location.origin);
+    console.log('🔧 Environment:', import.meta.env.PROD ? 'Production' : 'Development');
+    console.log('🔧 VITE_FRONTEND_URL:', import.meta.env.VITE_FRONTEND_URL);
+    console.log('🔧 Generated state:', state);
+    
+    const response = await apiClient.get('/xero/login', {
+      params: {
+        redirect_uri: redirectUri,
+        state: state
+      }
+    });
+    
+    console.log('🔧 Backend response:', response.data);
+    
+    if (!response.data.data?.authUrl) {
+      throw new Error('No authorization URL received from backend');
     }
-  });
-  return response.data.data;
+    
+    return {
+      authUrl: response.data.data.authUrl,
+      state: state
+    };
+  } catch (error: any) {
+    console.error('❌ Failed to get Xero auth URL:', error);
+    xeroOAuthHelper.resetOAuth();
+    throw error;
+  }
 };
 
 // Handle OAuth callback and exchange code for tokens
@@ -150,17 +172,37 @@ export const handleXeroCallback = async (code: string, state: string): Promise<{
   tenants: XeroTenant[];
   companyId: string;
 }> => {
-  // Use forced redirect URI to ensure correct domain
-  const redirectUri = getForcedRedirectUri();
-  
-  console.log('🔧 Handling OAuth callback with forced redirect URI:', redirectUri);
-  
-  const response = await apiClient.post('/xero/callback', { 
-    code, 
-    state,
-    redirect_uri: redirectUri
-  });
-  return response.data.data;
+  try {
+    // Verify the callback state
+    if (!xeroOAuthHelper.verifyCallback(state)) {
+      throw new Error('Invalid or expired OAuth state');
+    }
+    
+    // Get the redirect URI used in the OAuth flow
+    const redirectUri = xeroOAuthHelper.getDisplayRedirectUri();
+    
+    console.log('🔧 Handling OAuth callback with redirect URI:', redirectUri);
+    console.log('🔧 Current window location:', window.location.origin);
+    console.log('🔧 Environment:', import.meta.env.PROD ? 'Production' : 'Development');
+    console.log('🔧 VITE_FRONTEND_URL:', import.meta.env.VITE_FRONTEND_URL);
+    console.log('🔧 Callback data:', { code: code.substring(0, 10) + '...', state });
+    
+    const response = await apiClient.post('/xero/callback', { 
+      code, 
+      state,
+      redirect_uri: redirectUri
+    });
+    
+    // Complete the OAuth flow
+    xeroOAuthHelper.completeOAuth();
+    
+    console.log('✅ OAuth callback successful');
+    return response.data.data;
+  } catch (error: any) {
+    console.error('❌ OAuth callback failed:', error);
+    xeroOAuthHelper.resetOAuth();
+    throw error;
+  }
 };
 
 // Get company information and enrollment status

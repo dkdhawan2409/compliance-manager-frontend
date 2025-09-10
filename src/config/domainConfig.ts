@@ -8,24 +8,35 @@ export const DOMAIN_CONFIG = {
   
   // Get the appropriate domain based on environment
   getDomain: (): string => {
+    // Always check window.location.origin first (most reliable)
+    if (typeof window !== 'undefined') {
+      const windowDomain = window.location.origin;
+      console.log('🔧 DomainConfig - Window domain detected:', windowDomain);
+      
+      // If we're on a production domain, use it
+      if (windowDomain.includes('onrender.com') || windowDomain.includes('vercel.app') || windowDomain.includes('netlify.app')) {
+        console.log('🔧 DomainConfig - Using production window domain:', windowDomain);
+        return windowDomain;
+      }
+      
+      // If we're on localhost, use it for development
+      if (windowDomain.includes('localhost')) {
+        console.log('🔧 DomainConfig - Using localhost domain for development:', windowDomain);
+        return windowDomain;
+      }
+    }
+    
+    // In production, prioritize environment variable
     if (import.meta.env.PROD) {
-      // In production, prioritize environment variable, then use production domain
       const envDomain = import.meta.env.VITE_FRONTEND_URL;
       if (envDomain) {
-        console.log('🔧 Using environment domain for production:', envDomain);
+        console.log('🔧 DomainConfig - Using environment domain for production:', envDomain);
         return envDomain;
       }
       
       // Fallback to production domain
-      console.log('🔧 Using default production domain:', DOMAIN_CONFIG.PRODUCTION_DOMAIN);
+      console.log('🔧 DomainConfig - Using default production domain:', DOMAIN_CONFIG.PRODUCTION_DOMAIN);
       return DOMAIN_CONFIG.PRODUCTION_DOMAIN;
-    }
-    
-    // In development, use the actual window location to handle dynamic ports
-    if (typeof window !== 'undefined') {
-      const currentOrigin = window.location.origin;
-      console.log('🔧 Using current window origin for development:', currentOrigin);
-      return currentOrigin;
     }
     
     return DOMAIN_CONFIG.DEVELOPMENT_DOMAIN;

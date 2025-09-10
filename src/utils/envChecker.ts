@@ -69,6 +69,24 @@ export const logEnvironmentInfo = () => {
 
 // Utility functions for domain and API URL management
 export const getCurrentDomain = (): string => {
+  // Always check window.location.origin first (most reliable)
+  if (typeof window !== 'undefined') {
+    const windowDomain = window.location.origin;
+    console.log('🔧 Window domain detected:', windowDomain);
+    
+    // If we're on a production domain, use it
+    if (windowDomain.includes('onrender.com') || windowDomain.includes('vercel.app') || windowDomain.includes('netlify.app')) {
+      console.log('🔧 Using production window domain:', windowDomain);
+      return windowDomain;
+    }
+    
+    // If we're on localhost, use it for development
+    if (windowDomain.includes('localhost')) {
+      console.log('🔧 Using localhost domain for development:', windowDomain);
+      return windowDomain;
+    }
+  }
+  
   // In production, prioritize environment variable
   if (import.meta.env.PROD) {
     const envDomain = import.meta.env.VITE_FRONTEND_URL;
@@ -77,24 +95,10 @@ export const getCurrentDomain = (): string => {
       return envDomain;
     }
     
-    // In production, use window.location.origin as fallback
-    if (typeof window !== 'undefined') {
-      const windowDomain = window.location.origin;
-      console.log('🔧 Using window domain for production:', windowDomain);
-      return windowDomain;
-    }
-    
     // Final production fallback
     const fallbackDomain = 'https://compliance-manager-frontend.onrender.com';
     console.log('🔧 Using production fallback domain:', fallbackDomain);
     return fallbackDomain;
-  }
-  
-  // In development, use window.location.origin to handle dynamic ports
-  if (typeof window !== 'undefined') {
-    const windowDomain = window.location.origin;
-    console.log('🔧 Using window domain for development:', windowDomain);
-    return windowDomain;
   }
   
   // Development fallback
@@ -123,6 +127,25 @@ export const getForcedRedirectUri = (): string => {
   const redirectUri = `${currentDomain}/redirecturl`;
   console.log('🔧 Forced redirect URI (using current domain):', redirectUri);
   return redirectUri;
+};
+
+// Force production domain if we detect we're on a production host
+export const getProductionSafeRedirectUri = (): string => {
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    console.log('🔧 Production safe - Current hostname:', hostname);
+    
+    // If we're on a production domain, force use it
+    if (hostname.includes('onrender.com') || hostname.includes('vercel.app') || hostname.includes('netlify.app')) {
+      const productionDomain = `https://${hostname}`;
+      const redirectUri = `${productionDomain}/redirecturl`;
+      console.log('🔧 Production safe - Using production domain:', redirectUri);
+      return redirectUri;
+    }
+  }
+  
+  // Fallback to normal domain detection
+  return getForcedRedirectUri();
 };
 
 // Production-safe environment checker

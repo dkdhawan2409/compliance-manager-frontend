@@ -6,6 +6,7 @@ import { XERO_RESOURCE_TYPES, type XeroResourceType } from '../api/xeroService';
 import { useXero } from '../contexts/XeroContext';
 import XeroDataTable from '../components/XeroDataTable';
 import XeroSettings from '../components/XeroSettings';
+import XeroOAuthTroubleshooter from '../components/XeroOAuthTroubleshooter';
 
 import XeroDashboard from '../components/XeroDashboard';
 import SidebarLayout from '../components/SidebarLayout';
@@ -422,6 +423,11 @@ const XeroIntegration: React.FC = () => {
               </div>
             </div>
           )}
+
+          {/* OAuth Troubleshooter */}
+          <div className="mb-6">
+            <XeroOAuthTroubleshooter />
+          </div>
 
           {/* Xero Settings - Always Visible */}
           <div className="mb-6">

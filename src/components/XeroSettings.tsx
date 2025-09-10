@@ -133,6 +133,19 @@ const XeroSettings: React.FC<{ onSettingsSaved?: () => void }> = ({ onSettingsSa
             <p className="text-blue-700">Domain: {getCurrentDomain()}</p>
             <p className="text-blue-700">Environment: {import.meta.env.PROD ? 'Production' : 'Development'}</p>
             <p className="text-blue-700">VITE_FRONTEND_URL: {import.meta.env.VITE_FRONTEND_URL || 'Not set'}</p>
+            <p className="text-blue-700">Generated Redirect URI: {getCurrentDomain()}/redirecturl</p>
+            <div className="mt-2">
+              <button
+                onClick={() => {
+                  const redirectUri = `${getCurrentDomain()}/redirecturl`;
+                  navigator.clipboard.writeText(redirectUri);
+                  toast.success('Redirect URI copied to clipboard!');
+                }}
+                className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
+              >
+                📋 Copy Redirect URI
+              </button>
+            </div>
           </div>
         </div>
 
