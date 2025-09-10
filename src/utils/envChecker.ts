@@ -73,21 +73,33 @@ export const getCurrentDomain = (): string => {
   if (import.meta.env.PROD) {
     const envDomain = import.meta.env.VITE_FRONTEND_URL;
     if (envDomain) {
-      console.log('🔧 Using environment domain:', envDomain);
+      console.log('🔧 Using environment domain for production:', envDomain);
       return envDomain;
     }
+    
+    // In production, use window.location.origin as fallback
+    if (typeof window !== 'undefined') {
+      const windowDomain = window.location.origin;
+      console.log('🔧 Using window domain for production:', windowDomain);
+      return windowDomain;
+    }
+    
+    // Final production fallback
+    const fallbackDomain = 'https://compliance-manager-frontend.onrender.com';
+    console.log('🔧 Using production fallback domain:', fallbackDomain);
+    return fallbackDomain;
   }
   
-  // Fallback to window.location.origin
+  // In development, use window.location.origin to handle dynamic ports
   if (typeof window !== 'undefined') {
     const windowDomain = window.location.origin;
-    console.log('🔧 Using window domain:', windowDomain);
+    console.log('🔧 Using window domain for development:', windowDomain);
     return windowDomain;
   }
   
-  // Final fallback
-  const fallbackDomain = import.meta.env.VITE_FRONTEND_URL || 'https://yourdomain.com';
-  console.log('🔧 Using fallback domain:', fallbackDomain);
+  // Development fallback
+  const fallbackDomain = 'http://localhost:3000';
+  console.log('🔧 Using development fallback domain:', fallbackDomain);
   return fallbackDomain;
 };
 
@@ -106,8 +118,10 @@ export const getRedirectUrl = (): string => {
 
 // Force correct redirect URI for OAuth flow
 export const getForcedRedirectUri = (): string => {
-  const redirectUri = DOMAIN_CONFIG.getRedirectUri();
-  console.log('🔧 Forced redirect URI:', redirectUri);
+  // Always use the current domain to handle dynamic ports in development
+  const currentDomain = getCurrentDomain();
+  const redirectUri = `${currentDomain}/redirecturl`;
+  console.log('🔧 Forced redirect URI (using current domain):', redirectUri);
   return redirectUri;
 };
 

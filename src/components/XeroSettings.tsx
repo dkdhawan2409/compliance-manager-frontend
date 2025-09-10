@@ -5,7 +5,6 @@ import toast from 'react-hot-toast';
 
 const XeroSettings: React.FC<{ onSettingsSaved?: () => void }> = ({ onSettingsSaved }) => {
   const { settings, isLoading, error, saveSettings, loadSettings } = useXero();
-  const [showDebug, setShowDebug] = useState(false);
   
   const [formData, setFormData] = useState({
     clientId: '',
@@ -74,59 +73,8 @@ const XeroSettings: React.FC<{ onSettingsSaved?: () => void }> = ({ onSettingsSa
     <div className="bg-white rounded-lg shadow p-6">
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-lg font-semibold text-gray-900">Xero OAuth Configuration</h3>
-        <button
-          type="button"
-          onClick={() => setShowDebug(!showDebug)}
-          className="text-sm text-indigo-600 hover:text-indigo-800"
-        >
-          {showDebug ? 'Hide Debug' : 'Show Debug'}
-        </button>
       </div>
 
-      {/* Debug Panel */}
-      {showDebug && (
-        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-          <h4 className="font-medium text-gray-900 mb-2">🔧 Debug Information</h4>
-          <div className="space-y-2 text-sm">
-            <div>
-              <span className="font-medium">API URL:</span> {getApiUrl()}
-            </div>
-            <div>
-              <span className="font-medium">Environment:</span> {import.meta.env.DEV ? 'Development' : 'Production'}
-            </div>
-            <div>
-              <span className="font-medium">Token Present:</span> {localStorage.getItem('token') ? 'Yes' : 'No'}
-            </div>
-            <div>
-              <span className="font-medium">Settings Loaded:</span> {settings ? 'Yes' : 'No'}
-            </div>
-            {settings && (
-              <div>
-                <span className="font-medium">Client ID:</span> {settings.clientId ? 'Configured' : 'Missing'}
-              </div>
-            )}
-            <div>
-              <span className="font-medium">Window Location:</span> {typeof window !== 'undefined' ? window.location.origin : 'N/A'}
-            </div>
-            <div>
-              <span className="font-medium">Environment Domain:</span> {import.meta.env.VITE_FRONTEND_URL || 'Not set'}
-            </div>
-            <div>
-              <span className="font-medium">Detected Domain:</span> {getCurrentDomain()}
-            </div>
-            <div>
-              <span className="font-medium">Redirect URI:</span> {getCurrentDomain() + '/redirecturl'}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={handleTestConnection}
-            className="mt-3 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-          >
-            Test Connection
-          </button>
-        </div>
-      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -180,6 +128,12 @@ const XeroSettings: React.FC<{ onSettingsSaved?: () => void }> = ({ onSettingsSa
           <p className="text-xs text-gray-500 mt-1">
             Must match the redirect URI configured in your Xero app
           </p>
+          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+            <p className="text-blue-800 font-medium">Current Domain Detection:</p>
+            <p className="text-blue-700">Domain: {getCurrentDomain()}</p>
+            <p className="text-blue-700">Environment: {import.meta.env.PROD ? 'Production' : 'Development'}</p>
+            <p className="text-blue-700">VITE_FRONTEND_URL: {import.meta.env.VITE_FRONTEND_URL || 'Not set'}</p>
+          </div>
         </div>
 
         {error && (
@@ -216,7 +170,7 @@ const XeroSettings: React.FC<{ onSettingsSaved?: () => void }> = ({ onSettingsSa
           <li>2. Set the redirect URI to: <code className="bg-blue-100 px-1 rounded">{getCurrentDomain()}/redirecturl</code></li>
           <li>3. Copy your Client ID and Client Secret</li>
           <li>4. Save the settings above</li>
-          <li>5. Test the connection using the debug panel</li>
+          <li>5. Test the connection by saving the settings</li>
         </ol>
       </div>
     </div>

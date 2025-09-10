@@ -344,49 +344,84 @@ const XeroIntegration: React.FC = () => {
             </div>
           )}
 
-          {/* Connection Status Debug */}
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-            <h4 className="text-sm font-medium text-yellow-800 mb-2">🔍 Connection Status Debug</h4>
-            <div className="text-sm text-yellow-700 space-y-1">
-              <p><strong>Backend Connection Status:</strong> {isConnected ? '✅ Connected' : '❌ Not Connected'}</p>
-              <p><strong>Has Settings:</strong> {hasSettings ? '✅ Yes' : '❌ No'}</p>
-              <p><strong>Is Loading:</strong> {isLoading ? '⏳ Yes' : '✅ No'}</p>
-              <p><strong>Connection Status Object:</strong> {connectionStatus ? JSON.stringify(connectionStatus, null, 2) : 'null'}</p>
-              <p><strong>Manual Override:</strong> {connectionStatus?.isConnected ? '✅ Backend says Connected' : '❌ Backend says Not Connected'}</p>
-            </div>
-            {connectionStatus?.isConnected && !isConnected && (
-              <div className="mt-3 p-3 bg-red-100 border border-red-300 rounded">
-                <p className="text-red-800 text-sm font-medium">⚠️ SYNCHRONIZATION ISSUE DETECTED!</p>
-                <p className="text-red-700 text-sm">Backend is connected but frontend shows disconnected. Click the button below to fix.</p>
-                <div className="flex gap-2 mt-2">
-                  <button
-                    onClick={() => {
-                      console.log('🔧 Manual synchronization fix...');
-                      // Force reload settings to sync connection status
-                      loadSettings();
-                      toast.success('Connection status synchronized');
-                    }}
-                    className="px-4 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700 transition-colors"
-                  >
-                    🔧 Fix Synchronization
-                  </button>
-                  <button
-                    onClick={() => {
-                      console.log('🔧 Force override connection status...');
-                      // Force override the connection status based on backend response
-                      if (connectionStatus) {
-                        // This will trigger a re-render with correct connection status
-                        window.location.reload();
-                      }
-                    }}
-                    className="px-4 py-2 bg-orange-600 text-white rounded text-sm hover:bg-orange-700 transition-colors"
-                  >
-                    🔄 Force Refresh Page
-                  </button>
-                </div>
+          {/* Connection Issues - Only show when there are actual problems */}
+          {(connectionStatus?.connectionStatus === 'refresh_failed' || 
+            (connectionStatus?.isConnected && !isConnected) || 
+            error) && (
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
+              <h4 className="text-sm font-medium text-orange-800 mb-2">⚠️ Connection Issue Detected</h4>
+              <div className="text-sm text-orange-700 space-y-2">
+                {connectionStatus?.connectionStatus === 'refresh_failed' && (
+                  <div className="bg-orange-100 border border-orange-300 rounded p-3">
+                    <p className="font-medium text-orange-800">🔄 Token Refresh Failed</p>
+                    <p className="text-orange-700">Your Xero authorization has expired. This is normal and can be fixed by reconnecting.</p>
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={startAuth}
+                        disabled={isLoading || !hasSettings}
+                        className="px-4 py-2 bg-orange-600 text-white rounded text-sm hover:bg-orange-700 transition-colors disabled:opacity-50"
+                      >
+                        🔗 Reconnect to Xero
+                      </button>
+                      <button
+                        onClick={() => {
+                          console.log('🔧 Testing backend connection...');
+                          loadSettings();
+                          toast.success('Testing connection...');
+                        }}
+                        className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
+                      >
+                        🔍 Test Connection
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                {connectionStatus?.isConnected && !isConnected && (
+                  <div className="bg-red-100 border border-red-300 rounded p-3">
+                    <p className="font-medium text-red-800">⚠️ Synchronization Issue</p>
+                    <p className="text-red-700">Backend shows connected but frontend shows disconnected. This is a temporary sync issue.</p>
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={() => {
+                          console.log('🔧 Manual synchronization fix...');
+                          loadSettings();
+                          toast.success('Connection status synchronized');
+                        }}
+                        className="px-4 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700 transition-colors"
+                      >
+                        🔧 Fix Sync
+                      </button>
+                      <button
+                        onClick={() => window.location.reload()}
+                        className="px-4 py-2 bg-orange-600 text-white rounded text-sm hover:bg-orange-700 transition-colors"
+                      >
+                        🔄 Refresh Page
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                {error && (
+                  <div className="bg-red-100 border border-red-300 rounded p-3">
+                    <p className="font-medium text-red-800">❌ Error</p>
+                    <p className="text-red-700">{error}</p>
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={() => {
+                          console.log('🔧 Clearing error and retrying...');
+                          loadSettings();
+                        }}
+                        className="px-4 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700 transition-colors"
+                      >
+                        🔄 Retry
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Xero Settings - Always Visible */}
           <div className="mb-6">
@@ -499,6 +534,11 @@ const XeroIntegration: React.FC = () => {
                     {!hasSettings && (
                       <p className="text-sm text-indigo-600 mt-2">
                         Please configure your Xero settings above before connecting
+                      </p>
+                    )}
+                    {hasSettings && connectionStatus?.connectionStatus === 'refresh_failed' && (
+                      <p className="text-sm text-orange-600 mt-2">
+                        Your previous connection expired. Click above to reconnect.
                       </p>
                     )}
                   </div>

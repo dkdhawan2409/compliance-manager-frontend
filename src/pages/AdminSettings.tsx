@@ -247,24 +247,6 @@ const AdminSettings: React.FC = () => {
             Notification Settings
           </h1>
           
-          {/* Debug Navigation */}
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <h3 className="text-sm font-medium text-blue-800 mb-2">Debug Navigation</h3>
-            <div className="flex gap-2">
-              <button
-                onClick={() => window.location.href = '/ai-tools'}
-                className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-              >
-                Go to AI Tools
-              </button>
-              <button
-                onClick={() => window.location.href = '/ai-chat'}
-                className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
-              >
-                Go to AI Assistant
-              </button>
-            </div>
-          </div>
 
           {/* ===================== Twilio ===================== */}
           <section className="mb-12">

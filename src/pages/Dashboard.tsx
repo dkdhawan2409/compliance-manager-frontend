@@ -3,7 +3,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { Link, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import SidebarLayout from '../components/SidebarLayout';
-import DebugSuperAdmin from '../components/DebugSuperAdmin';
 
 const navLinks = [
   { name: 'Dashboard', to: '/dashboard', icon: (
@@ -51,7 +50,6 @@ const Dashboard: React.FC = () => {
       {/* Content previously inside <main> ... */}
       <div className="w-full">
         {/* Debug Component - Remove after testing */}
-        <DebugSuperAdmin />
         
         {/* Welcome Section */}
         <div className="flex items-center gap-4 bg-white/80 rounded-xl shadow-lg p-5 mb-6 border border-white/60">
