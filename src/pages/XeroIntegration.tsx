@@ -7,6 +7,8 @@ import { useXero } from '../contexts/XeroContext';
 import XeroDataTable from '../components/XeroDataTable';
 import XeroSettings from '../components/XeroSettings';
 import XeroOAuthTroubleshooter from '../components/XeroOAuthTroubleshooter';
+import XeroDebugPanel from '../components/XeroDebugPanel';
+import BackendHealthCheck from '../components/BackendHealthCheck';
 
 import XeroDashboard from '../components/XeroDashboard';
 import SidebarLayout from '../components/SidebarLayout';
@@ -427,6 +429,16 @@ const XeroIntegration: React.FC = () => {
           {/* OAuth Troubleshooter */}
           <div className="mb-6">
             <XeroOAuthTroubleshooter />
+          </div>
+
+          {/* Backend Health Check */}
+          <div className="mb-6">
+            <BackendHealthCheck />
+          </div>
+
+          {/* Debug Panel */}
+          <div className="mb-6">
+            <XeroDebugPanel />
           </div>
 
           {/* Xero Settings - Always Visible */}

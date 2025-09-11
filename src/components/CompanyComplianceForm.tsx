@@ -130,9 +130,42 @@ export default function CompanyComplianceForm({ onSubmit, defaultValues, deadlin
   // Accumulate form data for all tabs
   const [formData, setFormData] = React.useState<Partial<CompanyComplianceFormValues>>({ ...defaultValues });
 
+  // Reset form values when switching tabs to prevent cross-tab contamination
+  React.useEffect(() => {
+    // Reset form to accumulated data when switching tabs
+    const currentFormData = { ...defaultValues, ...formData };
+    
+    console.log(`🔄 Switching to tab ${tabIndex} (${tabLabels[tabIndex]})`, {
+      currentFormData,
+      fbtApplicable: currentFormData.fbtApplicable,
+      iasRequired: currentFormData.iasRequired
+    });
+    
+    // Only reset values that are relevant to the current tab
+    if (tabIndex === 0) {
+      // BAS tab - reset BAS related fields
+      setValue('basFrequency', currentFormData.basFrequency || 'Quarterly');
+      setValue('nextBasDue', currentFormData.nextBasDue || null);
+    } else if (tabIndex === 1) {
+      // FBT tab - reset FBT related fields
+      setValue('fbtApplicable', currentFormData.fbtApplicable || false);
+      setValue('nextFbtDue', currentFormData.nextFbtDue || null);
+    } else if (tabIndex === 2) {
+      // IAS tab - reset IAS related fields
+      setValue('iasRequired', currentFormData.iasRequired || false);
+      setValue('iasFrequency', currentFormData.iasFrequency || 'Quarterly');
+      setValue('nextIasDue', currentFormData.nextIasDue || null);
+    }
+  }, [tabIndex, setValue, defaultValues, formData]);
+
   // Handler for Next/Back/Save
   const handleNext = (data: CompanyComplianceFormValues) => {
-    setFormData(prev => ({ ...prev, ...data }));
+    console.log(`📝 Saving data from tab ${tabIndex} (${tabLabels[tabIndex]})`, data);
+    setFormData(prev => {
+      const newData = { ...prev, ...data };
+      console.log('📊 Accumulated form data:', newData);
+      return newData;
+    });
     setTabIndex(tabIndex + 1);
   };
   const handleBack = () => setTabIndex(tabIndex - 1);
@@ -252,24 +285,40 @@ export default function CompanyComplianceForm({ onSubmit, defaultValues, deadlin
             {/* FBT Applicable */}
             <div>
               <label className="block font-medium mb-1">FBT Applicable? <span className="text-red-500">*</span></label>
-              <div className="flex gap-4">
-                <label>
-                  <input 
-                    type="radio" 
-                    value="true" 
-                    checked={Boolean(fbtApplicable)}
-                    {...register('fbtApplicable', { required: 'Required' })} 
-                  /> Yes
-                </label>
-                <label>
-                  <input 
-                    type="radio" 
-                    value="false" 
-                    checked={!Boolean(fbtApplicable)}
-                    {...register('fbtApplicable', { required: 'Required' })} 
-                  /> No
-                </label>
-              </div>
+              <Controller
+                control={control}
+                name="fbtApplicable"
+                rules={{ required: 'Required' }}
+                render={({ field }) => {
+                  console.log('🔘 FBT Radio field value:', field.value, 'type:', typeof field.value);
+                  return (
+                    <div className="flex gap-4">
+                      <label>
+                        <input 
+                          type="radio" 
+                          value="true" 
+                          checked={Boolean(field.value)}
+                          onChange={() => {
+                            console.log('🔘 FBT Yes selected');
+                            field.onChange(true);
+                          }}
+                        /> Yes
+                      </label>
+                      <label>
+                        <input 
+                          type="radio" 
+                          value="false" 
+                          checked={!Boolean(field.value)}
+                          onChange={() => {
+                            console.log('🔘 FBT No selected');
+                            field.onChange(false);
+                          }}
+                        /> No
+                      </label>
+                    </div>
+                  );
+                }}
+              />
               {errors.fbtApplicable && <p className="text-red-500 text-sm">{errors.fbtApplicable.message}</p>}
             </div>
             {/* FBT Frequency (if applicable) */}
@@ -350,24 +399,40 @@ export default function CompanyComplianceForm({ onSubmit, defaultValues, deadlin
             {/* IAS Required */}
             <div>
               <label className="block font-medium mb-1">IAS Required? <span className="text-red-500">*</span></label>
-              <div className="flex gap-4">
-                <label>
-                  <input 
-                    type="radio" 
-                    value="true" 
-                    checked={Boolean(iasRequired)}
-                    {...register('iasRequired', { required: 'Required' })} 
-                  /> Yes
-                </label>
-                <label>
-                  <input 
-                    type="radio" 
-                    value="false" 
-                    checked={!Boolean(iasRequired)}
-                    {...register('iasRequired', { required: 'Required' })} 
-                  /> No
-                </label>
-              </div>
+              <Controller
+                control={control}
+                name="iasRequired"
+                rules={{ required: 'Required' }}
+                render={({ field }) => {
+                  console.log('🔘 IAS Radio field value:', field.value, 'type:', typeof field.value);
+                  return (
+                    <div className="flex gap-4">
+                      <label>
+                        <input 
+                          type="radio" 
+                          value="true" 
+                          checked={Boolean(field.value)}
+                          onChange={() => {
+                            console.log('🔘 IAS Yes selected');
+                            field.onChange(true);
+                          }}
+                        /> Yes
+                      </label>
+                      <label>
+                        <input 
+                          type="radio" 
+                          value="false" 
+                          checked={!Boolean(field.value)}
+                          onChange={() => {
+                            console.log('🔘 IAS No selected');
+                            field.onChange(false);
+                          }}
+                        /> No
+                      </label>
+                    </div>
+                  );
+                }}
+              />
               {errors.iasRequired && <p className="text-red-500 text-sm">{errors.iasRequired.message}</p>}
             </div>
             {/* IAS Frequency and Next IAS Due (if required) */}

@@ -9,12 +9,12 @@ const XeroOAuthTroubleshooter: React.FC = () => {
   const [redirectUri, setRedirectUri] = useState('');
 
   useEffect(() => {
-    setRedirectUri(xeroOAuthHelper.getDisplayRedirectUri());
+    setRedirectUri(getRenderRedirectUri()); // Always use static Render redirect URI
   }, []);
 
   const handleTestRedirectUri = async () => {
     try {
-      const testUri = xeroOAuthHelper.getRedirectUri();
+      const testUri = getRenderRedirectUri(); // Always use static Render redirect URI
       setRedirectUri(testUri);
       toast.success('Redirect URI updated successfully');
     } catch (error) {
@@ -24,7 +24,7 @@ const XeroOAuthTroubleshooter: React.FC = () => {
 
   const handleForceProductionUri = () => {
     try {
-      const productionUri = getProductionSafeRedirectUri();
+      const productionUri = getRenderRedirectUri(); // Always use static Render redirect URI
       setRedirectUri(productionUri);
       toast.success('Production-safe redirect URI applied');
     } catch (error) {

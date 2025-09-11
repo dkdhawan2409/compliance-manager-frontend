@@ -8,19 +8,22 @@ const XeroSettings: React.FC<{ onSettingsSaved?: () => void }> = ({ onSettingsSa
   
   const [formData, setFormData] = useState({
     clientId: '',
-    clientSecret: '',
-    redirectUri: getRenderRedirectUri()
+    clientSecret: ''
   });
 
   useEffect(() => {
     if (settings) {
       setFormData({
         clientId: settings.clientId || '',
-        clientSecret: '',
-        redirectUri: settings.redirectUri || getRenderRedirectUri()
+        clientSecret: ''
       });
     }
   }, [settings]);
+
+  // Load settings from backend API on component mount
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,7 +34,14 @@ const XeroSettings: React.FC<{ onSettingsSaved?: () => void }> = ({ onSettingsSa
     }
 
     try {
-      await saveSettings(formData);
+      // Always use the static redirect URI from backend
+      const settingsData = {
+        ...formData,
+        redirectUri: getRenderRedirectUri() // Static redirect URI - cannot be changed by user
+      };
+      
+      console.log('🔧 Saving Xero settings with static redirect URI:', settingsData.redirectUri);
+      await saveSettings(settingsData);
       onSettingsSaved?.();
     } catch (error) {
       console.error('Failed to save settings:', error);
@@ -114,38 +124,34 @@ const XeroSettings: React.FC<{ onSettingsSaved?: () => void }> = ({ onSettingsSa
         </div>
 
         <div>
-          <label htmlFor="redirectUri" className="block text-sm font-medium text-gray-700 mb-1">
-            Redirect URI
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Redirect URI (Static - Cannot be changed)
           </label>
-          <input
-            type="url"
-            id="redirectUri"
-            value={formData.redirectUri}
-            onChange={(e) => setFormData({ ...formData, redirectUri: e.target.value })}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            placeholder={getRenderRedirectUri()}
-          />
+          <div className="w-full p-3 bg-gray-100 border border-gray-300 rounded-lg">
+            <div className="flex items-center justify-between">
+              <span className="text-gray-700 font-mono text-sm">
+                {getRenderRedirectUri()}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(getRenderRedirectUri());
+                  toast.success('Redirect URI copied to clipboard!');
+                }}
+                className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
+              >
+                📋 Copy
+              </button>
+            </div>
+          </div>
           <p className="text-xs text-gray-500 mt-1">
-            Must match the redirect URI configured in your Xero app
+            This redirect URI is automatically set and cannot be changed. Configure this exact URI in your Xero app.
           </p>
           <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
-            <p className="text-blue-800 font-medium">Current Domain Detection:</p>
+            <p className="text-blue-800 font-medium">Configuration Info:</p>
             <p className="text-blue-700">Domain: {getCurrentDomain()}</p>
             <p className="text-blue-700">Environment: {import.meta.env.PROD ? 'Production' : 'Development'}</p>
             <p className="text-blue-700">VITE_FRONTEND_URL: {import.meta.env.VITE_FRONTEND_URL || 'Not set'}</p>
-            <p className="text-blue-700">Generated Redirect URI: {getRenderRedirectUri()}</p>
-            <div className="mt-2">
-              <button
-                onClick={() => {
-                  const redirectUri = getRenderRedirectUri();
-                  navigator.clipboard.writeText(redirectUri);
-                  toast.success('Redirect URI copied to clipboard!');
-                }}
-                className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
-              >
-                📋 Copy Redirect URI
-              </button>
-            </div>
           </div>
         </div>
 
