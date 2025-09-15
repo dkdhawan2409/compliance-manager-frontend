@@ -47,7 +47,7 @@ interface UseXeroReturn {
   selectTenant: (tenantId: string) => void;
   loadCompanyInfo: () => Promise<void>;
   loadSettings: () => Promise<void>;
-  saveSettings: (settings: { clientId: string; clientSecret: string; redirectUri: string }) => Promise<void>;
+  saveSettings: (settings: { accessToken: string } | { clientId: string; clientSecret: string; redirectUri: string }) => Promise<void>;
   deleteSettings: () => Promise<void>;
   
   // Computed
@@ -106,54 +106,65 @@ export const useXero = (): UseXeroReturn => {
     try {
       setIsLoading(true);
       setError(null);
-      console.log('🚀 Starting Xero authorization...');
+      console.log('🚀 Starting Xero connection...');
 
       // Check if we have settings configured
       if (!hasSettings) {
-        const errorMsg = 'Xero settings not configured. Please configure settings first.';
+        const errorMsg = 'Xero token not configured. Please add your Xero token first.';
         console.error('❌', errorMsg);
         setError(errorMsg);
         toast.error(errorMsg);
         return;
       }
 
-      // Clear any existing tokens and authorization state to force fresh authorization
-      localStorage.removeItem('xero_tokens');
-      localStorage.removeItem('xero_authorized');
-      localStorage.removeItem('xero_auth_timestamp');
-      setTokens(null);
-      setConnectionStatus(null);
-      console.log('🧹 Cleared existing tokens and authorization state for fresh authorization');
-
-      // Use the old flow since new endpoints may not be implemented yet
-      console.log('🔐 Using original Xero auth flow...');
-      const { authUrl } = await getXeroAuthUrl();
-      console.log('✅ Auth URL received:', authUrl);
-      
-      // Validate auth URL
-      if (!authUrl || !authUrl.startsWith('https://login.xero.com/')) {
-        throw new Error('Invalid authorization URL received from backend');
+      // Check if we have an access token (token-based auth)
+      if (settings?.accessToken) {
+        console.log('🔐 Using token-based authentication...');
+        
+        // Test the connection with the existing token
+        try {
+          const connectionStatus = await getConnectionStatus();
+          setConnectionStatus(connectionStatus);
+          
+          if (connectionStatus.isConnected) {
+            toast.success('Successfully connected to Xero!');
+            // Load tenants if available
+            if (connectionStatus.tenants && connectionStatus.tenants.length > 0) {
+              setTenants(connectionStatus.tenants);
+              setSelectedTenant(connectionStatus.tenants[0]);
+            }
+          } else {
+            throw new Error('Token is invalid or expired');
+          }
+        } catch (connectionError: any) {
+          console.error('❌ Token validation failed:', connectionError);
+          const errorMessage = connectionError.response?.data?.message || 'Invalid or expired Xero token. Please update your token.';
+          setError(errorMessage);
+          toast.error(errorMessage);
+        }
+      } else {
+        // Fallback to OAuth flow if no token is available
+        console.log('🔐 No token found, falling back to OAuth flow...');
+        const { authUrl } = await getXeroAuthUrl();
+        
+        if (!authUrl || !authUrl.startsWith('https://login.xero.com/')) {
+          throw new Error('Invalid authorization URL received from backend');
+        }
+        
+        localStorage.setItem('xero_auth_start_time', Date.now().toString());
+        console.log('🔄 Redirecting to Xero...');
+        window.location.href = authUrl;
       }
       
-      // Store timestamp for auth start to track timing
-      localStorage.setItem('xero_auth_start_time', Date.now().toString());
-      
-      // Redirect to Xero
-      console.log('🔄 Redirecting to Xero...');
-      window.location.href = authUrl;
-      
     } catch (err: any) {
-      console.error('❌ Xero auth error:', err);
-      console.error('Error response:', err.response);
-      console.error('Error status:', err.response?.status);
-      console.error('Error data:', err.response?.data);
+      console.error('❌ Xero connection error:', err);
       
-      let errorMessage = 'Failed to start Xero authorization';
+      let errorMessage = 'Failed to connect to Xero';
       
       if (err.response?.status === 401) {
         errorMessage = 'Authentication required. Please log in again.';
       } else if (err.response?.status === 404) {
-        errorMessage = 'Xero OAuth endpoint not found. Please check backend implementation.';
+        errorMessage = 'Xero endpoint not found. Please check backend implementation.';
       } else if (err.response?.status === 500) {
         errorMessage = 'Backend server error. Please check server logs.';
       } else if (err.response?.data?.message) {
@@ -167,7 +178,7 @@ export const useXero = (): UseXeroReturn => {
     } finally {
       setIsLoading(false);
     }
-  }, [hasSettings]);
+  }, [hasSettings, settings]);
 
   const handleCallback = useCallback(async (code: string, state: string) => {
     try {
@@ -475,14 +486,32 @@ export const useXero = (): UseXeroReturn => {
     checkExistingAuth();
   }, [selectedTenant]);
 
-  const saveSettings = useCallback(async (settingsData: { clientId: string; clientSecret: string; redirectUri: string }) => {
+  const saveSettings = useCallback(async (settingsData: { accessToken: string } | { clientId: string; clientSecret: string; redirectUri: string }) => {
     try {
       setIsLoading(true);
       setError(null);
       
-      const savedSettings = await saveXeroSettings(settingsData);
-      setSettings(savedSettings);
-      toast.success('Xero settings saved successfully');
+      // Handle token-based authentication
+      if ('accessToken' in settingsData) {
+        // For token-based auth, we'll save the token and automatically connect
+        const savedSettings = await saveXeroSettings(settingsData);
+        setSettings(savedSettings);
+        
+        // Automatically test the connection with the token
+        try {
+          const connectionStatus = await getConnectionStatus();
+          setConnectionStatus(connectionStatus);
+          toast.success('Xero token saved and connected successfully!');
+        } catch (connectionError) {
+          console.warn('Token saved but connection test failed:', connectionError);
+          toast.success('Xero token saved successfully');
+        }
+      } else {
+        // Handle traditional OAuth settings
+        const savedSettings = await saveXeroSettings(settingsData);
+        setSettings(savedSettings);
+        toast.success('Xero settings saved successfully');
+      }
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || 'Failed to save Xero settings';
       setError(errorMessage);

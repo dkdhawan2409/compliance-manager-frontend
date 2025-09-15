@@ -208,7 +208,7 @@ const XeroIntegration: React.FC = () => {
                   disabled={isLoading || !hasSettings}
                   className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {!hasSettings ? '⚙️ Configure Settings First' : '🔗 Connect to Xero'}
+                  {!hasSettings ? '⚙️ Add Xero Token First' : '🔗 Connect to Xero'}
                 </button>
               )}
               {isConnected && (
@@ -515,7 +515,7 @@ const XeroIntegration: React.FC = () => {
                         disabled={isLoading || !hasSettings}
                         className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
                       >
-                        {!hasSettings ? 'Configure Settings First' : 'Connect to Xero'}
+                        {!hasSettings ? 'Add Xero Token First' : 'Connect to Xero'}
                       </button>
                       {hasSettings && (
                         <button
@@ -547,11 +547,11 @@ const XeroIntegration: React.FC = () => {
                       disabled={isLoading || !hasSettings}
                       className="px-8 py-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
                     >
-                      {!hasSettings ? '⚙️ Configure Settings First' : '🔗 Connect to Xero Now'}
+                      {!hasSettings ? '⚙️ Add Xero Token First' : '🔗 Connect to Xero Now'}
                     </button>
                     {!hasSettings && (
                       <p className="text-sm text-indigo-600 mt-2">
-                        Please configure your Xero settings above before connecting
+                        Please add your Xero token above before connecting
                       </p>
                     )}
                     {hasSettings && connectionStatus?.connectionStatus === 'refresh_failed' && (
@@ -801,11 +801,11 @@ const XeroIntegration: React.FC = () => {
             onClick={startAuth}
             disabled={isLoading || !hasSettings}
             className="px-6 py-4 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 transition-colors font-medium shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            title={!hasSettings ? 'Configure Settings First' : 'Connect to Xero'}
+            title={!hasSettings ? 'Add Xero Token First' : 'Connect to Xero'}
           >
             <span className="text-xl">🔗</span>
             <span className="hidden sm:inline">
-              {!hasSettings ? 'Configure' : 'Connect'}
+              {!hasSettings ? 'Add Token' : 'Connect'}
             </span>
           </button>
         </div>

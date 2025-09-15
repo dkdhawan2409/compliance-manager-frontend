@@ -7,15 +7,13 @@ const XeroSettings: React.FC<{ onSettingsSaved?: () => void }> = ({ onSettingsSa
   const { settings, isLoading, error, saveSettings, loadSettings } = useXero();
   
   const [formData, setFormData] = useState({
-    clientId: '',
-    clientSecret: ''
+    accessToken: ''
   });
 
   useEffect(() => {
     if (settings) {
       setFormData({
-        clientId: settings.clientId || '',
-        clientSecret: ''
+        accessToken: settings.accessToken || ''
       });
     }
   }, [settings]);
@@ -28,23 +26,24 @@ const XeroSettings: React.FC<{ onSettingsSaved?: () => void }> = ({ onSettingsSa
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.clientId || !formData.clientSecret) {
-      toast.error('Please fill in all required fields');
+    if (!formData.accessToken.trim()) {
+      toast.error('Please enter your Xero access token');
       return;
     }
 
     try {
-      // Always use the static redirect URI from backend
+      // Save the access token directly
       const settingsData = {
-        ...formData,
-        redirectUri: getRenderRedirectUri() // Static redirect URI - cannot be changed by user
+        accessToken: formData.accessToken.trim()
       };
       
-      console.log('🔧 Saving Xero settings with static redirect URI:', settingsData.redirectUri);
+      console.log('🔧 Saving Xero access token');
       await saveSettings(settingsData);
       onSettingsSaved?.();
+      toast.success('Xero token saved successfully!');
     } catch (error) {
-      console.error('Failed to save settings:', error);
+      console.error('Failed to save token:', error);
+      toast.error('Failed to save Xero token');
     }
   };
 
@@ -82,78 +81,29 @@ const XeroSettings: React.FC<{ onSettingsSaved?: () => void }> = ({ onSettingsSa
   return (
     <div className="bg-white rounded-lg shadow p-6">
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-lg font-semibold text-gray-900">Xero OAuth Configuration</h3>
+        <h3 className="text-lg font-semibold text-gray-900">Simple Xero Authentication</h3>
       </div>
 
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="clientId" className="block text-sm font-medium text-gray-700 mb-1">
-            Xero Client ID *
-          </label>
-          <input
-            type="text"
-            id="clientId"
-            value={formData.clientId}
-            onChange={(e) => setFormData({ ...formData, clientId: e.target.value })}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            placeholder="Enter your Xero Client ID"
-            required
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Get this from your Xero app in the developer portal
-          </p>
-        </div>
-
-        <div>
-          <label htmlFor="clientSecret" className="block text-sm font-medium text-gray-700 mb-1">
-            Xero Client Secret *
+          <label htmlFor="accessToken" className="block text-sm font-medium text-gray-700 mb-1">
+            Xero Access Token *
           </label>
           <input
             type="password"
-            id="clientSecret"
-            value={formData.clientSecret}
-            onChange={(e) => setFormData({ ...formData, clientSecret: e.target.value })}
+            id="accessToken"
+            value={formData.accessToken}
+            onChange={(e) => setFormData({ ...formData, accessToken: e.target.value })}
             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            placeholder="Enter your Xero Client Secret"
+            placeholder="Enter your Xero access token"
             required
           />
           <p className="text-xs text-gray-500 mt-1">
-            Get this from your Xero app in the developer portal
+            Get this from your Xero app in the developer portal - much simpler than OAuth!
           </p>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Redirect URI (Static - Cannot be changed)
-          </label>
-          <div className="w-full p-3 bg-gray-100 border border-gray-300 rounded-lg">
-            <div className="flex items-center justify-between">
-              <span className="text-gray-700 font-mono text-sm">
-                {getRenderRedirectUri()}
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(getRenderRedirectUri());
-                  toast.success('Redirect URI copied to clipboard!');
-                }}
-                className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
-              >
-                📋 Copy
-              </button>
-            </div>
-          </div>
-          <p className="text-xs text-gray-500 mt-1">
-            This redirect URI is automatically set and cannot be changed. Configure this exact URI in your Xero app.
-          </p>
-          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
-            <p className="text-blue-800 font-medium">Configuration Info:</p>
-            <p className="text-blue-700">Domain: {getCurrentDomain()}</p>
-            <p className="text-blue-700">Environment: {import.meta.env.PROD ? 'Production' : 'Development'}</p>
-            <p className="text-blue-700">VITE_FRONTEND_URL: {import.meta.env.VITE_FRONTEND_URL || 'Not set'}</p>
-          </div>
-        </div>
 
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-3">
@@ -182,15 +132,21 @@ const XeroSettings: React.FC<{ onSettingsSaved?: () => void }> = ({ onSettingsSa
       </form>
 
       {/* Instructions */}
-      <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-        <h4 className="font-medium text-blue-900 mb-2">📋 Setup Instructions</h4>
-        <ol className="text-sm text-blue-800 space-y-1">
-          <li>1. Create a Xero app in the <a href="https://developer.xero.com/" target="_blank" rel="noopener noreferrer" className="underline">Xero Developer Portal</a></li>
-          <li>2. Set the redirect URI to: <code className="bg-blue-100 px-1 rounded">{getCurrentDomain()}/redirecturl</code></li>
-          <li>3. Copy your Client ID and Client Secret</li>
-          <li>4. Save the settings above</li>
-          <li>5. Test the connection by saving the settings</li>
+      <div className="mt-6 p-4 bg-green-50 rounded-lg">
+        <h4 className="font-medium text-green-900 mb-2">🚀 Simple Setup Instructions</h4>
+        <ol className="text-sm text-green-800 space-y-1">
+          <li>1. Go to <a href="https://developer.xero.com/" target="_blank" rel="noopener noreferrer" className="underline">Xero Developer Portal</a></li>
+          <li>2. Create a new app or select an existing one</li>
+          <li>3. Go to "My Apps" → Select your app → "Configuration"</li>
+          <li>4. Generate a new access token</li>
+          <li>5. Copy the token and paste it above</li>
+          <li>6. Click "Save Settings" - you're connected instantly!</li>
         </ol>
+        <div className="mt-3 p-3 bg-green-100 border border-green-200 rounded">
+          <p className="text-green-800 text-xs">
+            <strong>✅ Benefits:</strong> No Client ID/Secret needed, no redirect URI setup, no OAuth flow complexity!
+          </p>
+        </div>
       </div>
     </div>
   );

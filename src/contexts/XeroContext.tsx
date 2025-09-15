@@ -27,8 +27,9 @@ export interface XeroTenant {
 export interface XeroSettings {
   id: number;
   companyId: number;
-  clientId: string;
-  redirectUri: string;
+  accessToken?: string;
+  clientId?: string;
+  redirectUri?: string;
   createdAt: string;
   updatedAt: string;
 }
