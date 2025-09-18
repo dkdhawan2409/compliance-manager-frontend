@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import SidebarLayout from '../components/SidebarLayout';
 import { useAuth } from '../contexts/AuthContext';
+import { useXero } from '../contexts/XeroContext';
 import { useUserRole, requireAIToolsAccess } from '../utils/roleUtils';
 import TemplateDataCollector from '../components/TemplateDataCollector';
 import { NotificationTemplate } from '../api/templateService';
@@ -9,6 +10,7 @@ import toast from 'react-hot-toast';
 
 const TemplateWithXeroData: React.FC = () => {
   const { company } = useAuth();
+  const { state: xeroState } = useXero();
   const userRole = useUserRole(company);
   
   // Additional protection - redirect if not super admin

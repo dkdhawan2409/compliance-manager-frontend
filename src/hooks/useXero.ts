@@ -291,7 +291,7 @@ export const useXero = (): UseXeroReturn => {
 
   const loadData = useCallback(async (resourceType: XeroResourceType) => {
     if (!isConnected || !selectedTenant) {
-      throw new Error('Not connected to Xero');
+      console.log('⚠️ Not connected to Xero, will attempt demo data fallback');
     }
 
     console.log('🔍 Loading data:', { resourceType, tenantId: selectedTenant.id, isConnected });

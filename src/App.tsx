@@ -16,6 +16,7 @@ import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import Compliance from './pages/Compliance';
 import AdminCompanyList from './pages/AdminCompanyList';
+import AdminXeroManager from './pages/AdminXeroManager';
 import AdminNotify from './pages/AdminNotify';
 import AdminSettings from './pages/AdminSettings';
 import AdminCronSettings from './pages/AdminCronSettings';
@@ -31,6 +32,8 @@ import SuperAdminTemplates from './pages/SuperAdminTemplates';
 import TemplateWithXeroData from './pages/TemplateWithXeroData';
 import BASProcessing from './pages/BASProcessing';
 import FASProcessing from './pages/FASProcessing';
+import XeroOAuth2Page from './pages/XeroOAuth2Page';
+import XeroDataDisplay from './pages/XeroDataDisplay';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
@@ -104,6 +107,22 @@ function App() {
                 }
               />
               <Route
+                path="/xero/data-display"
+                element={
+                  <ProtectedRoute>
+                    <XeroDataDisplay />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/xero-oauth2"
+                element={
+                  <ProtectedRoute>
+                    <XeroOAuth2Page />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/xero/:connectionId/invoices"
                 element={
                   <ProtectedRoute>
@@ -132,6 +151,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <AdminCompanyList />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/xero-manager"
+                element={
+                  <ProtectedRoute>
+                    <AdminXeroManager />
                   </ProtectedRoute>
                 }
               />

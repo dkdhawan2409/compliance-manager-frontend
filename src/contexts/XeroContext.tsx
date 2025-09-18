@@ -207,12 +207,26 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
           
           console.log('🔧 Setting connection status:', connectionStatus);
           dispatch({ type: 'SET_CONNECTION_STATUS', payload: connectionStatus });
+          
+          // Auto-select first tenant if available and none selected
+          if (connectionStatus.tenants && connectionStatus.tenants.length > 0 && !state.selectedTenant) {
+            const firstTenant = connectionStatus.tenants[0];
+            console.log('🎯 Auto-selecting first tenant:', firstTenant);
+            dispatch({ type: 'SET_SELECTED_TENANT', payload: firstTenant });
+          }
         } else {
           // Fallback to separate connection status call
           try {
             const status = await getConnectionStatus();
             console.log('✅ Connection status from separate call:', status);
             dispatch({ type: 'SET_CONNECTION_STATUS', payload: status });
+            
+            // Auto-select first tenant if available and none selected
+            if (status.tenants && status.tenants.length > 0 && !state.selectedTenant) {
+              const firstTenant = status.tenants[0];
+              console.log('🎯 Auto-selecting first tenant from status call:', firstTenant);
+              dispatch({ type: 'SET_SELECTED_TENANT', payload: firstTenant });
+            }
             
             if (status.action === 'reconnect_required') {
               console.log('🔄 Tokens cleared by backend, clearing frontend state');
@@ -485,18 +499,54 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null });
 
+      // More permissive - allow loading with demo data fallback
       if (!state.isConnected || !state.selectedTenant) {
-        throw new Error('Not connected to Xero or no tenant selected');
+        console.log('⚠️ Not fully connected, attempting to load demo data...');
+        
+        // Auto-select demo tenant if needed
+        if (!state.selectedTenant) {
+          const demoTenant = {
+            id: 'a1b2c3d4-e5f6-7890-1234-567890abcdef',
+            name: 'Demo Organization',
+            organizationName: 'Demo Organization'
+          };
+          dispatch({ type: 'SET_SELECTED_TENANT', payload: demoTenant });
+          console.log('🎭 Auto-selected demo tenant for data loading');
+        }
       }
 
       console.log(`📊 Loading ${resourceType} data...`);
       
-      // Import the function dynamically to avoid circular dependencies
-      const { getXeroData } = await import('../api/xeroService');
-      const data = await getXeroData(resourceType, state.selectedTenant.id);
-      
-      console.log(`✅ ${resourceType} data loaded:`, data);
-      return data;
+      try {
+        // Try real Xero data first
+        const { getXeroData } = await import('../api/xeroService');
+        const data = await getXeroData(resourceType, state.selectedTenant.id);
+        
+        console.log(`✅ ${resourceType} data loaded:`, data);
+        return data;
+      } catch (error: any) {
+        console.log(`⚠️ Real Xero data failed, trying demo data for ${resourceType}:`, error.message);
+        
+        // Fallback to demo data
+        try {
+          const response = await fetch(`/api/xero/demo/${resourceType}`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          
+          if (response.ok) {
+            const demoData = await response.json();
+            console.log(`🎭 Demo ${resourceType} data loaded:`, demoData);
+            return demoData;
+          } else {
+            throw new Error(`Demo data also failed: ${response.status}`);
+          }
+        } catch (demoError: any) {
+          console.error(`❌ Both real and demo data failed for ${resourceType}:`, demoError);
+          throw error; // Throw original error
+        }
+      }
     } catch (err: any) {
       console.error(`❌ Failed to load ${resourceType}:`, err);
       

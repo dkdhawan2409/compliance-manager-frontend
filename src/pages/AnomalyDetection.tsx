@@ -156,7 +156,7 @@ const AnomalyDetection: React.FC = () => {
 
     try {
       const result = await scoreData({
-        data: dataset.slice(0, 10), // Score first 10 samples for demo
+        data: dataset, // Score all samples
         threshold,
         modelId: selectedModel || undefined
       });
