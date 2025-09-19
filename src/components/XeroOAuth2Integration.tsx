@@ -144,18 +144,21 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
 
     try {
       console.log('🔍 Checking connection status...');
-      // Use relative URL - Vite proxy will route to backend
+      
+      // Use timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+      
       const response = await fetch(`${getApiUrl()}/xero/status`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
+          'Content-Type': 'application/json'
         },
-        credentials: 'include',
-        mode: 'cors'
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const result = await response.json();
@@ -166,7 +169,7 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
         if (!result.data.tenants || result.data.tenants.length === 0) {
           console.log('⚠️ No tenants available, clearing state');
           setSelectedTenant('');
-          setXeroData(null); // Clear any existing data
+          setXeroData(null);
           
           // Clear any cached Xero localStorage data
           localStorage.removeItem('xero_authorized');
@@ -188,16 +191,31 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
             }, 500);
           }
         }
+      } else {
+        console.log('⚠️ Status check failed:', response.status, response.statusText);
+        // Set default disconnected status
+        setConnectionStatus({ 
+          connected: false, 
+          isTokenValid: false,
+          message: 'Not connected',
+          tenants: []
+        });
       }
     } catch (error: any) {
-      console.error('❌ Error checking connection status:', error);
-      console.error('❌ Error details:', {
-        message: error.message,
-        name: error.name,
-        stack: error.stack,
-        apiUrl: getApiUrl()
+      console.log('⚠️ Connection status check failed (using defaults):', error.message);
+      
+      // Don't show error to user for status checks - just use defaults
+      setConnectionStatus({ 
+        connected: false, 
+        isTokenValid: false,
+        message: 'Status check unavailable',
+        tenants: []
       });
-      toast.error(`Failed to check connection status: ${error.message}`);
+      
+      // Only show error if it's not a CORS/network issue
+      if (!error.message.includes('fetch') && !error.message.includes('CORS')) {
+        console.error('❌ Unexpected status check error:', error);
+      }
     }
   };
 
