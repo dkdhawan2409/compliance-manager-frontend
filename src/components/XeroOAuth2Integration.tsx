@@ -216,6 +216,14 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
       const apiUrl = getApiUrl();
       console.log('🔍 Making request to:', `${apiUrl}/xero/settings`);
       
+      // Enhanced authentication check
+      if (!token) {
+        console.error('❌ No authentication token found');
+        toast.error('Please log in to access Xero settings');
+        setXeroSettings({ hasCredentials: false });
+        return;
+      }
+      
       const response = await fetch(`${apiUrl}/xero/settings`, {
         method: 'GET',
         headers: {
@@ -242,6 +250,20 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
           setXeroSettings({ hasCredentials: false });
         }
       } else {
+        console.error('❌ Settings request failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url
+        });
+        
+        if (response.status === 401) {
+          toast.error('Authentication expired. Please log in again.');
+        } else if (response.status === 404) {
+          toast.error('Xero settings endpoint not found. Please contact support.');
+        } else {
+          toast.error(`Server error: ${response.status} ${response.statusText}`);
+        }
+        
         setXeroSettings({ hasCredentials: false });
       }
     } catch (error: any) {
@@ -250,9 +272,25 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
         message: error.message,
         name: error.name,
         stack: error.stack,
-        apiUrl: getApiUrl()
+        apiUrl: getApiUrl(),
+        hasToken: !!localStorage.getItem('token'),
+        timestamp: new Date().toISOString()
       });
-      toast.error(`Failed to load Xero settings: ${error.message}`);
+      
+      // Enhanced error messages based on error type
+      let errorMessage = 'Failed to load Xero settings';
+      
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        errorMessage = 'Cannot connect to server. Please check your internet connection or contact support.';
+      } else if (error.message.includes('CORS')) {
+        errorMessage = 'Server configuration issue. Please contact support.';
+      } else if (error.message.includes('NetworkError')) {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      } else {
+        errorMessage = `Connection error: ${error.message}`;
+      }
+      
+      toast.error(errorMessage);
       setXeroSettings({ hasCredentials: false });
     }
   };
