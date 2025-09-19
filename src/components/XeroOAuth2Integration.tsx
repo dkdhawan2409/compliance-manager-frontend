@@ -146,11 +146,15 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
       console.log('🔍 Checking connection status...');
       // Use relative URL - Vite proxy will route to backend
       const response = await fetch(`${getApiUrl()}/xero/status`, {
+        method: 'GET',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
-        }
+        },
+        credentials: 'include',
+        mode: 'cors'
       });
 
       if (response.ok) {
@@ -185,21 +189,43 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
           }
         }
       }
-    } catch (error) {
-      console.error('Error checking connection status:', error);
+    } catch (error: any) {
+      console.error('❌ Error checking connection status:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack,
+        apiUrl: getApiUrl()
+      });
+      toast.error(`Failed to check connection status: ${error.message}`);
     }
   };
 
   const fetchXeroSettings = async () => {
     try {
+      // Debug: Log environment and API URL
+      console.log('🔍 Environment check:', {
+        isProd: import.meta.env.PROD,
+        viteApiUrl: import.meta.env.VITE_API_URL,
+        calculatedApiUrl: getApiUrl(),
+        mode: import.meta.env.MODE
+      });
+      
       // Fetch company's Xero settings to display client credentials
       const token = localStorage.getItem('token');
-      const response = await fetch(`${getApiUrl()}/xero/settings`, {
+      const apiUrl = getApiUrl();
+      console.log('🔍 Making request to:', `${apiUrl}/xero/settings`);
+      
+      const response = await fetch(`${apiUrl}/xero/settings`, {
+        method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
-        }
+        },
+        credentials: 'include',
+        mode: 'cors'
       });
       
       if (response.ok) {
@@ -218,8 +244,15 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
       } else {
         setXeroSettings({ hasCredentials: false });
       }
-    } catch (error) {
-      console.error('Error fetching Xero settings:', error);
+    } catch (error: any) {
+      console.error('❌ Error fetching Xero settings:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack,
+        apiUrl: getApiUrl()
+      });
+      toast.error(`Failed to load Xero settings: ${error.message}`);
       setXeroSettings({ hasCredentials: false });
     }
   };
