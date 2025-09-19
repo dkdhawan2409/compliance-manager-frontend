@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { getApiUrl } from '../utils/envChecker';
 
 interface XeroCredentials {
   clientId: string;
@@ -31,7 +32,7 @@ const XeroAdminManager: React.FC = () => {
 
   const loadCompanies = async () => {
     try {
-      const response = await fetch('/api/companies/admin/all-with-xero', {
+      const response = await fetch(`${getApiUrl()}/companies/admin/all-with-xero`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -48,7 +49,7 @@ const XeroAdminManager: React.FC = () => {
 
   const loadExistingCredentials = async () => {
     try {
-      const response = await fetch('/api/xero/settings', {
+      const response = await fetch(`${getApiUrl()}/xero/settings`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -128,7 +129,7 @@ const XeroAdminManager: React.FC = () => {
 
     setBulkLoading(true);
     try {
-      const response = await fetch('/api/companies/admin/xero-client-all', {
+      const response = await fetch(`${getApiUrl()}/companies/admin/xero-client-all`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

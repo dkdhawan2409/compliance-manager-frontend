@@ -7,6 +7,7 @@ import {
   handleXeroCallback,
   deleteXeroSettings 
 } from '../api/xeroService';
+import { getApiUrl } from '../utils/envChecker';
 
 // Types
 export interface XeroTokens {
@@ -529,7 +530,7 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
         
         // Fallback to demo data
         try {
-          const response = await fetch(`/api/xero/demo/${resourceType}`, {
+          const response = await fetch(`${getApiUrl()}/xero/demo/${resourceType}`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('token')}`
             }

@@ -145,7 +145,7 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
     try {
       console.log('🔍 Checking connection status...');
       // Use relative URL - Vite proxy will route to backend
-      const response = await fetch('/api/xero/status', {
+      const response = await fetch(`${getApiUrl()}/xero/status`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Cache-Control': 'no-cache',
@@ -194,7 +194,7 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
     try {
       // Fetch company's Xero settings to display client credentials
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/xero/settings', {
+      const response = await fetch(`${getApiUrl()}/xero/settings`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Cache-Control': 'no-cache',
@@ -231,7 +231,7 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
       // Make API call to get authorization URL
       const token = localStorage.getItem('token');
       
-      const response = await fetch('/api/xero/connect', {
+      const response = await fetch(`${getApiUrl()}/xero/connect`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -265,7 +265,7 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
 
     try {
       // Use relative URL - Vite proxy will route to backend
-      const response = await fetch('/api/xero/disconnect', {
+      const response = await fetch(`${getApiUrl()}/xero/disconnect`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -301,7 +301,7 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
     setLoading(true);
     try {
       // Use relative URL - Vite proxy will route to backend
-      const response = await fetch(`/api/xero/data/${dataType}?tenantId=${selectedTenant}`, {
+      const response = await fetch(`${getApiUrl()}/xero/data/${dataType}?tenantId=${selectedTenant}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -358,7 +358,7 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
     
     try {
       // Try real data first, fallback to demo data if auth fails
-      let response = await fetch(`/api/xero/data/${type}?tenantId=${selectedTenant}`, {
+      let response = await fetch(`${getApiUrl()}/xero/data/${type}?tenantId=${selectedTenant}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -373,7 +373,7 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
         // Try demo data as fallback for testing
         console.log(`🎭 Auth failed, trying demo data for ${type}...`);
         try {
-          const demoResponse = await fetch(`/api/xero/demo/${type}`, {
+          const demoResponse = await fetch(`${getApiUrl()}/xero/demo/${type}`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
@@ -462,7 +462,7 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
       
       for (const type of dataTypes) {
         try {
-          const response = await fetch(`/api/xero/data/${type}?tenantId=${selectedTenant}`, {
+          const response = await fetch(`${getApiUrl()}/xero/data/${type}?tenantId=${selectedTenant}`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
@@ -474,7 +474,7 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
           } else if (response.status === 401) {
             // Try demo data as fallback
             try {
-              const demoResponse = await fetch(`/api/xero/demo/${type}`, {
+              const demoResponse = await fetch(`${getApiUrl()}/xero/demo/${type}`, {
                 headers: {
                   'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }

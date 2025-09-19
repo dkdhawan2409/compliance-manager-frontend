@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { getApiUrl } from '../utils/envChecker';
 
 interface XeroDataDisplayProps {
   className?: string;
@@ -27,7 +28,7 @@ const SimpleXeroDataDisplay: React.FC<XeroDataDisplayProps> = ({ className = '' 
     setLoading(true);
     try {
       // Always use demo data for reliable display
-      const response = await fetch(`/api/xero/demo/${type}`, {
+      const response = await fetch(`${getApiUrl()}/xero/demo/${type}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }

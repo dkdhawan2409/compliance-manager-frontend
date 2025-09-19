@@ -2,6 +2,7 @@ import React, { ComponentType } from 'react';
 import { useXero } from '../contexts/XeroContext';
 import { getFinancialSummary, getDashboardData } from '../api/xeroService';
 import { toast } from 'react-hot-toast';
+import { getApiUrl } from '../utils/envChecker';
 
 // Interface for the props that the HOC will inject
 export interface WithXeroDataProps {
@@ -101,7 +102,7 @@ export function withXeroData<T extends WithXeroDataProps>(
         } catch (error) {
           console.log('⚠️ Failed to load invoices, using demo data:', error);
           // Load demo data as fallback
-          const response = await fetch('/api/xero/demo/invoices', {
+          const response = await fetch(`${getApiUrl()}/xero/demo/invoices`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
           });
           if (response.ok) {
@@ -116,7 +117,7 @@ export function withXeroData<T extends WithXeroDataProps>(
         } catch (error) {
           console.log('⚠️ Failed to load contacts, using demo data:', error);
           // Load demo data as fallback
-          const response = await fetch('/api/xero/demo/contacts', {
+          const response = await fetch(`${getApiUrl()}/xero/demo/contacts`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
           });
           if (response.ok) {
