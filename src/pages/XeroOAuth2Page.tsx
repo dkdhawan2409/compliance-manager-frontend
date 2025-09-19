@@ -1,6 +1,7 @@
 import React from 'react';
 import SidebarLayout from '../components/SidebarLayout';
 import XeroOAuth2Integration from '../components/XeroOAuth2Integration';
+import ProductionDiagnostic from '../components/ProductionDiagnostic';
 
 const XeroOAuth2Page: React.FC = () => {
   return (
@@ -16,6 +17,11 @@ const XeroOAuth2Page: React.FC = () => {
         </div>
 
         <XeroOAuth2Integration />
+
+        {/* Production Diagnostic Tool */}
+        <div className="mt-8">
+          <ProductionDiagnostic />
+        </div>
 
         <div className="mt-8 bg-green-50 border border-green-200 rounded-lg p-6">
           <h2 className="text-lg font-semibold text-green-900 mb-4">🎯 OAuth2 Flow</h2>
