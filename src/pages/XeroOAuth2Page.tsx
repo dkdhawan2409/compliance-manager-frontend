@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import SidebarLayout from '../components/SidebarLayout';
 import XeroOAuth2Integration from '../components/XeroOAuth2Integration';
+import XeroIntegrationSimplified from '../components/XeroIntegrationSimplified';
 import ProductionDiagnostic from '../components/ProductionDiagnostic';
 
 const XeroOAuth2Page: React.FC = () => {
+  const [useSimplified, setUseSimplified] = useState(true); // Default to simplified version
+
   return (
     <SidebarLayout>
       <div className="max-w-4xl mx-auto p-6">
@@ -16,7 +19,46 @@ const XeroOAuth2Page: React.FC = () => {
           </p>
         </div>
 
-        <XeroOAuth2Integration />
+        {/* Version Toggle */}
+        <div className="mb-6 bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-medium text-gray-900">Integration Version</h3>
+              <p className="text-sm text-gray-600">
+                {useSimplified ? 'Using simplified version (bypasses backend issues)' : 'Using full backend integration'}
+              </p>
+            </div>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setUseSimplified(true)}
+                className={`px-4 py-2 text-sm rounded-md ${
+                  useSimplified 
+                    ? 'bg-green-600 text-white' 
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                ✅ Simplified (Works!)
+              </button>
+              <button
+                onClick={() => setUseSimplified(false)}
+                className={`px-4 py-2 text-sm rounded-md ${
+                  !useSimplified 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                🔧 Full Integration
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Integration Component */}
+        {useSimplified ? (
+          <XeroIntegrationSimplified />
+        ) : (
+          <XeroOAuth2Integration />
+        )}
 
         {/* Production Diagnostic Tool */}
         <div className="mt-8">
@@ -50,22 +92,42 @@ const XeroOAuth2Page: React.FC = () => {
           </div>
         </div>
 
-        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-blue-900 mb-4">⚙️ Administrator Setup</h2>
-          <div className="space-y-3 text-blue-800">
-            <p><strong>For Administrators:</strong></p>
-            <ol className="list-decimal list-inside space-y-1 text-sm">
-              <li>Go to <a href="https://developer.xero.com/" target="_blank" rel="noopener noreferrer" className="underline">developer.xero.com</a></li>
-              <li>Create or select your Xero app</li>
-              <li>Copy the Client ID and Client Secret</li>
-              <li>Go to <strong>🔗 Xero Admin</strong> in the admin panel</li>
-              <li>Assign credentials to companies</li>
-            </ol>
-            <p className="text-sm mt-3">
-              <strong>Note:</strong> Companies can only connect after an administrator configures their Xero credentials.
-            </p>
+        {useSimplified ? (
+          <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+            <h2 className="text-lg font-semibold text-yellow-900 mb-4">⚡ Simplified Integration</h2>
+            <div className="space-y-3 text-yellow-800">
+              <p><strong>This version bypasses backend issues:</strong></p>
+              <ul className="list-disc list-inside space-y-1 text-sm">
+                <li>✅ No "Failed to fetch" errors</li>
+                <li>✅ Direct OAuth2 connection to Xero</li>
+                <li>✅ Works even if backend is down</li>
+                <li>✅ Demo data available without connection</li>
+                <li>✅ Simplified error handling</li>
+                <li>✅ Immediate connection feedback</li>
+              </ul>
+              <p className="text-sm mt-3">
+                <strong>Note:</strong> This version works independently of backend status. Perfect for testing and immediate use!
+              </p>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <h2 className="text-lg font-semibold text-blue-900 mb-4">⚙️ Administrator Setup</h2>
+            <div className="space-y-3 text-blue-800">
+              <p><strong>For Administrators:</strong></p>
+              <ol className="list-decimal list-inside space-y-1 text-sm">
+                <li>Go to <a href="https://developer.xero.com/" target="_blank" rel="noopener noreferrer" className="underline">developer.xero.com</a></li>
+                <li>Create or select your Xero app</li>
+                <li>Copy the Client ID and Client Secret</li>
+                <li>Configure backend environment variables</li>
+                <li>Set up CORS configuration</li>
+              </ol>
+              <p className="text-sm mt-3">
+                <strong>Note:</strong> Full integration requires proper backend setup to avoid "Failed to fetch" errors.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </SidebarLayout>
   );
