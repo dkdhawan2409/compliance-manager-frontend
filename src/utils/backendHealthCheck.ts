@@ -1,5 +1,7 @@
+import { getApiUrl } from './envChecker';
+
 export const checkBackendHealth = async () => {
-  const apiBase = import.meta.env.VITE_API_URL || 'https://compliance-manager-backend.onrender.com/api';
+  const apiBase = getApiUrl();
   
   try {
     console.log('🔍 Checking backend health...');
@@ -54,7 +56,7 @@ export const checkBackendHealth = async () => {
 };
 
 export const testXeroEndpoints = async () => {
-  const apiBase = import.meta.env.VITE_API_URL || 'https://compliance-manager-backend.onrender.com/api';
+  const apiBase = getApiUrl();
   const token = localStorage.getItem('token');
   
   const results: any = {};

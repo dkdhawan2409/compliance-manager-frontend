@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { logXeroEnvironmentTest } from '../utils/xeroEnvironmentTest';
 
 interface XeroIntegrationSimplifiedProps {}
 
@@ -9,6 +10,9 @@ const XeroIntegrationSimplified: React.FC<XeroIntegrationSimplifiedProps> = () =
   const [connectionStatus, setConnectionStatus] = useState<string>('disconnected');
 
   useEffect(() => {
+    // Run environment test to ensure proper configuration
+    logXeroEnvironmentTest();
+    
     // Check if user is already connected (from localStorage)
     const xeroConnected = localStorage.getItem('xero_connected');
     if (xeroConnected === 'true') {
@@ -21,15 +25,28 @@ const XeroIntegrationSimplified: React.FC<XeroIntegrationSimplifiedProps> = () =
     setLoading(true);
     
     try {
-      // Direct OAuth URL - bypassing backend completely for now
+      // Direct OAuth URL with smart environment detection
       const clientId = process.env.REACT_APP_XERO_CLIENT_ID || 'demo-client-id';
-      const redirectUri = 'https://compliance-manager-frontend.onrender.com/redirecturl';
+      
+      // Smart redirect URI based on environment
+      const isLocal = window.location.hostname.includes('localhost');
+      const redirectUri = isLocal 
+        ? `http://localhost:3001/redirecturl`
+        : 'https://compliance-manager-frontend.onrender.com/redirecturl';
+      
       const state = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
       const scopes = 'offline_access accounting.transactions accounting.contacts accounting.settings';
       
       // Store state for later verification
       localStorage.setItem('xero_oauth_state', state);
       localStorage.setItem('xero_oauth_start', Date.now().toString());
+      
+      console.log('🔧 Creating OAuth URL with smart detection:', {
+        clientId: clientId.substring(0, 8) + '...',
+        redirectUri,
+        isLocal,
+        environment: isLocal ? 'development' : 'production'
+      });
       
       const authUrl = `https://login.xero.com/identity/connect/authorize?` +
         `response_type=code&` +

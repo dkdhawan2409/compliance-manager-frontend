@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../api/client';
+import { getApiUrl } from '../utils/envChecker';
 
 const BackendHealthCheck: React.FC = () => {
   const [healthStatus, setHealthStatus] = useState<'checking' | 'healthy' | 'unhealthy'>('checking');
@@ -12,7 +13,7 @@ const BackendHealthCheck: React.FC = () => {
     
     try {
       // Test basic health endpoint
-      const healthResponse = await fetch(`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'https://compliance-manager-backend.onrender.com'}/health`);
+      const healthResponse = await fetch(`${getApiUrl().replace('/api', '')}/health`);
       const healthData = await healthResponse.json();
       
       // Test Xero settings endpoint

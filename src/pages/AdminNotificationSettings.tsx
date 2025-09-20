@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import SidebarLayout from '../components/SidebarLayout';
 import { FaSms, FaEnvelope, FaBell, FaSave } from 'react-icons/fa';
 import apiClient from '../api/client';
+import { getApiUrl } from '../utils/envChecker';
 
 const notificationTypes = [
   { key: 'BAS', label: 'BAS', desc: 'Business Activity Statement' },
@@ -86,7 +87,7 @@ const AdminNotificationSettings: React.FC = () => {
   useEffect(() => {
     const fetchNotificationSettings = async () => {
       try {
-        const apiBase = import.meta.env.VITE_API_URL || 'https://compliance-manager-backend.onrender.com/api';
+        const apiBase = getApiUrl();
         const token = localStorage.getItem('token');
         const response = await fetch(`${apiBase}/companies/notification-settings`, {
           method: 'GET',
@@ -178,9 +179,10 @@ const AdminNotificationSettings: React.FC = () => {
         days: parseDurations(settings[type.key].email.duration),
       },
     }));
-    try {      const apiBase = import.meta.env.VITE_API_URL || 'https://compliance-manager-backend.onrender.com/api';
+    try {
+      const apiBase = getApiUrl();
 
-      // const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3333/api';
+      // Using getApiUrl() for smart environment detection
       const token = localStorage.getItem('token');
       await fetch(`${apiBase}/companies/notification-settings`, {
         method: 'POST',

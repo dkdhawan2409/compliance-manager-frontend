@@ -336,13 +336,26 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
 
   const createFallbackOAuthUrl = () => {
     // Create OAuth URL directly (fallback when backend is unavailable)
-    const clientId = 'YOUR_XERO_CLIENT_ID'; // You'll need to set this
-    const redirectUri = 'https://compliance-manager-frontend.onrender.com/redirecturl';
+    const clientId = process.env.REACT_APP_XERO_CLIENT_ID || 'demo-client-id';
+    
+    // Smart redirect URI based on environment
+    const isLocal = window.location.hostname.includes('localhost');
+    const redirectUri = isLocal 
+      ? `http://localhost:3001/redirecturl`
+      : 'https://compliance-manager-frontend.onrender.com/redirecturl';
+    
     const state = Math.random().toString(36).substring(2, 15);
     const scopes = 'offline_access accounting.transactions accounting.contacts accounting.settings';
     
     // Store state for verification
     localStorage.setItem('xero_oauth_state', state);
+    
+    console.log('🔧 Creating fallback OAuth URL with smart detection:', {
+      clientId: clientId.substring(0, 8) + '...',
+      redirectUri,
+      isLocal,
+      environment: isLocal ? 'development' : 'production'
+    });
     
     return `https://login.xero.com/identity/connect/authorize?` +
            `response_type=code&` +

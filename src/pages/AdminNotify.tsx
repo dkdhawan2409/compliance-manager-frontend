@@ -8,6 +8,7 @@ import ComplianceTextGenerator from '../components/ComplianceTextGenerator';
 import TemplateGenerator from '../components/TemplateGenerator';
 import ContentAnalyzer from '../components/ContentAnalyzer';
 import { OpenAISettingsData } from '../api/openaiService';
+import { getApiUrl } from '../utils/envChecker';
 
 const adminNavLinks = [
   { name: 'Company List', to: '/admin/companies' },
@@ -91,7 +92,7 @@ const AdminNotify: React.FC = () => {
   // Fetch notification settings for days
   useEffect(() => {
     const fetchNotifSettings = async () => {
-      const apiBase = import.meta.env.VITE_API_URL || 'https://compliance-manager-backend.onrender.com/api';
+      const apiBase = getApiUrl();
       const token = localStorage.getItem('token');
       const response = await fetch(`${apiBase}/companies/notification-settings`, {
         method: 'GET',
@@ -121,7 +122,7 @@ const AdminNotify: React.FC = () => {
 
   const fetchCompanies = async () => {
     try {
-      const apiBase = import.meta.env.VITE_API_URL || 'https://compliance-manager-backend.onrender.com/api';
+      const apiBase = getApiUrl();
       const token = localStorage.getItem('token');
       const response = await fetch(`${apiBase}/companies/all`, {
         headers: {
@@ -262,7 +263,7 @@ const AdminNotify: React.FC = () => {
     
     // Fetch companies when modal opens
     try {
-      const apiBase = import.meta.env.VITE_API_URL || 'https://compliance-manager-backend.onrender.com/api';
+      const apiBase = getApiUrl();
       const token = localStorage.getItem('token');
       const response = await fetch(`${apiBase}/companies/all`, {
         headers: {
@@ -337,7 +338,7 @@ const AdminNotify: React.FC = () => {
     setTesting(true);
     setTestResult(null);
     try {
-      const apiBase = import.meta.env.VITE_API_URL || 'https://compliance-manager-backend.onrender.com/api';
+      const apiBase = getApiUrl();
       const token = localStorage.getItem('token');
       const response = await fetch(`${apiBase}/companies/templates/${testTemplateId}/test`, {
         method: 'POST',
