@@ -1,7 +1,28 @@
 import axios from 'axios';
 
-// Get API URL from environment or use production backend
-const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://compliance-manager-backend.onrender.com/api' : 'http://localhost:3333/api');
+// Smart API URL detection for local vs production
+const getSmartApiUrl = (): string => {
+  // Check if we're running on a production domain
+  const isProductionDomain = typeof window !== 'undefined' && 
+    (window.location.hostname.includes('onrender.com') || 
+     window.location.hostname.includes('vercel.app') || 
+     window.location.hostname.includes('netlify.app'));
+
+  // If on production domain, always use production API
+  if (isProductionDomain) {
+    return 'https://compliance-manager-backend.onrender.com/api';
+  }
+
+  // If in production build but not on production domain (e.g., local production build)
+  if (import.meta.env.PROD) {
+    return import.meta.env.VITE_API_URL || 'https://compliance-manager-backend.onrender.com/api';
+  }
+  
+  // Development mode - use localhost
+  return import.meta.env.VITE_API_URL || 'http://localhost:3333/api';
+};
+
+const API_URL = getSmartApiUrl();
 
 console.log('🔧 API Client initialized with URL:', API_URL);
 

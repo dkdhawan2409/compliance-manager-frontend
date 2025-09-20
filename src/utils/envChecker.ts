@@ -108,12 +108,30 @@ export const getCurrentDomain = (): string => {
 };
 
 export const getApiUrl = (): string => {
-  // In production, always use the environment variable or production URL
-  if (import.meta.env.PROD) {
-    return import.meta.env.VITE_API_URL || 'https://compliance-manager-backend.onrender.com/api';
+  // Check if we're running on a production domain
+  const isProductionDomain = typeof window !== 'undefined' && 
+    (window.location.hostname.includes('onrender.com') || 
+     window.location.hostname.includes('vercel.app') || 
+     window.location.hostname.includes('netlify.app'));
+
+  // If on production domain, always use production API
+  if (isProductionDomain) {
+    const prodUrl = 'https://compliance-manager-backend.onrender.com/api';
+    console.log('🔧 Production domain detected, using production API:', prodUrl);
+    return prodUrl;
   }
-  // In development, allow localhost fallback
-  return import.meta.env.VITE_API_URL || 'http://localhost:3333/api';
+
+  // If in production build but not on production domain (e.g., local production build)
+  if (import.meta.env.PROD) {
+    const envUrl = import.meta.env.VITE_API_URL || 'https://compliance-manager-backend.onrender.com/api';
+    console.log('🔧 Production build, using environment API URL:', envUrl);
+    return envUrl;
+  }
+  
+  // Development mode - use localhost
+  const devUrl = import.meta.env.VITE_API_URL || 'http://localhost:3333/api';
+  console.log('🔧 Development mode, using localhost API:', devUrl);
+  return devUrl;
 };
 
 export const getRedirectUrl = (): string => {
