@@ -34,6 +34,8 @@ import BASProcessing from './pages/BASProcessing';
 import FASProcessing from './pages/FASProcessing';
 import XeroOAuth2Page from './pages/XeroOAuth2Page';
 import XeroDataDisplay from './pages/XeroDataDisplay';
+import MissingAttachments from './pages/MissingAttachments';
+import UploadReceipt from './pages/UploadReceipt';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
@@ -233,6 +235,18 @@ function App() {
                     <TemplateWithXeroData />
                   </SuperAdminRoute>
                 }
+              />
+              <Route
+                path="/missing-attachments"
+                element={
+                  <ProtectedRoute>
+                    <MissingAttachments />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/upload-receipt/:linkId"
+                element={<UploadReceipt />}
               />
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
             </Routes>
