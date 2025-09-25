@@ -89,7 +89,7 @@ export const saveXeroSettings = async (settings: {
   clientSecret: string;
   redirectUri: string;
 }): Promise<XeroSettings> => {
-  const response = await apiClient.post('/xero/settings', settings);
+  const response = await apiClient.post('/api/xero/settings', settings);
   return response.data.data;
 };
 
@@ -100,7 +100,7 @@ export const getXeroSettings = async (): Promise<XeroSettings & {
   tenants?: XeroTenant[];
   hasValidTokens?: boolean;
 }> => {
-  const response = await apiClient.get('/xero/settings');
+  const response = await apiClient.get('/api/xero/settings');
   return response.data.data;
 };
 
@@ -112,19 +112,46 @@ export const getConnectionStatus = async (): Promise<{
   tenants?: XeroTenant[];
   tokenRefreshed?: boolean;
   action?: string;
+  hasCredentials?: boolean;
+  needsOAuth?: boolean;
 }> => {
-  const response = await apiClient.get('/xero/connection-status');
-  return response.data.data;
+  console.log('🔍 getConnectionStatus: Making API call to /api/xero/status');
+  
+  try {
+    const response = await apiClient.get('/api/xero/status');
+    console.log('🔍 getConnectionStatus: Raw response:', response.data);
+    
+    const backendData = response.data.data;
+    console.log('🔍 getConnectionStatus: Backend data:', backendData);
+    
+    // Map backend response to frontend expected format
+    const mappedData = {
+      isConnected: backendData.connected || false,
+      connectionStatus: backendData.connected ? 'connected' : 'disconnected',
+      message: backendData.connected ? 'Xero connected successfully' : 'Not connected to Xero',
+      tenants: backendData.tenants || [],
+      hasCredentials: backendData.hasCredentials || false,
+      needsOAuth: backendData.needsOAuth || false,
+      tokenRefreshed: backendData.tokenRefreshed || false,
+      action: backendData.needsOAuth ? 'connect' : undefined
+    };
+    
+    console.log('🔍 getConnectionStatus: Mapped data:', mappedData);
+    return mappedData;
+  } catch (error) {
+    console.error('🔍 getConnectionStatus: Error:', error);
+    throw error;
+  }
 };
 
 // Delete Xero settings for the authenticated company
 export const deleteXeroSettings = async (): Promise<void> => {
-  await apiClient.delete('/xero/settings');
+  await apiClient.delete('/api/xero/settings');
 };
 
 // Get all Xero settings (admin only)
 export const getAllXeroSettings = async (): Promise<XeroSettings[]> => {
-  const response = await apiClient.get('/xero/settings/all');
+  const response = await apiClient.get('/api/xero/settings/all');
   return response.data.data;
 };
 
@@ -150,7 +177,7 @@ export const getXeroAuthUrl = async (): Promise<{ authUrl: string; state: string
     console.log('🔧 DEBUG - Redirect URI being sent to backend:', redirectUri);
     console.log('🔧 DEBUG - Full URL:', window.location.href);
     
-    const response = await apiClient.get('/xero/login', {
+    const response = await apiClient.get('/api/xero/connect', {
       params: {
         redirect_uri: redirectUri,
         state: state
@@ -158,11 +185,11 @@ export const getXeroAuthUrl = async (): Promise<{ authUrl: string; state: string
     });
     
     console.log('🔧 Backend response:', response.data);
-    console.log('🔧 DEBUG - Auth URL from backend:', response.data.data?.authUrl);
+    console.log('🔧 DEBUG - Auth URL from backend:', response.data.authUrl);
     
     // Check if the auth URL contains the correct redirect URI
-    if (response.data.data?.authUrl) {
-      const authUrl = response.data.data.authUrl;
+    if (response.data.authUrl) {
+      const authUrl = response.data.authUrl;
       console.log('🔧 DEBUG - Checking auth URL for redirect URI...');
       if (authUrl.includes('localhost')) {
         console.error('❌ ERROR: Backend returned auth URL with localhost!');
@@ -175,12 +202,12 @@ export const getXeroAuthUrl = async (): Promise<{ authUrl: string; state: string
       }
     }
     
-    if (!response.data.data?.authUrl) {
+    if (!response.data.authUrl) {
       throw new Error('No authorization URL received from backend');
     }
     
     return {
-      authUrl: response.data.data.authUrl,
+      authUrl: response.data.authUrl,
       state: state
     };
   } catch (error: any) {
@@ -213,7 +240,7 @@ export const handleXeroCallback = async (code: string, state: string): Promise<{
     console.log('🔧 Hostname:', window.location.hostname);
     console.log('🔧 NO LOCALHOST - Using Render domain only');
     
-    const response = await apiClient.post('/xero/callback', { 
+    const response = await apiClient.post('/api/xero/oauth-callback', { 
       code, 
       state,
       redirect_uri: redirectUri
@@ -233,13 +260,13 @@ export const handleXeroCallback = async (code: string, state: string): Promise<{
 
 // Get company information and enrollment status
 export const getXeroCompanyInfo = async (): Promise<XeroCompanyInfo> => {
-  const response = await apiClient.get('/xero/company-info');
+  const response = await apiClient.get('/api/xero/company-info');
   return response.data.data;
 };
 
 // Refresh access token
 export const refreshXeroToken = async (refreshToken: string, companyId: number): Promise<XeroTokens> => {
-  const response = await apiClient.post('/xero/refresh-token', { refreshToken, companyId });
+  const response = await apiClient.post('/api/xero/refresh-token', { refreshToken, companyId });
   return response.data.data;
 };
 

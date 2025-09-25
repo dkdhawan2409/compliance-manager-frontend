@@ -3,8 +3,10 @@ import { Navigate } from 'react-router-dom';
 import SidebarLayout from '../components/SidebarLayout';
 import { useAuth } from '../contexts/AuthContext';
 import { useUserRole, requireAIToolsAccess } from '../utils/roleUtils';
-import { templateService, useTemplates, useCreateTemplate, NotificationTemplate, CreateNotificationTemplateRequest } from '../api/templateService';
-import { useAnomalyDetection } from '../hooks/useAnomalyDetection';
+import { templateService, useTemplates,
+ useCreateTemplate, NotificationTemplate,
+  CreateNotificationTemplateRequest } from '../api/templateService';
+import { useAnomalyDetection} from '../hooks/useAnomalyDetection';
 import TemplateDataCollector from '../components/TemplateDataCollector';
 import toast from 'react-hot-toast';
 

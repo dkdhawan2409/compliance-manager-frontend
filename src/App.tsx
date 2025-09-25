@@ -34,6 +34,7 @@ import BASProcessing from './pages/BASProcessing';
 import FASProcessing from './pages/FASProcessing';
 import XeroOAuth2Page from './pages/XeroOAuth2Page';
 import XeroDataDisplay from './pages/XeroDataDisplay';
+import XeroFlow from './pages/XeroFlow';
 import MissingAttachments from './pages/MissingAttachments';
 import UploadReceipt from './pages/UploadReceipt';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -98,6 +99,14 @@ function App() {
                   <SuperAdminRoute>
                     <AITools />
                   </SuperAdminRoute>
+                }
+              />
+              <Route
+                path="/xero"
+                element={
+                  <ProtectedRoute>
+                    <XeroFlow />
+                  </ProtectedRoute>
                 }
               />
               <Route

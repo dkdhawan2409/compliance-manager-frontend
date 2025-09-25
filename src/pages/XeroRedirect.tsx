@@ -20,7 +20,7 @@ const XeroRedirect: React.FC = () => {
         setLoading(false);
         // Use full URL to ensure we stay on Render domain
         const currentOrigin = window.location.origin;
-        const redirectUrl = `${currentOrigin}/integrations/xero`;
+        const redirectUrl = `${currentOrigin}/xero`;
         console.log('🔧 Redirecting to:', redirectUrl);
         window.location.href = redirectUrl;
         return;
@@ -31,7 +31,7 @@ const XeroRedirect: React.FC = () => {
         setLoading(false);
         // Use full URL to ensure we stay on Render domain
         const currentOrigin = window.location.origin;
-        const redirectUrl = `${currentOrigin}/integrations/xero`;
+        const redirectUrl = `${currentOrigin}/xero`;
         console.log('🔧 Redirecting to:', redirectUrl);
         window.location.href = redirectUrl;
         return;
@@ -77,9 +77,9 @@ const XeroRedirect: React.FC = () => {
           toast.success('Xero connection successful!');
           console.log('Xero OAuth successful:', result);
           
-          // Use full URL to ensure we stay on Render domain
+          // Use full URL to ensure we stay on Render domain and add success parameter
           const currentOrigin = window.location.origin;
-          const redirectUrl = `${currentOrigin}/integrations/xero`;
+          const redirectUrl = `${currentOrigin}/xero?success=true`;
           console.log('🔧 Redirecting to:', redirectUrl);
           window.location.href = redirectUrl;
         } else {
@@ -89,7 +89,7 @@ const XeroRedirect: React.FC = () => {
           
           // Use full URL to ensure we stay on Render domain
           const currentOrigin = window.location.origin;
-          const redirectUrl = `${currentOrigin}/integrations/xero`;
+          const redirectUrl = `${currentOrigin}/xero`;
           console.log('🔧 Redirecting to:', redirectUrl);
           window.location.href = redirectUrl;
         }
@@ -99,7 +99,7 @@ const XeroRedirect: React.FC = () => {
         
         // Use full URL to ensure we stay on Render domain
         const currentOrigin = window.location.origin;
-        const redirectUrl = `${currentOrigin}/integrations/xero`;
+        const redirectUrl = `${currentOrigin}/xero`;
         console.log('🔧 Redirecting to:', redirectUrl);
         window.location.href = redirectUrl;
       } finally {

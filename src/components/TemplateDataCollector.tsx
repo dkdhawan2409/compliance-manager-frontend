@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useXero } from '../hooks/useXero';
+import { useXero } from '../contexts/XeroContext';
 import { getXeroCompanyInfo, getFinancialSummary, getAllInvoices } from '../api/xeroService';
 import { templateService, NotificationTemplate } from '../api/templateService';
 import TemplateSelector from './TemplateSelector';

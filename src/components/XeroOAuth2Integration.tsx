@@ -149,7 +149,7 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
       
-      const response = await fetch(`${getApiUrl()}/xero/status`, {
+      const response = await fetch(`${getApiUrl()}/api/xero/status`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -299,7 +299,7 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
         
-        const response = await fetch(`${getApiUrl()}/xero/connect`, {
+        const response = await fetch(`${getApiUrl()}/api/xero/connect`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -372,7 +372,7 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
 
     try {
       // Use relative URL - Vite proxy will route to backend
-      const response = await fetch(`${getApiUrl()}/xero/disconnect`, {
+      const response = await fetch(`${getApiUrl()}/api/xero/disconnect`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -465,7 +465,7 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
     
     try {
       // Try real data first, fallback to demo data if auth fails
-      let response = await fetch(`${getApiUrl()}/xero/data/${type}?tenantId=${selectedTenant}`, {
+      let response = await fetch(`${getApiUrl()}/api/xero/data/${type}?tenantId=${selectedTenant}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -480,7 +480,7 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
         // Try demo data as fallback for testing
         console.log(`🎭 Auth failed, trying demo data for ${type}...`);
         try {
-          const demoResponse = await fetch(`${getApiUrl()}/xero/demo/${type}`, {
+          const demoResponse = await fetch(`${getApiUrl()}/api/xero/demo/${type}`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
@@ -569,7 +569,7 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
       
       for (const type of dataTypes) {
         try {
-          const response = await fetch(`${getApiUrl()}/xero/data/${type}?tenantId=${selectedTenant}`, {
+          const response = await fetch(`${getApiUrl()}/api/xero/data/${type}?tenantId=${selectedTenant}`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
@@ -581,7 +581,7 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
           } else if (response.status === 401) {
             // Try demo data as fallback
             try {
-              const demoResponse = await fetch(`${getApiUrl()}/xero/demo/${type}`, {
+              const demoResponse = await fetch(`${getApiUrl()}/api/xero/demo/${type}`, {
                 headers: {
                   'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }

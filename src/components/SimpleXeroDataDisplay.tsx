@@ -10,6 +10,8 @@ const SimpleXeroDataDisplay: React.FC<XeroDataDisplayProps> = ({ className = '' 
   const [data, setData] = useState<any>({});
   const [loading, setLoading] = useState(false);
   const [selectedType, setSelectedType] = useState<string>('organization');
+  const [showDisconnectConfirmation, setShowDisconnectConfirmation] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
 
   const dataTypes = [
     { key: 'organization', label: '🏢 Organization', color: 'bg-blue-500' },
@@ -28,7 +30,7 @@ const SimpleXeroDataDisplay: React.FC<XeroDataDisplayProps> = ({ className = '' 
     setLoading(true);
     try {
       // Always use demo data for reliable display
-      const response = await fetch(`${getApiUrl()}/xero/demo/${type}`, {
+      const response = await fetch(`${getApiUrl()}/api/xero/demo/${type}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -63,6 +65,41 @@ const SimpleXeroDataDisplay: React.FC<XeroDataDisplayProps> = ({ className = '' 
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDisconnect = async () => {
+    setIsDisconnecting(true);
+    try {
+      const response = await fetch(`${getApiUrl()}/api/xero/disconnect`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (response.ok) {
+        setData({});
+        setShowDisconnectConfirmation(false);
+        toast.success('✅ Disconnected from Xero successfully');
+        // Redirect to Xero flow page
+        window.location.href = '/xero';
+      } else {
+        toast.error('Failed to disconnect from Xero');
+      }
+    } catch (error) {
+      console.error('Error disconnecting:', error);
+      toast.error('Failed to disconnect from Xero');
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
+
+  const confirmDisconnect = () => {
+    setShowDisconnectConfirmation(true);
+  };
+
+  const cancelDisconnect = () => {
+    setShowDisconnectConfirmation(false);
   };
 
   useEffect(() => {
@@ -154,6 +191,13 @@ const SimpleXeroDataDisplay: React.FC<XeroDataDisplayProps> = ({ className = '' 
           >
             🗑️ Clear Data
           </button>
+
+          <button
+            onClick={confirmDisconnect}
+            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 border-2 border-red-200"
+          >
+            🔌 Disconnect Xero
+          </button>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-6">
@@ -242,6 +286,48 @@ const SimpleXeroDataDisplay: React.FC<XeroDataDisplayProps> = ({ className = '' 
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Disconnect Confirmation Modal */}
+      {showDisconnectConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <div className="text-red-600 text-3xl mr-3">⚠️</div>
+                <h3 className="text-lg font-semibold text-gray-900">Disconnect Xero</h3>
+              </div>
+              
+              <div className="mb-6">
+                <p className="text-gray-600 mb-3">
+                  Are you sure you want to disconnect from Xero? This will:
+                </p>
+                <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside ml-4">
+                  <li>Disconnect your Xero account</li>
+                  <li>Clear all loaded data</li>
+                  <li>Require re-authentication to use Xero features</li>
+                </ul>
+              </div>
+              
+              <div className="flex space-x-3">
+                <button
+                  onClick={cancelDisconnect}
+                  disabled={isDisconnecting}
+                  className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 disabled:opacity-50 font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDisconnect}
+                  disabled={isDisconnecting}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-400 font-medium"
+                >
+                  {isDisconnecting ? '⏳ Disconnecting...' : '🔌 Disconnect'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

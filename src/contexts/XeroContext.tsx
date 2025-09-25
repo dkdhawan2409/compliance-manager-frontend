@@ -172,15 +172,22 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
   const API_RATE_LIMIT_MS = 2000; // 2 seconds between API calls
 
   const loadSettings = async () => {
+    console.log('🔄 loadSettings called, current state:', {
+      isLoading: state.isLoading,
+      lastApiCall,
+      now: Date.now(),
+      timeSinceLastCall: Date.now() - lastApiCall
+    });
+
     // Prevent multiple simultaneous calls
     if (state.isLoading) {
       console.log('⚠️ Settings already loading, skipping...');
       return;
     }
 
-    // Rate limiting protection
+    // Rate limiting protection - but allow initial load
     const now = Date.now();
-    if (now - lastApiCall < API_RATE_LIMIT_MS) {
+    if (lastApiCall > 0 && now - lastApiCall < API_RATE_LIMIT_MS) {
       console.log('⚠️ Rate limit protection: Skipping API call');
       return;
     }
@@ -191,53 +198,38 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
       dispatch({ type: 'SET_ERROR', payload: null });
 
       console.log('🔄 Loading Xero settings...');
-      const settingsData = await getXeroSettings();
       
-      if (settingsData) {
-        console.log('✅ Settings loaded:', settingsData);
-        dispatch({ type: 'SET_SETTINGS', payload: settingsData });
+      // Use status endpoint to get both settings and connection info
+      const statusData = await getConnectionStatus();
+      console.log('✅ Status loaded:', statusData);
+      
+      // Create settings object from status data
+      const settingsData = {
+        hasCredentials: statusData.hasCredentials || false,
+        hasOAuthSettings: statusData.hasCredentials || false,
+        isConnected: statusData.isConnected || false,
+        connectionStatus: statusData.connectionStatus || 'unknown',
+        tenants: statusData.tenants || []
+      };
+      
+      dispatch({ type: 'SET_SETTINGS', payload: settingsData });
 
-        // Check connection status
-        if (settingsData.isConnected !== undefined) {
-          const connectionStatus: XeroConnectionStatus = {
-            isConnected: Boolean(settingsData.isConnected),
-            connectionStatus: settingsData.connectionStatus || 'unknown',
-            message: settingsData.isConnected ? 'Xero connected successfully' : 'Not connected to Xero',
-            tenants: settingsData.tenants || []
-          };
-          
-          console.log('🔧 Setting connection status:', connectionStatus);
-          dispatch({ type: 'SET_CONNECTION_STATUS', payload: connectionStatus });
-          
-          // Auto-select first tenant if available and none selected
-          if (connectionStatus.tenants && connectionStatus.tenants.length > 0 && !state.selectedTenant) {
-            const firstTenant = connectionStatus.tenants[0];
-            console.log('🎯 Auto-selecting first tenant:', firstTenant);
-            dispatch({ type: 'SET_SELECTED_TENANT', payload: firstTenant });
-          }
-        } else {
-          // Fallback to separate connection status call
-          try {
-            const status = await getConnectionStatus();
-            console.log('✅ Connection status from separate call:', status);
-            dispatch({ type: 'SET_CONNECTION_STATUS', payload: status });
-            
-            // Auto-select first tenant if available and none selected
-            if (status.tenants && status.tenants.length > 0 && !state.selectedTenant) {
-              const firstTenant = status.tenants[0];
-              console.log('🎯 Auto-selecting first tenant from status call:', firstTenant);
-              dispatch({ type: 'SET_SELECTED_TENANT', payload: firstTenant });
-            }
-            
-            if (status.action === 'reconnect_required') {
-              console.log('🔄 Tokens cleared by backend, clearing frontend state');
-              dispatch({ type: 'CLEAR_STATE' });
-              toast.error('Xero authorization expired. Please reconnect to continue.');
-            }
-          } catch (statusError) {
-            console.log('⚠️ Failed to get connection status:', statusError);
-          }
-        }
+      // Set connection status
+      const connectionStatus: XeroConnectionStatus = {
+        isConnected: Boolean(statusData.isConnected),
+        connectionStatus: statusData.connectionStatus || 'unknown',
+        message: statusData.isConnected ? 'Xero connected successfully' : 'Not connected to Xero',
+        tenants: statusData.tenants || []
+      };
+      
+      console.log('🔧 Setting connection status:', connectionStatus);
+      dispatch({ type: 'SET_CONNECTION_STATUS', payload: connectionStatus });
+      
+      // Auto-select first tenant if available and none selected
+      if (connectionStatus.tenants && connectionStatus.tenants.length > 0 && !state.selectedTenant) {
+        const firstTenant = connectionStatus.tenants[0];
+        console.log('🎯 Auto-selecting first tenant:', firstTenant);
+        dispatch({ type: 'SET_SELECTED_TENANT', payload: firstTenant });
       }
     } catch (err: any) {
       console.log('Settings load error:', err.response?.status, err.response?.data);
@@ -253,6 +245,15 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
       } else {
         // 404 is expected for users who haven't configured Xero yet
         console.log('ℹ️ No Xero settings found - user needs to configure settings first');
+        // Set default settings for OAuth to work
+        const defaultSettings = {
+          hasCredentials: false,
+          hasOAuthSettings: false,
+          isConnected: false,
+          connectionStatus: 'not_configured',
+          tenants: []
+        };
+        dispatch({ type: 'SET_SETTINGS', payload: defaultSettings });
       }
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
@@ -262,10 +263,13 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
   // Load settings on mount (only once)
   useEffect(() => {
     if (!isInitialized) {
-      loadSettings();
+      console.log('🚀 XeroProvider: Initializing and loading settings...');
+      loadSettings().catch(error => {
+        console.error('❌ XeroProvider: Failed to load settings on mount:', error);
+      });
       setIsInitialized(true);
     }
-  }, [isInitialized]);
+  }, [isInitialized, loadSettings]);
 
   // Persist connection status to localStorage
   useEffect(() => {
@@ -287,12 +291,21 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
 
       console.log('🚀 Starting Xero authorization...');
 
+      // Try to load settings first if not already loaded
       if (!state.hasSettings) {
-        const errorMsg = 'Xero settings not configured. Please configure settings first.';
-        console.error('❌', errorMsg);
-        dispatch({ type: 'SET_ERROR', payload: errorMsg });
-        toast.error(errorMsg);
-        return;
+        console.log('🔄 Settings not loaded, attempting to load first...');
+        try {
+          await loadSettings();
+          // Check again after loading
+          if (!state.hasSettings) {
+            console.log('⚠️ Settings still not loaded, proceeding with OAuth anyway...');
+            // Continue with OAuth even if settings are not configured
+            // The backend should handle the OAuth flow
+          }
+        } catch (settingsError) {
+          console.log('⚠️ Settings load failed, proceeding with OAuth anyway...');
+          // Continue with OAuth even if settings load fails
+        }
       }
 
       // Clear existing state
@@ -347,7 +360,7 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
         const authAge = Date.now() - parseInt(authStartTime);
         if (authAge > 4 * 60 * 1000) { // 4 minutes
           console.warn('⚠️ Authorization took longer than expected:', authAge / 1000, 'seconds');
-          toast.warning('Authorization took longer than expected. Please complete within 5 minutes.');
+          toast('Authorization took longer than expected. Please complete within 5 minutes.', { icon: '⚠️' });
         }
       }
 
@@ -379,11 +392,8 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
 
       toast.success('Successfully connected to Xero!');
       
-      // Redirect to dashboard using full URL to stay on Render domain
-      const currentOrigin = window.location.origin;
-      const redirectUrl = `${currentOrigin}/integrations/xero?showDashboard=true`;
-      console.log('🔧 XeroContext redirecting to:', redirectUrl);
-      window.location.href = redirectUrl;
+      // Don't redirect - let the component handle the flow
+      console.log('✅ Xero connection completed, staying on current page');
       
     } catch (err: any) {
       console.error('❌ Callback error:', err);
@@ -450,10 +460,23 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
     const now = Date.now();
     if (now - lastApiCall < API_RATE_LIMIT_MS) {
       console.log('⚠️ Rate limit protection: Skipping refresh connection');
-      toast.warning('Please wait before making another request');
+      toast('Please wait before making another request', { icon: '⚠️' });
       return;
     }
-    await loadSettings();
+    
+    try {
+      console.log('🔄 Refreshing Xero connection...');
+      await loadSettings();
+      
+      // Also refresh connection status to get latest tenants
+      const status = await getConnectionStatus();
+      dispatch({ type: 'SET_CONNECTION_STATUS', payload: status });
+      
+      console.log('✅ Connection refreshed successfully');
+    } catch (error: any) {
+      console.error('❌ Failed to refresh connection:', error);
+      dispatch({ type: 'SET_ERROR', payload: error.message || 'Failed to refresh connection' });
+    }
   };
 
   const refreshToken = async () => {
@@ -461,7 +484,7 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
     const now = Date.now();
     if (now - lastApiCall < API_RATE_LIMIT_MS) {
       console.log('⚠️ Rate limit protection: Skipping token refresh');
-      toast.warning('Please wait before making another request');
+      toast('Please wait before making another request', { icon: '⚠️' });
       return;
     }
 
@@ -491,7 +514,7 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
     const now = Date.now();
     if (now - lastApiCall < API_RATE_LIMIT_MS) {
       console.log('⚠️ Rate limit protection: Skipping data load');
-      toast.warning('Please wait before making another request');
+      toast('Please wait before making another request', { icon: '⚠️' });
       return;
     }
 
@@ -530,7 +553,7 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
         
         // Fallback to demo data
         try {
-          const response = await fetch(`${getApiUrl()}/xero/demo/${resourceType}`, {
+          const response = await fetch(`${getApiUrl()}/api/xero/demo/${resourceType}`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('token')}`
             }

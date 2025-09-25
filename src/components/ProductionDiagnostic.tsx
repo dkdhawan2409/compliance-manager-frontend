@@ -29,7 +29,7 @@ const ProductionDiagnostic: React.FC = () => {
 
     // Test 3: Basic connectivity (no auth)
     try {
-      const basicResponse = await fetch(`${getApiUrl()}/xero/demo/organization`, {
+      const basicResponse = await fetch(`${getApiUrl()}/api/xero/demo/organization`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -59,7 +59,7 @@ const ProductionDiagnostic: React.FC = () => {
     // Test 4: Authenticated request
     if (token) {
       try {
-        const authResponse = await fetch(`${getApiUrl()}/xero/settings`, {
+        const authResponse = await fetch(`${getApiUrl()}/api/xero/settings`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,

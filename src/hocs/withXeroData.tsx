@@ -67,7 +67,7 @@ export function withXeroData<T extends WithXeroDataProps>(
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 8000);
           
-          const invoiceResponse = await fetch(`${getApiUrl()}/xero/demo/invoices`, {
+          const invoiceResponse = await fetch(`${getApiUrl()}/api/xero/demo/invoices`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
             signal: controller.signal
           });
@@ -123,7 +123,7 @@ export function withXeroData<T extends WithXeroDataProps>(
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 8000);
           
-          const contactResponse = await fetch(`${getApiUrl()}/xero/demo/contacts`, {
+          const contactResponse = await fetch(`${getApiUrl()}/api/xero/demo/contacts`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
             signal: controller.signal
           });
