@@ -717,6 +717,7 @@ const EnhancedXeroFlow: React.FC = () => {
             )}
           </CardContent>
         </Card>
+        </Slide>
 
         {/* Enhanced Tenant Selection */}
         {isConnected && tenants && tenants.length > 0 && (
@@ -929,6 +930,7 @@ const EnhancedXeroFlow: React.FC = () => {
               </Grid>
             </CardContent>
           </Card>
+        </Slide>
         )}
 
         {/* Enhanced Data Display Tabs */}
@@ -1020,6 +1022,7 @@ const EnhancedXeroFlow: React.FC = () => {
               ))}
             </CardContent>
           </Card>
+        </Fade>
         )}
 
         {/* Enhanced Instructions */}
