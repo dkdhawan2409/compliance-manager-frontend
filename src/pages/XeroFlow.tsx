@@ -1,13 +1,8 @@
 import React from 'react';
-import SidebarLayout from '../components/SidebarLayout';
-import XeroFlowManager from '../components/XeroFlowManager';
+import EnhancedXeroFlow from './EnhancedXeroFlow';
 
 const XeroFlow: React.FC = () => {
-  return (
-    <SidebarLayout>
-      <XeroFlowManager />
-    </SidebarLayout>
-  );
+  return <EnhancedXeroFlow />;
 };
 
 export default XeroFlow;

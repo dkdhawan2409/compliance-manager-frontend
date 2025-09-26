@@ -15,7 +15,7 @@ export const XeroConnect: React.FC<XeroConnectProps> = ({
   children,
 }) => {
   const { state, startAuth, clearError } = useXero();
-  const { isLoading, error, isConnected } = state;
+  const { isLoading, error, isConnected, hasSettings } = state;
 
   const handleConnect = async () => {
     try {
@@ -87,6 +87,14 @@ export const XeroConnect: React.FC<XeroConnectProps> = ({
       >
         {getButtonContent()}
       </Button>
+      
+      {!hasSettings && !isConnected && (
+        <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+          <p className="text-sm text-yellow-700">
+            ⚠️ Xero Client ID is not configured. Please ask your administrator to configure Xero client credentials.
+          </p>
+        </div>
+      )}
       
       {error && (
         <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">

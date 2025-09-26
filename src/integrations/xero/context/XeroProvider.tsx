@@ -315,7 +315,19 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
       console.error('❌ Xero auth error:', err);
       let errorMessage = XERO_MESSAGES.CONNECT_ERROR;
       
-      if (err.response?.status === 401) {
+      // Handle specific client ID validation errors
+      if (err.response?.status === 400) {
+        const errorData = err.response.data;
+        if (errorData?.error === 'CLIENT_ID_NOT_SET') {
+          errorMessage = 'Xero Client ID is not configured. Please ask your administrator to configure Xero client credentials.';
+        } else if (errorData?.error === 'CLIENT_SECRET_NOT_SET') {
+          errorMessage = 'Xero Client Secret is not configured. Please ask your administrator to configure Xero client credentials.';
+        } else if (errorData?.error === 'NO_XERO_SETTINGS') {
+          errorMessage = 'Xero settings not found. Please ask your administrator to configure Xero client credentials for your company.';
+        } else if (errorData?.message) {
+          errorMessage = errorData.message;
+        }
+      } else if (err.response?.status === 401) {
         errorMessage = XERO_MESSAGES.UNAUTHORIZED;
       } else if (err.response?.status === 404) {
         errorMessage = 'Xero OAuth endpoint not found. Please check backend implementation.';
