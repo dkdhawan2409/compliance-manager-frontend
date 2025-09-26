@@ -124,7 +124,10 @@ const EnhancedXeroFlow: React.FC = () => {
       
       if (result.success) {
         setLoadedData(prev => ({ ...prev, [dataType]: result.data }));
-        toast.success(`${dataType} data loaded successfully!`);
+        // Only show success toast for individual loads, not for bulk
+        if (!isLoadingData) {
+          toast.success(`${dataType} data loaded successfully!`);
+        }
       } else {
         toast.error(`Failed to load ${dataType}: ${result.message}`);
       }
@@ -165,18 +168,21 @@ const EnhancedXeroFlow: React.FC = () => {
         'quotes'
       ];
 
-      const loadPromises = dataTypes.map(async (type) => {
+      // Load data sequentially to avoid rate limiting
+      for (const type of dataTypes) {
         try {
+          console.log(`📊 Loading ${type}...`);
           const result = await loadData(type);
           if (result.success) {
             setLoadedData(prev => ({ ...prev, [type]: result.data }));
           }
+          // Add small delay between requests to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 500));
         } catch (error) {
           console.warn(`⚠️ Failed to load ${type}:`, error);
         }
-      });
+      }
 
-      await Promise.all(loadPromises);
       toast.success('🎉 All Xero data loaded successfully!');
       
     } catch (error: any) {
@@ -202,22 +208,73 @@ const EnhancedXeroFlow: React.FC = () => {
     if (!data) return <Typography color="text.secondary">No data loaded</Typography>;
     
     if (Array.isArray(data)) {
+      if (data.length === 0) {
+        return <Typography color="text.secondary">No {dataType} data available</Typography>;
+      }
+
+      // Get the first item to determine table structure
+      const firstItem = data[0];
+      const columns = Object.keys(firstItem);
+      
       return (
         <Box>
           <Typography variant="h6" gutterBottom>
             {dataType.charAt(0).toUpperCase() + dataType.slice(1)} ({data.length} items)
           </Typography>
-          <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
-            {data.slice(0, 10).map((item: any, index: number) => (
-              <Card key={index} sx={{ mb: 1, p: 2 }}>
-                <Typography variant="body2">
-                  {JSON.stringify(item, null, 2)}
-                </Typography>
-              </Card>
-            ))}
-            {data.length > 10 && (
-              <Typography color="text.secondary" sx={{ mt: 2 }}>
-                ... and {data.length - 10} more items
+          <Box sx={{ maxHeight: 600, overflow: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f5f5f5', position: 'sticky', top: 0 }}>
+                  {columns.map((column) => (
+                    <th 
+                      key={column}
+                      style={{ 
+                        padding: '12px 8px', 
+                        textAlign: 'left', 
+                        borderBottom: '2px solid #ddd',
+                        fontWeight: 'bold',
+                        fontSize: '12px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                      }}
+                    >
+                      {column.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.slice(0, 50).map((item: any, index: number) => (
+                  <tr 
+                    key={index} 
+                    style={{ 
+                      backgroundColor: index % 2 === 0 ? '#ffffff' : '#f9f9f9',
+                      borderBottom: '1px solid #eee'
+                    }}
+                  >
+                    {columns.map((column) => (
+                      <td 
+                        key={column}
+                        style={{ 
+                          padding: '10px 8px', 
+                          borderBottom: '1px solid #eee',
+                          maxWidth: '200px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}
+                        title={typeof item[column] === 'object' ? JSON.stringify(item[column]) : String(item[column] || '')}
+                      >
+                        {renderCellValue(item[column])}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {data.length > 50 && (
+              <Typography color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
+                Showing first 50 of {data.length} items
               </Typography>
             )}
           </Box>
@@ -225,18 +282,112 @@ const EnhancedXeroFlow: React.FC = () => {
       );
     }
     
+    // For non-array data, show as key-value pairs
     return (
       <Box>
         <Typography variant="h6" gutterBottom>
           {dataType.charAt(0).toUpperCase() + dataType.slice(1)}
         </Typography>
-        <Card sx={{ p: 2 }}>
-          <Typography variant="body2" component="pre" sx={{ whiteSpace: 'pre-wrap' }}>
-            {JSON.stringify(data, null, 2)}
-          </Typography>
-        </Card>
+        <Box sx={{ maxHeight: 600, overflow: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f5f5f5' }}>
+                <th style={{ padding: '12px 8px', textAlign: 'left', borderBottom: '2px solid #ddd', fontWeight: 'bold' }}>
+                  Property
+                </th>
+                <th style={{ padding: '12px 8px', textAlign: 'left', borderBottom: '2px solid #ddd', fontWeight: 'bold' }}>
+                  Value
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(data).map(([key, value], index) => (
+                <tr 
+                  key={key} 
+                  style={{ 
+                    backgroundColor: index % 2 === 0 ? '#ffffff' : '#f9f9f9',
+                    borderBottom: '1px solid #eee'
+                  }}
+                >
+                  <td style={{ padding: '10px 8px', borderBottom: '1px solid #eee', fontWeight: 'bold' }}>
+                    {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                  </td>
+                  <td 
+                    style={{ 
+                      padding: '10px 8px', 
+                      borderBottom: '1px solid #eee',
+                      maxWidth: '300px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}
+                    title={typeof value === 'object' ? JSON.stringify(value) : String(value || '')}
+                  >
+                    {renderCellValue(value)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Box>
       </Box>
     );
+  };
+
+  const renderCellValue = (value: any) => {
+    if (value === null || value === undefined) {
+      return <span style={{ color: '#999', fontStyle: 'italic' }}>—</span>;
+    }
+    
+    if (typeof value === 'boolean') {
+      return (
+        <Chip 
+          label={value ? 'Yes' : 'No'} 
+          size="small" 
+          color={value ? 'success' : 'default'}
+          variant="outlined"
+        />
+      );
+    }
+    
+    if (typeof value === 'number') {
+      return <span style={{ fontFamily: 'monospace' }}>{value.toLocaleString()}</span>;
+    }
+    
+    if (typeof value === 'string') {
+      if (value.length > 50) {
+        return (
+          <span title={value}>
+            {value.substring(0, 50)}...
+          </span>
+        );
+      }
+      return value;
+    }
+    
+    if (Array.isArray(value)) {
+      return (
+        <Chip 
+          label={`${value.length} items`} 
+          size="small" 
+          color="info"
+          variant="outlined"
+        />
+      );
+    }
+    
+    if (typeof value === 'object') {
+      return (
+        <Chip 
+          label="Object" 
+          size="small" 
+          color="secondary"
+          variant="outlined"
+        />
+      );
+    }
+    
+    return String(value);
   };
 
   if (!isAuthenticated) {
