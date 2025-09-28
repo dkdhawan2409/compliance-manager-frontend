@@ -199,6 +199,16 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
     };
   }, [config]);
 
+  // Rate limiting protection - MOVED UP TO PREVENT CIRCULAR DEPENDENCY
+  const canMakeApiCall = useCallback((): boolean => {
+    const now = Date.now();
+    if (now - lastApiCall < XERO_API_LIMITS.RETRY_DELAY_MS) {
+      return false;
+    }
+    setLastApiCall(now);
+    return true;
+  }, [lastApiCall]);
+
   // Load client ID from existing Xero settings - RE-ENABLED FOR PRODUCTION
   const loadClientIdFromSettings = useCallback(async () => {
     if (!canMakeApiCall()) {
@@ -237,15 +247,6 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
     }
   }, [isInitialized, loadSettings]); // Include dependencies
 
-  // Rate limiting protection
-  const canMakeApiCall = (): boolean => {
-    const now = Date.now();
-    if (now - lastApiCall < XERO_API_LIMITS.RETRY_DELAY_MS) {
-      return false;
-    }
-    setLastApiCall(now);
-    return true;
-  };
 
   // Load settings - RE-ENABLED TO CHECK CREDENTIALS
   const loadSettings = useCallback(async () => {
