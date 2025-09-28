@@ -339,10 +339,7 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
     const clientId = process.env.REACT_APP_XERO_CLIENT_ID || 'demo-client-id';
     
     // Smart redirect URI based on environment
-    const isLocal = window.location.hostname.includes('localhost');
-    const redirectUri = isLocal 
-      ? `http://localhost:3001/redirecturl`
-      : 'https://compliance-manager-frontend.onrender.com/redirecturl';
+    const redirectUri = window.location.origin + '/redirecturl';
     
     const state = Math.random().toString(36).substring(2, 15);
     const scopes = 'offline_access accounting.transactions accounting.contacts accounting.settings';
@@ -840,7 +837,7 @@ const XeroOAuth2Integration = forwardRef<any, {}>((props, ref) => {
                   Redirect URI
                 </label>
                 <div className="bg-gray-50 p-3 rounded border font-mono text-sm">
-                  {xeroSettings.redirect_uri || 'http://localhost:3001/redirecturl (default)'}
+                  {xeroSettings.redirect_uri || window.location.origin + '/redirecturl (default)'}
                 </div>
               </div>
             </div>

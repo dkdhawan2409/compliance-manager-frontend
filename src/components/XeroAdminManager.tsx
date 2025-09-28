@@ -20,7 +20,7 @@ const XeroAdminManager: React.FC = () => {
   const [credentials, setCredentials] = useState<XeroCredentials>({
     clientId: '',
     clientSecret: '',
-    redirectUri: 'http://localhost:3001/redirecturl'
+    redirectUri: window.location.origin + '/redirecturl'
   });
   const [loading, setLoading] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
@@ -62,7 +62,7 @@ const XeroAdminManager: React.FC = () => {
           setCredentials({
             clientId: data.data.client_id,
             clientSecret: data.data.client_secret || '', // Show the actual client secret
-            redirectUri: data.data.redirect_uri || 'http://localhost:3001/redirecturl'
+            redirectUri: data.data.redirect_uri || window.location.origin + '/redirecturl'
           });
           console.log('✅ Auto-filled existing Xero credentials');
         }
@@ -101,7 +101,7 @@ const XeroAdminManager: React.FC = () => {
         setCredentials({
           clientId: '',
           clientSecret: '',
-          redirectUri: 'http://localhost:3001/redirecturl'
+          redirectUri: window.location.origin + '/redirecturl'
         });
         setSelectedCompany(null);
         loadCompanies(); // Refresh the list
@@ -145,7 +145,7 @@ const XeroAdminManager: React.FC = () => {
         setCredentials({
           clientId: '',
           clientSecret: '',
-          redirectUri: 'http://localhost:3001/redirecturl'
+          redirectUri: window.location.origin + '/redirecturl'
         });
         loadCompanies(); // Refresh the list
       } else {
@@ -291,7 +291,7 @@ const XeroAdminManager: React.FC = () => {
           <li>Go to <a href="https://developer.xero.com/" target="_blank" rel="noopener noreferrer" className="underline">developer.xero.com</a></li>
           <li>Create or select your Xero app</li>
           <li>Copy the Client ID and Client Secret</li>
-          <li>Set the redirect URI to: <code className="bg-yellow-100 px-1 rounded">http://localhost:3001/redirecturl</code></li>
+          <li>Set the redirect URI to: <code className="bg-yellow-100 px-1 rounded">{window.location.origin}/redirecturl</code></li>
           <li>Click "Save Credentials" to apply to all companies</li>
         </ol>
         
