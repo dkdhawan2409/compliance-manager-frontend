@@ -174,28 +174,68 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
   const [maxApiCalls] = useState(5); // Maximum API calls allowed
 
   // Merge with default config - MEMOIZED TO PREVENT INFINITE RENDERS
-  const fullConfig: XeroConfig = useMemo(() => ({
-    clientId: '',
-    redirectUri: '',
-    scopes: ['offline_access', 'accounting.transactions', 'accounting.contacts', 'accounting.settings'],
-    apiBaseUrl: '/api/xero-plug-play',
-    autoRefreshTokens: true,
-    enableDemoMode: false,
-    ...config,
-  }), [config]);
+  const fullConfig: XeroConfig = useMemo(() => {
+    // Determine API base URL based on environment
+    const isProduction = window.location.hostname !== 'localhost' && !window.location.hostname.includes('127.0.0.1');
+    const apiBaseUrl = isProduction 
+      ? 'https://compliance-manager-backend.onrender.com/api/xero-plug-play' // Production backend
+      : '/api/xero-plug-play'; // Local development
+    
+    console.log('🔧 XeroProvider Config:', { isProduction, apiBaseUrl, hostname: window.location.hostname });
+    
+    // Determine redirect URI based on environment
+    const redirectUri = isProduction 
+      ? `${window.location.origin}/xero-callback` // Production callback
+      : `${window.location.origin}/xero-callback`; // Local callback
+    
+    return {
+      clientId: '',
+      redirectUri,
+      scopes: ['offline_access', 'accounting.transactions', 'accounting.contacts', 'accounting.settings'],
+      apiBaseUrl,
+      autoRefreshTokens: true,
+      enableDemoMode: false,
+      ...config,
+    };
+  }, [config]);
 
-  // Load client ID from existing Xero settings - DISABLED TO STOP API CALLS
+  // Load client ID from existing Xero settings - RE-ENABLED FOR PRODUCTION
   const loadClientIdFromSettings = useCallback(async () => {
-    console.log('🚫 loadClientIdFromSettings disabled to stop API calls');
-    return false;
-  }, []);
+    if (!canMakeApiCall()) {
+      console.log('⏳ Rate limit: Too soon since last API call, skipping loadClientIdFromSettings...');
+      return false;
+    }
+    
+    console.log('🔧 Loading client ID from existing Xero settings...');
+    try {
+      const tempClient = createXeroApi(fullConfig);
+      const settings = await tempClient.getSettings();
+      
+      if (settings.clientId) {
+        console.log('✅ Found existing client ID:', settings.clientId.substring(0, 8) + '...');
+        return true;
+      } else {
+        console.log('⚠️ No client ID found in settings');
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Failed to load client ID from settings:', error);
+      return false;
+    }
+  }, [fullConfig, canMakeApiCall]);
 
-  // Initialize API client and load dynamic config - COMPLETELY DISABLED TO STOP API CALLS
+  // Initialize API client and load dynamic config - RE-ENABLED FOR PRODUCTION
   useEffect(() => {
-    console.log('🚫 XeroProvider initialization COMPLETELY DISABLED to stop API calls');
-    // Don't create API client at all to prevent any API calls
-    dispatch({ type: 'SET_LOADING', payload: false });
-  }, []); // Empty dependency array to run only once
+    if (!isInitialized) {
+      console.log('🚀 Initializing XeroProvider - loading settings...');
+      setIsInitialized(true);
+      
+      // Load settings to check if credentials are configured
+      setTimeout(() => {
+        loadSettings();
+      }, 1000); // Small delay to prevent immediate API call
+    }
+  }, [isInitialized, loadSettings]); // Include dependencies
 
   // Rate limiting protection
   const canMakeApiCall = (): boolean => {
