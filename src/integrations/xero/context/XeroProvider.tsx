@@ -186,8 +186,8 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
     
     // Use redirect URI from settings if available, otherwise fallback to default
     const redirectUri = state.settings?.redirect_uri || (isProduction 
-      ? `${window.location.origin}/xero-callback` // Production callback
-      : `${window.location.origin}/xero-callback`); // Local callback
+      ? `${window.location.origin}/redirecturl` // Production callback
+      : `${window.location.origin}/redirecturl`); // Local callback
     
     return {
       clientId: state.settings?.client_id || '',
