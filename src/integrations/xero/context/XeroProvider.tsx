@@ -21,6 +21,7 @@ import {
   XERO_LOCAL_STORAGE_KEYS, 
   XERO_API_LIMITS, 
   XERO_MESSAGES,
+  XERO_ERROR_CODES,
 } from '../constants';
 
 // Initial state
@@ -233,20 +234,6 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
       return false;
     }
   }, [fullConfig, canMakeApiCall]);
-
-  // Initialize API client and load dynamic config - RE-ENABLED FOR PRODUCTION
-  useEffect(() => {
-    if (!isInitialized) {
-      console.log('🚀 Initializing XeroProvider - loading settings...');
-      setIsInitialized(true);
-      
-      // Load settings to check if credentials are configured
-      setTimeout(() => {
-        loadSettings();
-      }, 1000); // Small delay to prevent immediate API call
-    }
-  }, [isInitialized, loadSettings]); // Include dependencies
-
 
   // Load settings - RE-ENABLED TO CHECK CREDENTIALS
   const loadSettings = useCallback(async () => {
