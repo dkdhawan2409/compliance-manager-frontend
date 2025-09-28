@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import SidebarLayout from '../components/SidebarLayout';
 import { useAuth } from '../contexts/AuthContext';
-import { useXero } from '../contexts/XeroContext';
+import { useXero } from '../integrations/xero/context/XeroProvider';
 import { useUserRole, requireAIToolsAccess } from '../utils/roleUtils';
 import TemplateDataCollector from '../components/TemplateDataCollector';
 import { NotificationTemplate } from '../api/templateService';

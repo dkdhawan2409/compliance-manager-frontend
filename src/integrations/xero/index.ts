@@ -2,7 +2,7 @@
 // This is a complete, self-contained Xero integration that can be easily integrated into any React project
 
 export { XeroProvider } from './context/XeroProvider';
-export { useXero } from './hooks/useXero';
+export { useXero } from './context/XeroProvider';
 export { XeroConnect } from './components/XeroConnect';
 export { XeroDashboard } from './components/XeroDashboard';
 export { XeroDataTable } from './components/XeroDataTable';

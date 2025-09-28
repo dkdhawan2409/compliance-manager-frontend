@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useXero } from '../hooks/useXero';
+import { useXero } from '../integrations/xero/context/XeroProvider';
 import { logEnvironmentInfo, getCurrentDomain, getApiUrl, getRenderRedirectUri } from '../utils/envChecker';
 import toast from 'react-hot-toast';
 

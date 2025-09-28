@@ -49,7 +49,7 @@ const XeroAdminManager: React.FC = () => {
 
   const loadExistingCredentials = async () => {
     try {
-      const response = await fetch(`${getApiUrl()}/xero/settings`, {
+      const response = await fetch(`${getApiUrl()}/xero-plug-play/settings`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -57,11 +57,11 @@ const XeroAdminManager: React.FC = () => {
       
       if (response.ok) {
         const data = await response.json();
-        if (data.success && data.data && data.data.clientId) {
+        if (data.success && data.data && data.data.client_id) {
           // Auto-fill the form with existing credentials
           setCredentials({
-            clientId: data.data.clientId,
-            clientSecret: '', // Keep empty for security - user must re-enter
+            clientId: data.data.client_id,
+            clientSecret: data.data.client_secret || '', // Show the actual client secret
             redirectUri: data.data.redirect_uri || 'http://localhost:3001/redirecturl'
           });
           console.log('✅ Auto-filled existing Xero credentials');
@@ -205,15 +205,15 @@ const XeroAdminManager: React.FC = () => {
             Xero Client Secret *
           </label>
           <input
-            type="password"
+            type="text"
             value={credentials.clientSecret}
             onChange={(e) => setCredentials({ ...credentials, clientSecret: e.target.value })}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder={credentials.clientId && !credentials.clientSecret ? "••••••••••••••••" : "Enter Xero Client Secret"}
+            placeholder="Enter Xero Client Secret"
           />
-          {credentials.clientId && !credentials.clientSecret && (
-            <p className="text-xs text-gray-500 mt-1">
-              Secret hidden for security. Enter new secret to update.
+          {credentials.clientId && credentials.clientSecret && (
+            <p className="text-xs text-green-600 mt-1">
+              ✅ Client secret loaded from saved settings.
             </p>
           )}
         </div>
@@ -265,13 +265,13 @@ const XeroAdminManager: React.FC = () => {
         </div>
       </div>
 
-      {/* Bulk Assignment */}
+      {/* Save Credentials */}
       <div className="p-4 bg-green-50 rounded-lg">
-        <h3 className="text-lg font-semibold text-green-900 mb-4">🌐 Assign to All Companies</h3>
+        <h3 className="text-lg font-semibold text-green-900 mb-4">💾 Save Xero Credentials</h3>
         
         <div className="flex justify-between items-center">
           <p className="text-green-700">
-            This will assign the credentials to all {companies.length} companies
+            Save these credentials for all companies. New companies will automatically use these credentials.
           </p>
           
           <button
@@ -279,7 +279,7 @@ const XeroAdminManager: React.FC = () => {
             disabled={bulkLoading}
             className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {bulkLoading ? 'Assigning...' : 'Assign to All'}
+            {bulkLoading ? 'Saving...' : 'Save Credentials'}
           </button>
         </div>
       </div>
@@ -292,13 +292,12 @@ const XeroAdminManager: React.FC = () => {
           <li>Create or select your Xero app</li>
           <li>Copy the Client ID and Client Secret</li>
           <li>Set the redirect URI to: <code className="bg-yellow-100 px-1 rounded">http://localhost:3001/redirecturl</code></li>
-          <li>Assign credentials to companies using this form</li>
+          <li>Click "Save Credentials" to apply to all companies</li>
         </ol>
         
         <div className="mt-4 p-3 bg-yellow-100 rounded">
           <p className="text-yellow-800 text-sm">
-            <strong>💡 Auto-fill:</strong> If you've previously saved credentials, the Client ID and Redirect URI will be auto-filled. 
-            You'll need to re-enter the Client Secret for security reasons.
+            <strong>💡 Auto-apply:</strong> Saved credentials will automatically be used by all existing companies and any new companies that are created.
           </p>
         </div>
       </div>

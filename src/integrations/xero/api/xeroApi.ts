@@ -172,7 +172,7 @@ export class XeroApiClient {
   // Settings Management
   async saveSettings(settings: Partial<XeroSettings>): Promise<XeroSettings> {
     try {
-      const response = await this.client.post('/api/xero/settings', settings);
+      const response = await this.client.post('/settings', settings);
       return response.data.data;
     } catch (error) {
       console.error('❌ Failed to save Xero settings:', error);
@@ -187,7 +187,7 @@ export class XeroApiClient {
     hasValidTokens?: boolean;
   }> {
     try {
-      const response = await this.client.get('/api/xero/settings');
+      const response = await this.client.get('/settings');
       return response.data.data;
     } catch (error) {
       console.error('❌ Failed to get Xero settings:', error);
@@ -197,7 +197,7 @@ export class XeroApiClient {
 
   async deleteSettings(): Promise<void> {
     try {
-      await this.client.delete('/api/xero/settings');
+      await this.client.delete('/settings');
     } catch (error) {
       console.error('❌ Failed to delete Xero settings:', error);
       throw error;
@@ -207,7 +207,7 @@ export class XeroApiClient {
   // Connection Status
   async getConnectionStatus(): Promise<XeroConnectionStatus> {
     try {
-      const response = await this.client.get('/api/xero/status');
+      const response = await this.client.get('/status');
       const backendData = response.data.data;
       
       return {
@@ -229,7 +229,7 @@ export class XeroApiClient {
   async getAuthUrl(): Promise<{ authUrl: string; state: string }> {
     try {
       const state = this.generateState();
-      const response = await this.client.get('/api/xero/connect', {
+      const response = await this.client.get('/connect', {
         params: {
           redirect_uri: this.config.redirectUri,
           state: state,
@@ -262,7 +262,7 @@ export class XeroApiClient {
     companyId: string;
   }> {
     try {
-      const response = await this.client.post('/api/xero/oauth-callback', {
+      const response = await this.client.post('/oauth-callback', {
         code,
         state,
         redirect_uri: this.config.redirectUri,
@@ -303,7 +303,7 @@ export class XeroApiClient {
 
   private async performTokenRefresh(): Promise<XeroTokens> {
     try {
-      const response = await this.client.post('/api/xero/refresh-token', {
+      const response = await this.client.post('/refresh-token', {
         refreshToken: this.tokens?.refreshToken,
       });
       return response.data.data;
@@ -393,7 +393,7 @@ export class XeroApiClient {
   // Demo Mode Support
   async getDemoData(resourceType: XeroResourceType): Promise<XeroDataResponse<any>> {
     try {
-      const response = await this.client.get(`/api/xero/demo/${resourceType}`);
+      const response = await this.client.get(`/demo/${resourceType}`);
       return response.data;
     } catch (error) {
       console.error(`❌ Failed to load demo ${resourceType}:`, error);

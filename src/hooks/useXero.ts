@@ -57,6 +57,85 @@ interface UseXeroReturn {
 }
 
 export const useXero = (): UseXeroReturn => {
+  // 🚨 EMERGENCY BRAKE - OLD USEXERO HOOK DISABLED
+  console.log('🚨🚨🚨 OLD USEXERO HOOK DISABLED - USING EMERGENCY BRAKE 🚨🚨🚨');
+  
+  return {
+    // Return safe default values
+    tokens: null,
+    tenants: [],
+    selectedTenant: null,
+    companyInfo: null,
+    settings: null,
+    connectionStatus: {
+      isConnected: false,
+      connectionStatus: 'disconnected',
+      message: 'Old Xero hook disabled - use new plug-and-play integration',
+      tenants: [],
+      hasValidTokens: false,
+      needsReconnection: false,
+      lastConnected: null,
+    },
+    isLoading: false,
+    error: 'Old Xero hook disabled - use new plug-and-play integration',
+    hasSettings: false,
+    isConnecting: false,
+    isRefreshing: false,
+    isDisconnecting: false,
+    isDemoMode: false,
+    
+    // Disabled functions
+    startAuth: () => { 
+      console.log('🚫 Old useXero hook disabled');
+      return Promise.resolve();
+    },
+    handleCallback: () => { 
+      console.log('🚫 Old useXero hook disabled');
+      return Promise.resolve();
+    },
+    disconnect: () => { 
+      console.log('🚫 Old useXero hook disabled');
+      return Promise.resolve();
+    },
+    loadSettings: () => { 
+      console.log('🚫 Old useXero hook disabled');
+      return Promise.resolve();
+    },
+    refreshConnection: () => { 
+      console.log('🚫 Old useXero hook disabled');
+      return Promise.resolve();
+    },
+    refreshToken: () => { 
+      console.log('🚫 Old useXero hook disabled');
+      return Promise.resolve();
+    },
+    loadData: () => { 
+      console.log('🚫 Old useXero hook disabled');
+      return Promise.resolve({ success: false, message: 'Old hook disabled' });
+    },
+    selectTenant: () => { 
+      console.log('🚫 Old useXero hook disabled');
+    },
+    clearError: () => { 
+      console.log('🚫 Old useXero hook disabled');
+    },
+    saveSettings: () => { 
+      console.log('🚫 Old useXero hook disabled');
+      return Promise.resolve();
+    },
+    deleteSettings: () => { 
+      console.log('🚫 Old useXero hook disabled');
+      return Promise.resolve();
+    },
+    
+    // Computed
+    isConnected: false,
+  };
+};
+
+// DISABLED - Original implementation commented out
+/*
+export const useXero = (): UseXeroReturn => {
   const { company } = useAuth();
   const userRole = useUserRole(company);
   
@@ -599,4 +678,5 @@ export const useXero = (): UseXeroReturn => {
     canAccess,
     hasSettings,
   };
-}; 
+};
+*/ 

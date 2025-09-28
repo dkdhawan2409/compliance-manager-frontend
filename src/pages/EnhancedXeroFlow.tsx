@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import SidebarLayout from '../components/SidebarLayout';
-import { useXero } from '../contexts/XeroContext';
+import { useXero } from '../integrations/xero/context/XeroProvider';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   Card, 
@@ -93,26 +93,35 @@ const EnhancedXeroFlow: React.FC = () => {
 
   // Helper function to show limited toasts
   const showLimitedToast = (message: string, type: 'success' | 'error' | 'warning' = 'success') => {
-    if (toastCount >= 3) {
+    // More aggressive rate limiting
+    if (toastCount >= 2) {
       // Clear existing toasts if we have too many
       toast.dismiss();
       setToastCount(0);
     }
     
+    // Prevent duplicate messages
+    const now = Date.now();
+    const lastToastTime = (window as any).lastToastTime || 0;
+    if (now - lastToastTime < 1000) { // 1 second between toasts
+      return;
+    }
+    (window as any).lastToastTime = now;
+    
     if (type === 'success') {
-      toast.success(message);
+      toast.success(message, { duration: 3000 });
     } else if (type === 'error') {
-      toast.error(message);
+      toast.error(message, { duration: 4000 });
     } else {
-      toast(message, { icon: '⚠️' });
+      toast(message, { icon: '⚠️', duration: 3000 });
     }
     
     setToastCount(prev => prev + 1);
     
-    // Reset count after 5 seconds
+    // Reset count after 3 seconds
     setTimeout(() => {
       setToastCount(prev => Math.max(0, prev - 1));
-    }, 5000);
+    }, 3000);
   };
 
   // Auto-select first tenant if only one is available
@@ -123,20 +132,10 @@ const EnhancedXeroFlow: React.FC = () => {
     }
   }, [tenants, selectedTenant, selectTenant]);
 
-  // Refresh connection status when component mounts
+  // Refresh connection status when component mounts - DISABLED to prevent infinite loops
   useEffect(() => {
-    const refreshOnMount = async () => {
-      try {
-        console.log('🔄 Refreshing Xero connection status...');
-        await loadSettings();
-        await refreshConnection();
-      } catch (error) {
-        console.log('⚠️ Failed to refresh connection status:', error);
-      }
-    };
-
-    refreshOnMount();
-  }, [loadSettings, refreshConnection]);
+    console.log('🚫 Auto-refresh disabled to prevent infinite API loops');
+  }, []); // Empty dependency array - only run once on mount
 
   const handleOneClickConnect = async () => {
     if (isConnecting) return;
@@ -177,7 +176,7 @@ const EnhancedXeroFlow: React.FC = () => {
     
     try {
       console.log(`📊 Loading ${dataType} data...`);
-      const result = await loadData(dataType);
+      const result = await loadData(dataType as any);
       
       if (result.success) {
         setLoadedData(prev => ({ ...prev, [dataType]: result.data }));
@@ -246,7 +245,7 @@ const EnhancedXeroFlow: React.FC = () => {
       for (const type of dataTypes) {
         try {
           console.log(`📊 Loading ${type}...`);
-          const result = await loadData(type);
+          const result = await loadData(type as any);
           if (result.success) {
             setLoadedData(prev => ({ ...prev, [type]: result.data }));
             successCount++;
@@ -301,22 +300,92 @@ const EnhancedXeroFlow: React.FC = () => {
       
       return (
         <Box>
-          <Typography variant="h6" gutterBottom>
-            {dataType.charAt(0).toUpperCase() + dataType.slice(1)} ({data.length} items)
-          </Typography>
           <Box sx={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            mb: 2,
+            flexDirection: { xs: 'column', sm: 'row' },
+            gap: { xs: 1, sm: 0 }
+          }}>
+            <Typography variant="h6" sx={{ 
+              fontSize: { xs: '1rem', sm: '1.25rem' },
+              fontWeight: 'bold'
+            }}>
+              {dataType.charAt(0).toUpperCase() + dataType.slice(1)} ({data.length} items)
+            </Typography>
+            <Box sx={{ display: { xs: 'block', sm: 'none' } }}>
+              <Typography variant="caption" color="text.secondary">
+                Scroll horizontally to view all columns
+              </Typography>
+            </Box>
+          </Box>
+          
+          {/* Mobile Card View */}
+          <Box sx={{ display: { xs: 'block', sm: 'none' }, mb: 2 }}>
+            {data.slice(0, 10).map((item: any, index: number) => (
+              <Card key={index} sx={{ mb: 1, p: 2 }}>
+                {Object.entries(item).slice(0, 3).map(([key, value]) => (
+                  <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography variant="caption" sx={{ fontWeight: 'bold', minWidth: '80px' }}>
+                      {key}:
+                    </Typography>
+                    <Typography variant="caption" sx={{ flex: 1, textAlign: 'right' }}>
+                      {renderMobileCellValue(value)}
+                    </Typography>
+                  </Box>
+                ))}
+                {Object.keys(item).length > 3 && (
+                  <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                    +{Object.keys(item).length - 3} more fields
+                  </Typography>
+                )}
+              </Card>
+            ))}
+            {data.length > 10 && (
+              <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block' }}>
+                Showing first 10 of {data.length} items
+              </Typography>
+            )}
+          </Box>
+          
+          {/* Desktop Table View */}
+          <Box sx={{ 
+            display: { xs: 'none', sm: 'block' },
             maxHeight: 600, 
             overflow: 'auto',
             borderRadius: 2,
             border: '1px solid #e0e0e0',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            width: '100%',
+            maxWidth: '100%',
+            '&::-webkit-scrollbar': {
+              width: '8px',
+              height: '8px'
+            },
+            '&::-webkit-scrollbar-track': {
+              background: '#f1f1f1',
+              borderRadius: '4px'
+            },
+            '&::-webkit-scrollbar-thumb': {
+              background: '#c1c1c1',
+              borderRadius: '4px',
+              '&:hover': {
+                background: '#a8a8a8'
+              }
+            }
           }}>
-            <table style={{ 
-              width: '100%', 
-              borderCollapse: 'collapse', 
-              fontSize: '14px',
-              backgroundColor: 'white'
+            <Box sx={{ 
+              overflowX: 'auto',
+              minWidth: { xs: '100%', sm: '600px' }
             }}>
+              <table style={{ 
+                width: '100%', 
+                borderCollapse: 'collapse', 
+                fontSize: '14px',
+                backgroundColor: 'white',
+                minWidth: '600px' // Ensure table has minimum width for readability
+              }}>
               <thead>
                 <tr style={{ 
                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -328,18 +397,29 @@ const EnhancedXeroFlow: React.FC = () => {
                     <th 
                       key={column}
                       style={{ 
-                        padding: '16px 12px', 
+                        padding: '12px 8px', 
                         textAlign: 'left', 
                         borderBottom: '2px solid #5a67d8',
                         fontWeight: 'bold',
-                        fontSize: '12px',
+                        fontSize: '11px',
                         textTransform: 'uppercase',
                         letterSpacing: '0.5px',
                         color: 'white',
-                        position: 'relative'
+                        position: 'relative',
+                        minWidth: '100px'
                       }}
                     >
-                      {column.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                      <Box sx={{ 
+                        display: { xs: 'none', sm: 'block' }
+                      }}>
+                        {column.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                      </Box>
+                      <Box sx={{ 
+                        display: { xs: 'block', sm: 'none' },
+                        fontSize: '10px'
+                      }}>
+                        {column.substring(0, 8)}...
+                      </Box>
                     </th>
                   ))}
                 </tr>
@@ -367,18 +447,28 @@ const EnhancedXeroFlow: React.FC = () => {
                       <td 
                         key={column}
                         style={{ 
-                          padding: '12px 12px', 
+                          padding: '8px 6px', 
                           borderBottom: '1px solid #e8eaf6',
-                          maxWidth: '200px',
+                          maxWidth: '150px',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
-                          fontSize: '13px',
+                          fontSize: '12px',
                           fontWeight: '500'
                         }}
                         title={typeof item[column] === 'object' ? JSON.stringify(item[column]) : String(item[column] || '')}
                       >
-                        {renderCellValue(item[column])}
+                        <Box sx={{
+                          display: { xs: 'none', sm: 'block' }
+                        }}>
+                          {renderCellValue(item[column])}
+                        </Box>
+                        <Box sx={{
+                          display: { xs: 'block', sm: 'none' },
+                          fontSize: '10px'
+                        }}>
+                          {renderMobileCellValue(item[column])}
+                        </Box>
                       </td>
                     ))}
                   </tr>
@@ -390,6 +480,7 @@ const EnhancedXeroFlow: React.FC = () => {
                 Showing first 50 of {data.length} items
               </Typography>
             )}
+            </Box>
           </Box>
         </Box>
       );
@@ -503,6 +594,41 @@ const EnhancedXeroFlow: React.FC = () => {
     return String(value);
   };
 
+  const renderMobileCellValue = (value: any) => {
+    if (value === null || value === undefined) {
+      return <span style={{ color: '#999', fontStyle: 'italic' }}>—</span>;
+    }
+    
+    if (typeof value === 'boolean') {
+      return <span style={{ color: value ? '#4caf50' : '#f44336' }}>{value ? '✓' : '✗'}</span>;
+    }
+    
+    if (typeof value === 'number') {
+      return <span style={{ fontFamily: 'monospace', fontSize: '10px' }}>{value.toLocaleString()}</span>;
+    }
+    
+    if (typeof value === 'string') {
+      if (value.length > 15) {
+        return (
+          <span title={value} style={{ fontSize: '10px' }}>
+            {value.substring(0, 15)}...
+          </span>
+        );
+      }
+      return <span style={{ fontSize: '10px' }}>{value}</span>;
+    }
+    
+    if (Array.isArray(value)) {
+      return <span style={{ fontSize: '10px', color: '#2196f3' }}>{value.length} items</span>;
+    }
+    
+    if (typeof value === 'object') {
+      return <span style={{ fontSize: '10px', color: '#9c27b0' }}>Object</span>;
+    }
+    
+    return <span style={{ fontSize: '10px' }}>{String(value)}</span>;
+  };
+
   if (!isAuthenticated) {
     return (
       <SidebarLayout>
@@ -513,36 +639,61 @@ const EnhancedXeroFlow: React.FC = () => {
 
   return (
     <SidebarLayout>
-      <Box sx={{ p: 3 }}>
+      <Box sx={{ p: { xs: 2, sm: 3 }, maxWidth: '100%', overflow: 'hidden' }}>
         {/* Enhanced Header */}
         <Fade in timeout={800}>
           <Paper 
             elevation={0} 
             sx={{ 
-              mb: 4, 
-              p: 4, 
+              mb: { xs: 2, sm: 4 }, 
+              p: { xs: 2, sm: 4 }, 
               background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
               color: 'white',
-              borderRadius: 3,
+              borderRadius: { xs: 2, sm: 3 },
               position: 'relative',
               overflow: 'hidden'
             }}
           >
             <Box sx={{ position: 'relative', zIndex: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', mr: 2, width: 56, height: 56 }}>
-                  <AutoAwesome sx={{ fontSize: 32 }} />
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                mb: 2,
+                flexDirection: { xs: 'column', sm: 'row' },
+                textAlign: { xs: 'center', sm: 'left' }
+              }}>
+                <Avatar sx={{ 
+                  bgcolor: 'rgba(255,255,255,0.2)', 
+                  mr: { xs: 0, sm: 2 }, 
+                  mb: { xs: 2, sm: 0 },
+                  width: { xs: 48, sm: 56 }, 
+                  height: { xs: 48, sm: 56 } 
+                }}>
+                  <AutoAwesome sx={{ fontSize: { xs: 24, sm: 32 } }} />
                 </Avatar>
                 <Box>
-                  <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 0.5 }}>
+                  <Typography variant="h4" sx={{ 
+                    fontWeight: 'bold', 
+                    mb: 0.5,
+                    fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' }
+                  }}>
                     Xero Flow
                   </Typography>
-                  <Typography variant="h6" sx={{ opacity: 0.9, fontWeight: 300 }}>
+                  <Typography variant="h6" sx={{ 
+                    opacity: 0.9, 
+                    fontWeight: 300,
+                    fontSize: { xs: '1rem', sm: '1.25rem' }
+                  }}>
                     Complete Data Management
                   </Typography>
                 </Box>
               </Box>
-              <Typography variant="body1" sx={{ opacity: 0.9, maxWidth: 600 }}>
+              <Typography variant="body1" sx={{ 
+                opacity: 0.9, 
+                maxWidth: 600,
+                fontSize: { xs: '0.875rem', sm: '1rem' },
+                textAlign: { xs: 'center', sm: 'left' }
+              }}>
                 Comprehensive Xero integration with full data access, real-time synchronization, and advanced analytics
               </Typography>
             </Box>
@@ -584,35 +735,61 @@ const EnhancedXeroFlow: React.FC = () => {
               transition: 'all 0.3s ease'
             }}
           >
-            <CardContent sx={{ p: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between', 
+                mb: 2,
+                flexDirection: { xs: 'column', sm: 'row' },
+                gap: { xs: 2, sm: 0 }
+              }}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 2,
+                  flexDirection: { xs: 'column', sm: 'row' },
+                  textAlign: { xs: 'center', sm: 'left' }
+                }}>
                   <Avatar 
                     sx={{ 
                       bgcolor: isConnected ? '#4caf50' : '#f44336',
-                      width: 48,
-                      height: 48
+                      width: { xs: 40, sm: 48 },
+                      height: { xs: 40, sm: 48 }
                     }}
                   >
                     {isConnected ? <CheckCircle /> : <ErrorIcon />}
                   </Avatar>
                   <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                    <Typography variant="h6" sx={{ 
+                      fontWeight: 'bold',
+                      fontSize: { xs: '1.1rem', sm: '1.25rem' }
+                    }}>
                       Connection Status
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" color="text.secondary" sx={{
+                      fontSize: { xs: '0.8rem', sm: '0.875rem' }
+                    }}>
                       {isConnected ? 'Successfully connected to Xero' : 'Not connected to Xero'}
                     </Typography>
                   </Box>
                 </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 1,
+                  flexDirection: { xs: 'row', sm: 'row' }
+                }}>
                   {isConnected ? (
                     <Chip 
                       icon={<CheckCircle />} 
                       label="Connected" 
                       color="success" 
                       variant="filled"
-                      sx={{ fontWeight: 'bold' }}
+                      sx={{ 
+                        fontWeight: 'bold',
+                        fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                      }}
                     />
                   ) : (
                     <Chip 
@@ -620,10 +797,13 @@ const EnhancedXeroFlow: React.FC = () => {
                       label="Not Connected" 
                       color="error" 
                       variant="filled"
-                      sx={{ fontWeight: 'bold' }}
+                      sx={{ 
+                        fontWeight: 'bold',
+                        fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                      }}
                     />
                   )}
-                  {isLoading && <CircularProgress size={24} />}
+                  {isLoading && <CircularProgress size={20} />}
                 </Box>
               </Box>
 
@@ -640,21 +820,29 @@ const EnhancedXeroFlow: React.FC = () => {
             )}
 
             {!isConnected ? (
-              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+              <Box sx={{ 
+                display: 'flex', 
+                gap: 2, 
+                alignItems: 'center', 
+                flexWrap: 'wrap',
+                flexDirection: { xs: 'column', sm: 'row' },
+                justifyContent: { xs: 'center', sm: 'flex-start' }
+              }}>
                 <Button
                   variant="contained"
                   startIcon={isConnecting ? <CircularProgress size={20} color="inherit" /> : <CloudSync />}
                   onClick={handleOneClickConnect}
-                  disabled={isConnecting || !hasSettings}
+                  disabled={isConnecting}
                   size="large"
                   sx={{
                     background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
                     borderRadius: 2,
-                    px: 4,
+                    px: { xs: 3, sm: 4 },
                     py: 1.5,
                     fontWeight: 'bold',
                     textTransform: 'none',
                     boxShadow: '0 4px 12px rgba(33, 150, 243, 0.3)',
+                    width: { xs: '100%', sm: 'auto' },
                     '&:hover': {
                       background: 'linear-gradient(45deg, #1976D2 30%, #1CB5E0 90%)',
                       boxShadow: '0 6px 16px rgba(33, 150, 243, 0.4)',
@@ -664,16 +852,31 @@ const EnhancedXeroFlow: React.FC = () => {
                   {isConnecting ? 'Connecting...' : 'Connect to Xero'}
                 </Button>
                 {!hasSettings && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 1,
+                    flexDirection: { xs: 'column', sm: 'row' },
+                    textAlign: { xs: 'center', sm: 'left' }
+                  }}>
                     <Warning color="warning" />
-                    <Typography variant="body2" color="text.secondary">
-                      Contact your administrator to configure Xero credentials
+                    <Typography variant="body2" color="text.secondary" sx={{
+                      fontSize: { xs: '0.8rem', sm: '0.875rem' }
+                    }}>
+                      Xero credentials may not be configured. If connection fails, please ask your administrator to set up Xero client credentials.
                     </Typography>
                   </Box>
                 )}
               </Box>
             ) : (
-              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+              <Box sx={{ 
+                display: 'flex', 
+                gap: 2, 
+                alignItems: 'center', 
+                flexWrap: 'wrap',
+                flexDirection: { xs: 'column', sm: 'row' },
+                justifyContent: { xs: 'center', sm: 'flex-start' }
+              }}>
                 <Button
                   variant="outlined"
                   startIcon={<Refresh />}
@@ -681,12 +884,13 @@ const EnhancedXeroFlow: React.FC = () => {
                   disabled={isLoading}
                   sx={{
                     borderRadius: 2,
-                    px: 3,
+                    px: { xs: 2, sm: 3 },
                     py: 1,
                     fontWeight: 'bold',
                     textTransform: 'none',
                     borderColor: '#4caf50',
                     color: '#4caf50',
+                    width: { xs: '100%', sm: 'auto' },
                     '&:hover': {
                       borderColor: '#45a049',
                       backgroundColor: 'rgba(76, 175, 80, 0.04)',
@@ -702,10 +906,11 @@ const EnhancedXeroFlow: React.FC = () => {
                   onClick={disconnect}
                   sx={{
                     borderRadius: 2,
-                    px: 3,
+                    px: { xs: 2, sm: 3 },
                     py: 1,
                     fontWeight: 'bold',
                     textTransform: 'none',
+                    width: { xs: '100%', sm: 'auto' },
                     '&:hover': {
                       backgroundColor: 'rgba(244, 67, 54, 0.04)',
                     }
@@ -798,7 +1003,12 @@ const EnhancedXeroFlow: React.FC = () => {
                       </Typography>
                     </Box>
                   </Box>
-                  <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    gap: 1,
+                    flexDirection: { xs: 'column', sm: 'row' },
+                    width: { xs: '100%', sm: 'auto' }
+                  }}>
                     <Button
                       variant="contained"
                       startIcon={isLoadingData ? <CircularProgress size={20} color="inherit" /> : <Download />}
@@ -808,11 +1018,13 @@ const EnhancedXeroFlow: React.FC = () => {
                       sx={{
                         background: 'linear-gradient(45deg, #4caf50 30%, #66bb6a 90%)',
                         borderRadius: 2,
-                        px: 3,
+                        px: { xs: 2, sm: 3 },
                         py: 1.5,
                         fontWeight: 'bold',
                         textTransform: 'none',
                         boxShadow: '0 4px 12px rgba(76, 175, 80, 0.3)',
+                        width: { xs: '100%', sm: 'auto' },
+                        fontSize: { xs: '0.875rem', sm: '1rem' },
                         '&:hover': {
                           background: 'linear-gradient(45deg, #45a049 30%, #5cb85c 90%)',
                           boxShadow: '0 6px 16px rgba(76, 175, 80, 0.4)',
@@ -843,7 +1055,7 @@ const EnhancedXeroFlow: React.FC = () => {
                   </Box>
                 )}
 
-              <Grid container spacing={2}>
+              <Grid container spacing={{ xs: 1, sm: 2 }}>
                 {[
                   { type: 'organization', label: 'Organization', icon: <AccountBalance />, color: '#2196F3' },
                   { type: 'contacts', label: 'Contacts', icon: <People />, color: '#4CAF50' },
@@ -861,12 +1073,17 @@ const EnhancedXeroFlow: React.FC = () => {
                   { type: 'overpayments', label: 'Overpayments', icon: <Receipt />, color: '#CDDC39' },
                   { type: 'quotes', label: 'Quotes', icon: <Receipt />, color: '#FFC107' }
                 ].map(({ type, label, icon, color }, index) => (
-                  <Grid item xs={12} sm={6} md={4} key={type}>
+                  <Box key={type} sx={{ 
+                    width: { xs: '100%', sm: 'calc(50% - 8px)', md: 'calc(33.333% - 11px)', lg: 'calc(25% - 12px)' },
+                    display: 'inline-block',
+                    verticalAlign: 'top',
+                    mb: 2
+                  }}>
                     <Zoom in timeout={1200 + (index * 100)}>
                       <Card 
                         elevation={2}
                         sx={{ 
-                          p: 2, 
+                          p: { xs: 1.5, sm: 2 }, 
                           cursor: 'pointer',
                           borderRadius: 2,
                           border: loadedData[type] ? `2px solid ${color}` : '2px solid transparent',
@@ -874,6 +1091,7 @@ const EnhancedXeroFlow: React.FC = () => {
                             ? `linear-gradient(135deg, ${color}15 0%, ${color}08 100%)`
                             : 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
                           transition: 'all 0.3s ease',
+                          minHeight: { xs: 80, sm: 100 },
                           '&:hover': { 
                             transform: 'translateY(-4px)',
                             boxShadow: `0 8px 25px ${color}30`,
@@ -882,23 +1100,44 @@ const EnhancedXeroFlow: React.FC = () => {
                         }}
                         onClick={() => loadSpecificData(type)}
                       >
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Box sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'space-between',
+                          flexDirection: { xs: 'column', sm: 'row' },
+                          gap: { xs: 1, sm: 0 }
+                        }}>
+                          <Box sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: { xs: 1, sm: 1.5 },
+                            flexDirection: { xs: 'column', sm: 'row' },
+                            textAlign: { xs: 'center', sm: 'left' }
+                          }}>
                             <Avatar 
                               sx={{ 
                                 bgcolor: color, 
-                                width: 40, 
-                                height: 40,
+                                width: { xs: 32, sm: 40 }, 
+                                height: { xs: 32, sm: 40 },
                                 boxShadow: `0 4px 12px ${color}40`
                               }}
                             >
                               {icon}
                             </Avatar>
-                            <Typography variant="body1" sx={{ fontWeight: 'bold', color: loadedData[type] ? color : 'inherit' }}>
+                            <Typography variant="body1" sx={{ 
+                              fontWeight: 'bold', 
+                              color: loadedData[type] ? color : 'inherit',
+                              fontSize: { xs: '0.8rem', sm: '0.875rem' }
+                            }}>
                               {label}
                             </Typography>
                           </Box>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: 1,
+                            justifyContent: { xs: 'center', sm: 'flex-end' }
+                          }}>
                             {loadedData[type] && (
                               <Badge 
                                 badgeContent={getDataCount(type)} 
@@ -908,11 +1147,14 @@ const EnhancedXeroFlow: React.FC = () => {
                                     backgroundColor: color,
                                     color: 'white',
                                     fontWeight: 'bold',
-                                    fontSize: '0.75rem'
+                                    fontSize: { xs: '0.6rem', sm: '0.75rem' }
                                   }
                                 }}
                               >
-                                <CheckCircle sx={{ color: color, fontSize: 20 }} />
+                                <CheckCircle sx={{ 
+                                  color: color, 
+                                  fontSize: { xs: 16, sm: 20 } 
+                                }} />
                               </Badge>
                             )}
                             {dataLoadingStates[type] && (
@@ -925,7 +1167,7 @@ const EnhancedXeroFlow: React.FC = () => {
                         </Box>
                       </Card>
                     </Zoom>
-                  </Grid>
+                  </Box>
                 ))}
               </Grid>
             </CardContent>
@@ -1052,7 +1294,7 @@ const EnhancedXeroFlow: React.FC = () => {
                   </Box>
                 </Box>
                 
-                <Grid container spacing={2}>
+                <Grid container spacing={{ xs: 1, sm: 2 }}>
                   {[
                     { step: 1, title: 'Configure Credentials', desc: 'Ensure your administrator has configured Xero client credentials', icon: <Security /> },
                     { step: 2, title: 'Connect to Xero', desc: 'Click "Connect to Xero" to authorize the integration', icon: <CloudSync /> },
@@ -1060,7 +1302,12 @@ const EnhancedXeroFlow: React.FC = () => {
                     { step: 4, title: 'Load Data', desc: 'Load specific data types or all data at once', icon: <DataUsage /> },
                     { step: 5, title: 'View & Manage', desc: 'View and manage your Xero data in organized tables', icon: <TableChart /> }
                   ].map(({ step, title, desc, icon }) => (
-                    <Grid item xs={12} sm={6} md={4} key={step}>
+                    <Box key={step} sx={{ 
+                      width: { xs: '100%', sm: 'calc(50% - 8px)', md: 'calc(33.333% - 11px)' },
+                      display: 'inline-block',
+                      verticalAlign: 'top',
+                      mb: 2
+                    }}>
                       <Box sx={{ 
                         p: 2, 
                         borderRadius: 2, 
@@ -1085,7 +1332,7 @@ const EnhancedXeroFlow: React.FC = () => {
                           {desc}
                         </Typography>
                       </Box>
-                    </Grid>
+                    </Box>
                   ))}
                 </Grid>
               </CardContent>

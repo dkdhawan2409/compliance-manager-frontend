@@ -1,9 +1,9 @@
 // Xero Context Provider
 // Comprehensive React context for managing Xero integration state and actions
 
-import React, { createContext, useContext, useReducer, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useState, ReactNode, useCallback, useMemo } from 'react';
 import { toast } from 'react-hot-toast';
-import { getXeroSettings } from '../../api/xeroService';
+// Removed dependency on old xeroService - using new API client instead
 import { 
   XeroState, 
   XeroAction, 
@@ -100,85 +100,102 @@ interface XeroProviderProps {
 
 // Provider Component
 export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {} }) => {
+  // 🚨 GLOBAL EMERGENCY BRAKE - COMPLETELY DISABLE ALL XERO OPERATIONS
+  const EMERGENCY_BRAKE_ACTIVE = false;
+  
+  if (EMERGENCY_BRAKE_ACTIVE) {
+    console.log('🚨🚨🚨 GLOBAL EMERGENCY BRAKE ACTIVE - ALL XERO OPERATIONS DISABLED 🚨🚨🚨');
+    // Return a completely disabled provider with safe no-op functions
+    return (
+      <XeroContext.Provider value={{
+        state: {
+          ...initialState,
+          hasSettings: true, // Enable button to be clickable
+          connectionStatus: 'disconnected', // Show as disconnected
+        },
+        startAuth: () => { 
+          console.log('🚫 Emergency brake: startAuth disabled');
+          // Show user-friendly message
+          if (typeof window !== 'undefined' && window.alert) {
+            alert('🚨 Xero operations are currently disabled due to system maintenance. Please try again later.');
+          }
+          return Promise.resolve();
+        },
+        handleCallback: () => { 
+          console.log('🚫 Emergency brake: handleCallback disabled');
+          return Promise.resolve();
+        },
+        disconnect: () => { 
+          console.log('🚫 Emergency brake: disconnect disabled');
+          return Promise.resolve();
+        },
+        loadSettings: () => { 
+          console.log('🚫 Emergency brake: loadSettings disabled');
+          return Promise.resolve();
+        },
+        refreshConnection: () => { 
+          console.log('🚫 Emergency brake: refreshConnection disabled');
+          return Promise.resolve();
+        },
+        refreshToken: () => { 
+          console.log('🚫 Emergency brake: refreshToken disabled');
+          return Promise.resolve();
+        },
+        loadData: () => { 
+          console.log('🚫 Emergency brake: loadData disabled');
+          return Promise.resolve({ success: false, message: 'Emergency brake active' });
+        },
+        selectTenant: () => { 
+          console.log('🚫 Emergency brake: selectTenant disabled');
+        },
+        clearError: () => { 
+          console.log('🚫 Emergency brake: clearError disabled');
+        },
+        saveSettings: () => { 
+          console.log('🚫 Emergency brake: saveSettings disabled');
+          return Promise.resolve();
+        },
+        deleteSettings: () => { 
+          console.log('🚫 Emergency brake: deleteSettings disabled');
+          return Promise.resolve();
+        },
+      }}>
+        {children}
+      </XeroContext.Provider>
+    );
+  }
+
   const [state, dispatch] = useReducer(xeroReducer, initialState);
   const [isInitialized, setIsInitialized] = useState(false);
   const [lastApiCall, setLastApiCall] = useState<number>(0);
   const [apiClient, setApiClient] = useState<XeroApiClient | null>(null);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(false);
+  const [apiCallCount, setApiCallCount] = useState(0);
+  const [maxApiCalls] = useState(5); // Maximum API calls allowed
 
-  // Merge with default config
-  const fullConfig: XeroConfig = {
+  // Merge with default config - MEMOIZED TO PREVENT INFINITE RENDERS
+  const fullConfig: XeroConfig = useMemo(() => ({
     clientId: '',
     redirectUri: '',
     scopes: ['offline_access', 'accounting.transactions', 'accounting.contacts', 'accounting.settings'],
-    apiBaseUrl: '/api/xero',
+    apiBaseUrl: '/api/xero-plug-play',
     autoRefreshTokens: true,
     enableDemoMode: false,
     ...config,
-  };
+  }), [config]);
 
-  // Load client ID from existing Xero settings
-  const loadClientIdFromSettings = async () => {
-    try {
-      console.log('🔧 Loading client ID from existing Xero settings...');
-      const existingSettings = await getXeroSettings();
-      
-      if (existingSettings?.clientId) {
-        console.log('✅ Found existing Xero client ID:', existingSettings.clientId);
-        
-        const newConfig = {
-          ...fullConfig,
-          clientId: existingSettings.clientId,
-        };
-        
-        // Create API client with the loaded client ID
-        const client = createXeroApi(newConfig);
-        setApiClient(client);
-        
-        dispatch({ 
-          type: 'SET_SETTINGS', 
-          payload: existingSettings 
-        });
-        
-        dispatch({ 
-          type: 'SET_CONNECTION_STATUS', 
-          payload: { 
-            isConnected: existingSettings.isConnected || false,
-            message: existingSettings.isConnected ? 'Connected to Xero' : 'Not connected',
-            needsOAuth: !existingSettings.isConnected,
-          }
-        });
-        
-        toast.success('Xero client ID loaded from existing settings');
-        return true;
-      } else {
-        console.log('ℹ️ No existing Xero client ID found');
-        return false;
-      }
-    } catch (error) {
-      console.log('ℹ️ No existing Xero settings found or error loading:', error);
-      return false;
-    }
-  };
+  // Load client ID from existing Xero settings - DISABLED TO STOP API CALLS
+  const loadClientIdFromSettings = useCallback(async () => {
+    console.log('🚫 loadClientIdFromSettings disabled to stop API calls');
+    return false;
+  }, []);
 
-  // Initialize API client and load dynamic config
+  // Initialize API client and load dynamic config - COMPLETELY DISABLED TO STOP API CALLS
   useEffect(() => {
-    const initializeProvider = async () => {
-      dispatch({ type: 'SET_LOADING', payload: true });
-      
-      // Try to load client ID from existing settings
-      const hasExistingSettings = await loadClientIdFromSettings();
-      
-      if (!hasExistingSettings) {
-        // Create API client with provided config
-        const client = createXeroApi(fullConfig);
-        setApiClient(client);
-      }
-      
-      dispatch({ type: 'SET_LOADING', payload: false });
-    };
-
-    initializeProvider();
-  }, [fullConfig]);
+    console.log('🚫 XeroProvider initialization COMPLETELY DISABLED to stop API calls');
+    // Don't create API client at all to prevent any API calls
+    dispatch({ type: 'SET_LOADING', payload: false });
+  }, []); // Empty dependency array to run only once
 
   // Rate limiting protection
   const canMakeApiCall = (): boolean => {
@@ -190,83 +207,71 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
     return true;
   };
 
-  // Load settings
-  const loadSettings = async () => {
-    if (!apiClient || state.isLoading || !canMakeApiCall()) {
+  // Load settings - RE-ENABLED TO CHECK CREDENTIALS
+  const loadSettings = useCallback(async () => {
+    if (isLoadingSettings) {
+      console.log('⏳ Settings already loading, skipping...');
       return;
     }
-
+    
+    const now = Date.now();
+    if (now - lastApiCall < 2000) { // 2 second cooldown
+      console.log('⏳ Too soon since last API call, skipping loadSettings...');
+      return;
+    }
+    
+    setIsLoadingSettings(true);
+    setLastApiCall(now);
+    
     try {
-      dispatch({ type: 'SET_LOADING', payload: true });
-      dispatch({ type: 'SET_ERROR', payload: null });
-
-      const statusData = await apiClient.getConnectionStatus();
+      console.log('🔧 Loading Xero settings to check credentials...');
+      const tempClient = createXeroApi(fullConfig);
+      const settings = await tempClient.getSettings();
       
-      const settingsData = {
-        hasCredentials: statusData.hasCredentials || false,
-        hasOAuthSettings: statusData.hasCredentials || false,
-        isConnected: statusData.isConnected || false,
-        connectionStatus: statusData.connectionStatus || 'unknown',
-        tenants: statusData.tenants || []
-      };
+      console.log('✅ Settings loaded:', settings);
+      dispatch({ type: 'SET_SETTINGS', payload: settings });
       
-      dispatch({ type: 'SET_SETTINGS', payload: settingsData });
-
-      const connectionStatus: XeroConnectionStatus = {
-        isConnected: Boolean(statusData.isConnected),
-        connectionStatus: statusData.connectionStatus || 'unknown',
-        message: statusData.isConnected ? XERO_MESSAGES.CONNECT_SUCCESS : 'Not connected to Xero',
-        tenants: statusData.tenants || [],
-        hasValidTokens: statusData.hasValidTokens,
-        needsReconnection: statusData.needsReconnection,
-        lastConnected: statusData.lastConnected,
-      };
-      
-      dispatch({ type: 'SET_CONNECTION_STATUS', payload: connectionStatus });
-      
-      // Auto-select first tenant if available and none selected
-      if (connectionStatus.tenants && connectionStatus.tenants.length > 0 && !state.selectedTenant) {
-        const firstTenant = connectionStatus.tenants[0];
-        dispatch({ type: 'SET_SELECTED_TENANT', payload: firstTenant });
+      // Update connection status based on settings
+      if (settings.isConnected) {
+        dispatch({ type: 'SET_CONNECTION_STATUS', payload: {
+          isConnected: true,
+          connectionStatus: 'connected',
+          message: 'Connected to Xero',
+          tenants: settings.tenants || [],
+          hasCredentials: true,
+        }});
+      } else {
+        dispatch({ type: 'SET_CONNECTION_STATUS', payload: {
+          isConnected: false,
+          connectionStatus: 'disconnected',
+          message: 'Not connected to Xero',
+          tenants: [],
+          hasCredentials: !!settings.clientId,
+        }});
       }
-
-      // Set demo mode if enabled
-      if (fullConfig.enableDemoMode) {
-        dispatch({ type: 'SET_DEMO_MODE', payload: true });
-      }
-
+      
     } catch (err: any) {
       console.error('❌ Failed to load settings:', err);
-      
-      if (err.response?.status !== 404 && err.response?.status !== 401) {
-        const errorMessage = err.response?.data?.message || XERO_MESSAGES.SERVER_ERROR;
-        dispatch({ type: 'SET_ERROR', payload: errorMessage });
-        toast.error(errorMessage);
-      } else {
-        // Expected for users who haven't configured Xero yet
-        const defaultSettings = {
-          hasCredentials: false,
-          hasOAuthSettings: false,
-          isConnected: false,
-          connectionStatus: 'not_configured',
-          tenants: []
-        };
-        dispatch({ type: 'SET_SETTINGS', payload: defaultSettings });
-      }
+      // Don't show error toast for settings load failure
+      // Just set hasSettings to false
+      dispatch({ type: 'SET_SETTINGS', payload: null });
     } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
+      setIsLoadingSettings(false);
     }
-  };
+  }, [fullConfig, isLoadingSettings, lastApiCall]);
 
-  // Initialize on mount
+  // Initialize on mount - RE-ENABLED TO LOAD SETTINGS
   useEffect(() => {
-    if (!isInitialized && apiClient) {
-      loadSettings().catch(error => {
-        console.error('❌ Failed to load settings on mount:', error);
-      });
+    if (!isInitialized) {
+      console.log('🚀 Initializing XeroProvider - loading settings...');
       setIsInitialized(true);
+      
+      // Load settings to check if credentials are configured
+      setTimeout(() => {
+        loadSettings();
+      }, 1000); // Small delay to prevent immediate API call
     }
-  }, [isInitialized, apiClient]);
+  }, [isInitialized, loadSettings]);
 
   // Persist connection status
   useEffect(() => {
@@ -279,8 +284,68 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
     }
   }, [state.isConnected]);
 
-  // Start OAuth flow
+  // Start OAuth flow - RE-ENABLED BUT MODIFIED TO WORK
   const startAuth = async () => {
+    try {
+      dispatch({ type: 'SET_LOADING', payload: true });
+      dispatch({ type: 'SET_ERROR', payload: null });
+
+      // Clear existing state
+      dispatch({ type: 'CLEAR_STATE' });
+      localStorage.removeItem(XERO_LOCAL_STORAGE_KEYS.TOKENS);
+      localStorage.removeItem(XERO_LOCAL_STORAGE_KEYS.AUTHORIZED);
+      localStorage.removeItem(XERO_LOCAL_STORAGE_KEYS.AUTH_TIMESTAMP);
+
+      // Create a temporary API client for auth URL
+      const tempClient = createXeroApi(fullConfig);
+      const authResponse = await tempClient.getAuthUrl();
+      console.log('🔧 Auth response:', authResponse);
+      
+      if (!authResponse || !authResponse.authUrl) {
+        throw new Error('Invalid authorization response received from backend');
+      }
+      
+      const { authUrl } = authResponse;
+      window.location.href = authUrl;
+      
+    } catch (err: any) {
+      console.error('❌ Error connecting to Xero:', err);
+      
+      let errorMessage = 'Failed to connect to Xero';
+      
+      // Handle specific client ID validation errors
+      if (err.response?.status === 400) {
+        const errorData = err.response.data;
+        if (errorData?.error === 'CLIENT_ID_NOT_SET') {
+          errorMessage = 'Xero Client ID is not configured. Please ask your administrator to configure Xero client credentials.';
+        } else if (errorData?.error === 'CLIENT_SECRET_NOT_SET') {
+          errorMessage = 'Xero Client Secret is not configured. Please ask your administrator to configure Xero client credentials.';
+        } else if (errorData?.error === 'NO_XERO_SETTINGS') {
+          errorMessage = 'Xero settings not found. Please ask your administrator to configure Xero client credentials for your company.';
+        } else if (errorData?.message) {
+          errorMessage = errorData.message;
+        }
+      } else if (err.response?.status === 401) {
+        errorMessage = 'Authentication required. Please log in again.';
+      } else if (err.response?.status === 404) {
+        errorMessage = 'Xero OAuth endpoint not found. Please check backend implementation.';
+      } else if (err.response?.status === 500) {
+        errorMessage = 'Backend server error. Please check server logs.';
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      dispatch({ type: 'SET_ERROR', payload: errorMessage });
+      toast.error(errorMessage);
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
+    }
+  };
+
+  // DISABLED - Original startAuth function
+  const startAuth_ORIGINAL = async () => {
     if (!apiClient || !canMakeApiCall()) {
       return;
     }
@@ -348,9 +413,8 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
 
   // Handle OAuth callback
   const handleCallback = async (code: string, state: string) => {
-    if (!apiClient || !canMakeApiCall()) {
-      return;
-    }
+    // Create a temporary API client for callback handling
+    const tempClient = createXeroApi(fullConfig);
 
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
@@ -365,7 +429,7 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
         }
       }
 
-      const result = await apiClient.handleCallback(code, state);
+      const result = await tempClient.handleCallback(code, state);
       
       dispatch({ type: 'SET_TOKENS', payload: result.tokens });
       dispatch({ type: 'SET_TENANTS', payload: result.tenants });
@@ -421,9 +485,8 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
 
   // Disconnect
   const disconnect = async () => {
-    if (!apiClient || !canMakeApiCall()) {
-      return;
-    }
+    // Create a temporary API client for disconnect
+    const tempClient = createXeroApi(fullConfig);
 
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
@@ -436,7 +499,7 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
       localStorage.removeItem(XERO_LOCAL_STORAGE_KEYS.AUTHORIZED);
       localStorage.removeItem(XERO_LOCAL_STORAGE_KEYS.AUTH_TIMESTAMP);
       
-      await apiClient.deleteSettings();
+      await tempClient.deleteSettings();
       
       toast.success(XERO_MESSAGES.DISCONNECT_SUCCESS);
     } catch (err: any) {

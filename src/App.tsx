@@ -6,7 +6,9 @@ import { Toaster } from 'react-hot-toast';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { AuthProvider } from './contexts/AuthContext';
-import { XeroProvider } from './contexts/XeroContext';
+import { XeroProvider } from './integrations/xero/context/XeroProvider';
+// 🚨 GLOBAL EMERGENCY BRAKE - Import to activate
+import './utils/emergencyBrake';
 import { theme } from './theme/theme';
 import ProtectedRoute from './components/ProtectedRoute';
 import SuperAdminRoute from './components/SuperAdminRoute';
@@ -35,6 +37,7 @@ import FASProcessing from './pages/FASProcessing';
 import XeroOAuth2Page from './pages/XeroOAuth2Page';
 import XeroDataDisplay from './pages/XeroDataDisplay';
 import XeroFlow from './pages/XeroFlow';
+import SuperAdminXeroManagement from './pages/SuperAdminXeroManagement';
 import MissingAttachments from './pages/MissingAttachments';
 import UploadReceipt from './pages/UploadReceipt';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -107,6 +110,14 @@ function App() {
                   <ProtectedRoute>
                     <XeroFlow />
                   </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/super-admin/xero-management"
+                element={
+                  <SuperAdminRoute>
+                    <SuperAdminXeroManagement />
+                  </SuperAdminRoute>
                 }
               />
               <Route
