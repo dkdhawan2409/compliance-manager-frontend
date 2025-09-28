@@ -184,13 +184,13 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
     
     console.log('🔧 XeroProvider Config:', { isProduction, apiBaseUrl, hostname: window.location.hostname });
     
-    // Determine redirect URI based on environment
-    const redirectUri = isProduction 
+    // Use redirect URI from settings if available, otherwise fallback to default
+    const redirectUri = state.settings?.redirect_uri || (isProduction 
       ? `${window.location.origin}/xero-callback` // Production callback
-      : `${window.location.origin}/xero-callback`; // Local callback
+      : `${window.location.origin}/xero-callback`); // Local callback
     
     return {
-      clientId: '',
+      clientId: state.settings?.client_id || '',
       redirectUri,
       scopes: ['offline_access', 'accounting.transactions', 'accounting.contacts', 'accounting.settings'],
       apiBaseUrl,
@@ -198,7 +198,7 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
       enableDemoMode: false,
       ...config,
     };
-  }, [config]);
+  }, [config, state.settings]);
 
   // Rate limiting protection - MOVED UP TO PREVENT CIRCULAR DEPENDENCY
   const canMakeApiCall = useCallback((): boolean => {

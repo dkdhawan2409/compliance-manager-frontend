@@ -231,7 +231,6 @@ export class XeroApiClient {
       const state = this.generateState();
       const response = await this.client.get('/connect', {
         params: {
-          redirect_uri: this.config.redirectUri,
           state: state,
         },
       });
@@ -265,7 +264,6 @@ export class XeroApiClient {
       const response = await this.client.post('/oauth-callback', {
         code,
         state,
-        redirect_uri: this.config.redirectUri,
       });
 
       const result = response.data.data;
