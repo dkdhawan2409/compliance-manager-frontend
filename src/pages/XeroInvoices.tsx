@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useXero } from '../contexts/XeroContext';
+import { useXero } from '../integrations/xero/context/XeroProvider';
 import SidebarLayout from '../components/SidebarLayout';
 import toast from 'react-hot-toast';
 

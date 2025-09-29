@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useXero } from '../contexts/XeroContext';
+import { useXero } from '../integrations/xero/context/XeroProvider';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   getDashboardData, 
