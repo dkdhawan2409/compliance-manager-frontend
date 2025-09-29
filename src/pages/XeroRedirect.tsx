@@ -59,7 +59,7 @@ const XeroRedirect: React.FC = () => {
         console.log('🔧 Making OAuth callback with RENDER redirect URI:', redirectUri);
         console.log('🔧 NO LOCALHOST - Using Render domain only');
 
-        const response = await fetch(`${apiUrl}/xero/callback`, {
+        const response = await fetch(`${apiUrl}/xero-plug-play/oauth-callback`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
