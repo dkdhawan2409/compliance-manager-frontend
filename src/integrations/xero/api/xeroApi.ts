@@ -245,9 +245,12 @@ export class XeroApiClient {
         throw new Error('No authorization URL received from backend');
       }
 
+      // Use the state returned from backend to ensure consistency
+      const backendState = response.data?.data?.state || response.data?.state || state;
+      
       return {
         authUrl: authUrl,
-        state: state,
+        state: backendState,
       };
     } catch (error) {
       console.error('❌ Failed to get auth URL:', error);
