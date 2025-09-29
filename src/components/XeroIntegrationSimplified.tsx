@@ -31,7 +31,7 @@ const XeroIntegrationSimplified: React.FC<XeroIntegrationSimplifiedProps> = () =
       // Smart redirect URI based on environment
       const isLocal = window.location.hostname.includes('localhost');
       const redirectUri = isLocal 
-        ? `http://localhost:3001/redirecturl`
+        ? `${window.location.origin}/redirecturl`
         : 'https://compliance-manager-frontend.onrender.com/redirecturl';
       
       const state = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);

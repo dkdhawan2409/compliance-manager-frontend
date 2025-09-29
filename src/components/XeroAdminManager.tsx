@@ -85,7 +85,7 @@ const XeroAdminManager: React.FC = () => {
 
     setLoading(true);
     try {
-      const response = await fetch(`/api/companies/admin/${selectedCompany}/xero-client`, {
+      const response = await fetch(`${getApiUrl()}/companies/admin/${selectedCompany}/xero-client`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

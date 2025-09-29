@@ -43,7 +43,7 @@ export const testXeroEnvironment = (): XeroEnvironmentTest => {
 
   const calculatedRedirectUri = `${origin}/redirecturl`;
   const expectedRedirectUri = isLocal
-    ? 'http://localhost:3001/redirecturl'
+    ? `${window.location.origin}/redirecturl`
     : 'https://compliance-manager-frontend.onrender.com/redirecturl';
 
   // Check if configuration is correct
