@@ -29,9 +29,10 @@ import {
   UploadLink,
   Statistics
 } from '../api/missingAttachmentService';
-import { getConnectionStatus } from '../api/xeroService';
+import { useXero } from '../integrations/xero/context/XeroProvider';
 
 const MissingAttachments: React.FC = () => {
+  const { state: xeroState } = useXero();
   const [activeTab, setActiveTab] = useState<'overview' | 'config' | 'transactions' | 'links'>('overview');
   const [config, setConfig] = useState<MissingAttachmentConfig | null>(null);
   const [statistics, setStatistics] = useState<Statistics | null>(null);
@@ -39,8 +40,6 @@ const MissingAttachments: React.FC = () => {
   const [uploadLinks, setUploadLinks] = useState<UploadLink[]>([]);
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [xeroConnected, setXeroConnected] = useState<boolean>(false);
-  const [xeroStatus, setXeroStatus] = useState<string>('');
 
   useEffect(() => {
     loadData();
@@ -49,16 +48,13 @@ const MissingAttachments: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [configData, statsData, xeroConnectionData] = await Promise.all([
+      const [configData, statsData] = await Promise.all([
         getMissingAttachmentConfig(),
-        getMissingAttachmentStatistics(30),
-        getConnectionStatus()
+        getMissingAttachmentStatistics(30)
       ]);
       
       setConfig(configData);
       setStatistics(statsData);
-      setXeroConnected(xeroConnectionData.isConnected === true || xeroConnectionData.isConnected === 'true');
-      setXeroStatus(xeroConnectionData.connectionStatus || 'Unknown');
     } catch (error: any) {
       console.error('Error loading data:', error);
       toast.error('Failed to load missing attachments data');
@@ -92,7 +88,7 @@ const MissingAttachments: React.FC = () => {
       // Show specific error messages for Xero connection issues
       const errorMessage = error.response?.data?.error || error.message;
       if (errorMessage.includes('Xero not connected') || errorMessage.includes('access token not found')) {
-        toast.error('Xero not connected. Please go to Xero Integration and connect your account first.');
+        toast.error('Xero not connected. Please go to Xero Flow and connect your account first.');
       } else if (errorMessage.includes('token expired')) {
         toast.error('Xero token expired. Please reconnect to Xero.');
       } else if (errorMessage.includes('tenant not found')) {
@@ -276,27 +272,27 @@ const MissingAttachments: React.FC = () => {
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Xero Connection Status</h2>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className={`w-4 h-4 rounded-full ${xeroConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                <div className={`w-4 h-4 rounded-full ${xeroState.isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
                 <span className="text-sm font-medium text-gray-900">
-                  {xeroConnected ? 'Connected' : 'Not Connected'}
+                  {xeroState.isConnected ? 'Connected' : 'Not Connected'}
                 </span>
                 <span className="text-xs text-gray-500">
-                  ({xeroStatus})
+                  ({xeroState.selectedTenant?.name || 'No organization selected'})
                 </span>
               </div>
-              {!xeroConnected && (
+              {!xeroState.isConnected && (
                 <a
-                  href="/integrations/xero"
+                  href="/xero"
                   className="text-sm bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700"
                 >
                   Connect Xero
                 </a>
               )}
             </div>
-            {!xeroConnected && (
+            {!xeroState.isConnected && (
               <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                 <p className="text-sm text-yellow-800">
-                  ⚠️ Real Xero data is not available. Please connect to Xero to detect actual missing attachments.
+                  ⚠️ Real Xero data is not available. Please connect to Xero Flow to detect actual missing attachments.
                 </p>
               </div>
             )}
