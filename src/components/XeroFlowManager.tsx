@@ -26,11 +26,11 @@ const XeroFlowManager: React.FC = () => {
 
   // Auto-load data when tenant is selected
   useEffect(() => {
-    if (selectedTenant && !autoLoadComplete && !isAutoLoading) {
-      console.log('🚀 Auto-loading data for tenant:', selectedTenant.name);
+    if (selectedTenant && !autoLoadComplete && !isAutoLoading && isConnected) {
+      console.log('🚀 Auto-loading data for tenant:', selectedTenant.name, 'isConnected:', isConnected);
       autoLoadXeroData();
     }
-  }, [selectedTenant, autoLoadComplete, isAutoLoading]);
+  }, [selectedTenant, autoLoadComplete, isAutoLoading, isConnected]);
 
   // Refresh connection status when component mounts or when returning from OAuth
   useEffect(() => {
@@ -45,8 +45,26 @@ const XeroFlowManager: React.FC = () => {
         if (urlParams.get('success') === 'true') {
           console.log('🎉 OAuth completed successfully, refreshing state...');
           toast.success('Xero connection successful!');
+          
           // Clear the URL parameter
           window.history.replaceState({}, document.title, window.location.pathname);
+          
+          // Force refresh connection status to get latest data
+          setTimeout(async () => {
+            try {
+              console.log('🔄 Force refreshing connection after OAuth success...');
+              await loadSettings();
+              await refreshConnection();
+              
+              // If we have tenants but no selected tenant, auto-select the first one
+              if (state.tenants && state.tenants.length > 0 && !state.selectedTenant) {
+                console.log('🎯 Auto-selecting first tenant after OAuth success');
+                selectTenant(state.tenants[0].id);
+              }
+            } catch (error) {
+              console.log('⚠️ Failed to refresh after OAuth success:', error);
+            }
+          }, 1000);
         }
       } catch (error) {
         console.log('⚠️ Failed to refresh connection status:', error);
@@ -54,7 +72,7 @@ const XeroFlowManager: React.FC = () => {
     };
 
     refreshOnMount();
-  }, [loadSettings, refreshConnection]);
+  }, [loadSettings, refreshConnection, selectTenant, state.tenants, state.selectedTenant]);
 
   const handleOneClickConnect = async () => {
     if (isConnecting) return;
@@ -72,26 +90,45 @@ const XeroFlowManager: React.FC = () => {
   };
 
   const autoLoadXeroData = async () => {
-    if (!selectedTenant || isAutoLoading || autoLoadComplete) return;
+    if (!selectedTenant || isAutoLoading || autoLoadComplete || !isConnected) {
+      console.log('⚠️ Skipping auto-load:', { 
+        selectedTenant: !!selectedTenant, 
+        isAutoLoading, 
+        autoLoadComplete, 
+        isConnected 
+      });
+      return;
+    }
     
     setIsAutoLoading(true);
     try {
-      console.log('📊 Starting auto-load of Xero data...');
+      console.log('📊 Starting auto-load of Xero data for tenant:', selectedTenant.name);
+      toast.loading('Loading Xero data...', { duration: 2000 });
       
       // Load key data types automatically
       const dataTypes = ['organization', 'contacts', 'invoices', 'accounts'] as const;
-      const loadPromises = dataTypes.map(type => 
-        loadData(type).catch(err => {
-          console.warn(`⚠️ Failed to load ${type}:`, err);
-          return null; // Don't fail the entire process for one data type
+      const loadResults = await Promise.allSettled(
+        dataTypes.map(async type => {
+          console.log(`🔄 Loading ${type}...`);
+          const result = await loadData({ resourceType: type, tenantId: selectedTenant.id });
+          console.log(`✅ Loaded ${type}:`, result?.data?.length || 'No data');
+          return { type, result };
         })
       );
       
-      await Promise.all(loadPromises);
+      // Check results
+      const successful = loadResults.filter(r => r.status === 'fulfilled').length;
+      const failed = loadResults.filter(r => r.status === 'rejected').length;
+      
+      console.log(`📊 Auto-load results: ${successful} successful, ${failed} failed`);
       
       setAutoLoadComplete(true);
-      toast.success('🎉 All Xero data loaded successfully!');
-      console.log('✅ Auto-load complete');
+      
+      if (successful > 0) {
+        toast.success(`🎉 Xero data loaded! (${successful}/${dataTypes.length} successful)`);
+      } else {
+        toast.error('⚠️ Failed to load Xero data, but connection is ready');
+      }
       
     } catch (error: any) {
       console.error('❌ Auto-load error:', error);
@@ -106,6 +143,17 @@ const XeroFlowManager: React.FC = () => {
   const handleSelectTenant = (tenantId: string) => {
     selectTenant(tenantId);
     toast.success('Organization selected successfully!');
+    // Reset auto-load completion when switching tenants
+    setAutoLoadComplete(false);
+  };
+
+  const handleReloadData = () => {
+    if (!selectedTenant || !isConnected) {
+      toast.error('Please select an organization and ensure you are connected');
+      return;
+    }
+    setAutoLoadComplete(false);
+    autoLoadXeroData();
   };
 
   const handleLoadData = async () => {
@@ -369,6 +417,13 @@ const XeroFlowManager: React.FC = () => {
             >
               <div className="text-2xl mb-2">🔄</div>
               <div className="font-medium text-gray-900">Refresh</div>
+            </button>
+            <button
+              onClick={handleReloadData}
+              className="p-3 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow text-center"
+            >
+              <div className="text-2xl mb-2">📊</div>
+              <div className="font-medium text-gray-900">Reload Data</div>
             </button>
               <button
               onClick={handleDisconnect}
