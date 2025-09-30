@@ -293,15 +293,20 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
   // Initialize on mount - RE-ENABLED TO LOAD SETTINGS
   useEffect(() => {
     if (!isInitialized) {
-      console.log('🚀 Initializing XeroProvider - loading settings...');
+      console.log('🚀 Initializing XeroProvider - creating API client and loading settings...');
       setIsInitialized(true);
+      
+      // Create the API client first
+      const client = createXeroApi(fullConfig);
+      setApiClient(client);
+      console.log('✅ API client created and set');
       
       // Load settings to check if credentials are configured
       setTimeout(() => {
         loadSettings();
       }, 1000); // Small delay to prevent immediate API call
     }
-  }, [isInitialized, loadSettings]);
+  }, [isInitialized, loadSettings, fullConfig]);
 
   // Persist connection status
   useEffect(() => {
