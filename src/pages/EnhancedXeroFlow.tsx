@@ -132,6 +132,14 @@ const EnhancedXeroFlow: React.FC = () => {
     }
   }, [tenants, selectedTenant, selectTenant]);
 
+  // Check for token expiration and show reconnection message
+  useEffect(() => {
+    if (!isConnected && hasSettings) {
+      console.log('⚠️ Xero not connected but credentials exist - likely token expired');
+      showLimitedToast('Xero connection expired. Please reconnect to view your data.', 'warning');
+    }
+  }, [isConnected, hasSettings]);
+
   // Refresh connection status when component mounts - DISABLED to prevent infinite loops
   useEffect(() => {
     console.log('🚫 Auto-refresh disabled to prevent infinite API loops');
@@ -203,11 +211,21 @@ const EnhancedXeroFlow: React.FC = () => {
           showLimitedToast(`${dataType} data loaded successfully!`, 'success');
         }
       } else {
-        showLimitedToast(`Failed to load ${dataType}: ${result.message}`, 'error');
+        // Check if it's a token expiration error
+        if (result.message && result.message.includes('expired')) {
+          showLimitedToast('Xero connection expired. Please reconnect to view data.', 'error');
+        } else {
+          showLimitedToast(`Failed to load ${dataType}: ${result.message}`, 'error');
+        }
       }
     } catch (error: any) {
       console.error(`❌ Error loading ${dataType}:`, error);
-      showLimitedToast(`Failed to load ${dataType}: ${error.message}`, 'error');
+      // Check if it's a token expiration error
+      if (error.message && (error.message.includes('expired') || error.message.includes('unauthorized'))) {
+        showLimitedToast('Xero connection expired. Please reconnect to view data.', 'error');
+      } else {
+        showLimitedToast(`Failed to load ${dataType}: ${error.message}`, 'error');
+      }
     } finally {
       setDataLoadingStates(prev => ({ ...prev, [dataType]: false }));
     }
@@ -301,12 +319,21 @@ const EnhancedXeroFlow: React.FC = () => {
       if (successCount > 0) {
         showLimitedToast(`🎉 Loaded ${successCount} data types successfully${errorCount > 0 ? ` (${errorCount} failed)` : ''}`, 'success');
       } else {
-        showLimitedToast('Failed to load any data. Please try again.', 'error');
+        // Check if all errors are due to token expiration
+        if (errorCount === dataTypes.length) {
+          showLimitedToast('Xero connection expired. Please reconnect to view all data.', 'error');
+        } else {
+          showLimitedToast('Failed to load any data. Please try again.', 'error');
+        }
       }
       
     } catch (error: any) {
       console.error('❌ Error loading all data:', error);
-      showLimitedToast('Failed to load data. Please try again.', 'error');
+      if (error.message && (error.message.includes('expired') || error.message.includes('unauthorized'))) {
+        showLimitedToast('Xero connection expired. Please reconnect to view data.', 'error');
+      } else {
+        showLimitedToast('Failed to load data. Please try again.', 'error');
+      }
     } finally {
       setIsLoadingData(false);
     }
@@ -847,6 +874,25 @@ const EnhancedXeroFlow: React.FC = () => {
             {!hasSettings && (
               <Alert severity="warning" sx={{ mb: 2 }}>
                 ⚠️ Xero Client ID is not configured. Please ask your administrator to configure Xero client credentials.
+              </Alert>
+            )}
+
+            {!isConnected && hasSettings && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1 }}>
+                  🔄 Reconnection Required
+                </Typography>
+                <Typography variant="body2" sx={{ mb: 1 }}>
+                  Your Xero connection has expired. Click "Connect to Xero" below to reconnect and access all your transaction data.
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                  After reconnecting, you'll be able to view all transaction types including:
+                </Typography>
+                <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  {['Bank Transactions', 'General Transactions', 'Payments', 'Journals', 'Invoices', 'Contacts', 'Accounts'].map((type) => (
+                    <Chip key={type} label={type} size="small" variant="outlined" />
+                  ))}
+                </Box>
               </Alert>
             )}
 
