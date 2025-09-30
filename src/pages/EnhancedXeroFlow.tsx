@@ -376,7 +376,13 @@ const EnhancedXeroFlow: React.FC = () => {
               fontSize: { xs: '1rem', sm: '1.25rem' },
               fontWeight: 'bold'
             }}>
-              {dataType.charAt(0).toUpperCase() + dataType.slice(1)} ({data.length} items)
+              {dataType.charAt(0).toUpperCase() + dataType.slice(1)} 
+              <Chip 
+                label={`${data.length} records`} 
+                color="primary" 
+                size="small" 
+                sx={{ ml: 1, fontWeight: 'bold' }}
+              />
             </Typography>
             <Box sx={{ display: { xs: 'block', sm: 'none' } }}>
               <Typography variant="caption" color="text.secondary">
@@ -387,9 +393,9 @@ const EnhancedXeroFlow: React.FC = () => {
           
           {/* Mobile Card View */}
           <Box sx={{ display: { xs: 'block', sm: 'none' }, mb: 2 }}>
-            {data.slice(0, 20).map((item: any, index: number) => (
+            {data.map((item: any, index: number) => (
               <Card key={index} sx={{ mb: 1, p: 2 }}>
-                {Object.entries(item).slice(0, 5).map(([key, value]) => (
+                {Object.entries(item).slice(0, 8).map(([key, value]) => (
                   <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
                     <Typography variant="caption" sx={{ fontWeight: 'bold', minWidth: '80px' }}>
                       {key}:
@@ -399,16 +405,16 @@ const EnhancedXeroFlow: React.FC = () => {
                     </Typography>
                   </Box>
                 ))}
-                {Object.keys(item).length > 5 && (
+                {Object.keys(item).length > 8 && (
                   <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                    +{Object.keys(item).length - 5} more fields
+                    +{Object.keys(item).length - 8} more fields
                   </Typography>
                 )}
               </Card>
             ))}
-            {data.length > 20 && (
+            {data.length > 0 && (
               <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block' }}>
-                Showing first 20 of {data.length} items
+                ✅ Showing all {data.length} records in mobile view
               </Typography>
             )}
           </Box>
@@ -539,10 +545,18 @@ const EnhancedXeroFlow: React.FC = () => {
                 ))}
               </tbody>
             </table>
-            {data.length > 50 && (
-              <Typography color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
-                Showing first 50 of {data.length} items
-              </Typography>
+            {data.length > 0 && (
+              <Box sx={{ mt: 2, textAlign: 'center' }}>
+                <Typography color="text.secondary" sx={{ mb: 1 }}>
+                  ✅ Showing all {data.length} records (fetched up to 1000 per request)
+                </Typography>
+                {data.length >= 1000 && (
+                  <Typography color="warning.main" variant="caption">
+                    Note: If you have more than 1000 records, only the first 1000 are shown. 
+                    Contact support for bulk data export.
+                  </Typography>
+                )}
+              </Box>
             )}
             </Box>
           </Box>
