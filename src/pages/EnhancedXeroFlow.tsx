@@ -176,7 +176,10 @@ const EnhancedXeroFlow: React.FC = () => {
     
     try {
       console.log(`📊 Loading ${dataType} data...`);
-      const result = await loadData(dataType as any);
+      const result = await loadData({ 
+        resourceType: dataType as any, 
+        tenantId: selectedTenant.id 
+      });
       
       if (result.success) {
         setLoadedData(prev => ({ ...prev, [dataType]: result.data }));
@@ -245,7 +248,10 @@ const EnhancedXeroFlow: React.FC = () => {
       for (const type of dataTypes) {
         try {
           console.log(`📊 Loading ${type}...`);
-          const result = await loadData(type as any);
+          const result = await loadData({ 
+            resourceType: type as any, 
+            tenantId: selectedTenant.id 
+          });
           if (result.success) {
             setLoadedData(prev => ({ ...prev, [type]: result.data }));
             successCount++;
