@@ -50,251 +50,173 @@ export function withXeroData<T extends WithXeroDataProps>(
       hasSettings,
     } = state;
 
-    // Function to load Xero data for financial analysis with robust fallbacks
+    // Function to load Xero data for financial analysis - ONLY from connected account
     const loadXeroDataForAnalysis = async () => {
-      console.log('🔍 Starting Xero data loading for BAS analysis...');
+      console.log('🔍 Starting Xero data loading for BAS/FAS analysis...');
       
       // Check if Xero is connected first
       if (!isConnected) {
         console.log('❌ Xero is not connected - cannot load data for analysis');
         throw new Error('Xero is not connected. Please connect to Xero first to load data for analysis.');
       }
+
+      // Check if we have a selected tenant
+      if (!selectedTenant) {
+        console.log('❌ No tenant selected - cannot load data for analysis');
+        throw new Error('No Xero organization selected. Please select an organization first.');
+      }
       
       try {
-        toast.loading('Loading Xero data for BAS analysis...', { id: 'xero-load' });
+        toast.loading(`Loading data from ${selectedTenant.name || 'Xero organization'}...`, { id: 'xero-load' });
 
-        // Always try to load demo data first as a reliable fallback
-        let transactions, contacts;
+        console.log(`📊 Loading real Xero data from tenant: ${selectedTenant.name} (${selectedTenant.id})`);
         
-        console.log('🎭 Loading demo data for BAS processing...');
-        
-        // Load demo invoices (reliable fallback)
+        // Load REAL invoices from the connected Xero account
+        let invoices;
         try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 8000);
-          
-          const invoiceResponse = await fetch(`${getApiUrl()}/api/xero/demo/invoices`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-            signal: controller.signal
-          });
-          
-          clearTimeout(timeoutId);
-          
-          if (invoiceResponse.ok) {
-            transactions = await invoiceResponse.json();
-            console.log('✅ Demo invoices loaded:', transactions?.data?.length || 0, 'records');
-          } else {
-            throw new Error(`Demo invoices failed: ${invoiceResponse.status}`);
-          }
+          console.log('📋 Loading invoices from connected Xero account...');
+          const invoiceData = await loadData('invoices');
+          invoices = invoiceData?.data || invoiceData?.Invoices || [];
+          console.log(`✅ Real invoices loaded: ${invoices.length} records from ${selectedTenant.name}`);
         } catch (error: any) {
-          console.log('⚠️ Demo invoices failed, using static fallback:', error.message);
-          // Static fallback data for BAS processing
-          transactions = {
-            data: [
-              {
-                InvoiceID: 'demo-001',
-                InvoiceNumber: 'INV-001',
-                Total: 11000.00,
-                AmountPaid: 11000.00,
-                AmountDue: 0.00,
-                Status: 'PAID',
-                Date: '2024-07-15',
-                DueDate: '2024-08-15',
-                Contact: { Name: 'Demo Customer 1' },
-                LineItems: [
-                  { Description: 'Consulting Services', UnitAmount: 10000.00, TaxAmount: 1000.00 }
-                ]
-              },
-              {
-                InvoiceID: 'demo-002', 
-                InvoiceNumber: 'INV-002',
-                Total: 5500.00,
-                AmountPaid: 5500.00,
-                AmountDue: 0.00,
-                Status: 'PAID',
-                Date: '2024-08-01',
-                DueDate: '2024-09-01',
-                Contact: { Name: 'Demo Customer 2' },
-                LineItems: [
-                  { Description: 'Professional Services', UnitAmount: 5000.00, TaxAmount: 500.00 }
-                ]
-              }
-            ]
-          };
-          console.log('📊 Using static demo invoices for BAS processing');
+          console.error('❌ Failed to load invoices from Xero:', error);
+          throw new Error(`Failed to load invoices from Xero: ${error.message}`);
         }
 
-        // Load demo contacts (reliable fallback)
+        // Load REAL contacts from the connected Xero account
+        let contacts;
         try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 8000);
-          
-          const contactResponse = await fetch(`${getApiUrl()}/api/xero/demo/contacts`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-            signal: controller.signal
-          });
-          
-          clearTimeout(timeoutId);
-          
-          if (contactResponse.ok) {
-            contacts = await contactResponse.json();
-            console.log('✅ Demo contacts loaded:', contacts?.data?.length || 0, 'records');
-          } else {
-            throw new Error(`Demo contacts failed: ${contactResponse.status}`);
-          }
+          console.log('👥 Loading contacts from connected Xero account...');
+          const contactData = await loadData('contacts');
+          contacts = contactData?.data || contactData?.Contacts || [];
+          console.log(`✅ Real contacts loaded: ${contacts.length} records from ${selectedTenant.name}`);
         } catch (error: any) {
-          console.log('⚠️ Demo contacts failed, using static fallback:', error.message);
-          // Static fallback contacts
-          contacts = {
-            data: [
-              { ContactID: 'demo-contact-1', Name: 'Demo Customer 1', EmailAddress: 'demo1@example.com' },
-              { ContactID: 'demo-contact-2', Name: 'Demo Customer 2', EmailAddress: 'demo2@example.com' }
-            ]
-          };
-          console.log('📊 Using static demo contacts for BAS processing');
+          console.error('❌ Failed to load contacts from Xero:', error);
+          throw new Error(`Failed to load contacts from Xero: ${error.message}`);
+        }
+
+        // Load REAL bank transactions from the connected Xero account
+        let bankTransactions;
+        try {
+          console.log('🏦 Loading bank transactions from connected Xero account...');
+          const bankData = await loadData('bank-transactions');
+          bankTransactions = bankData?.data || bankData?.BankTransactions || [];
+          console.log(`✅ Real bank transactions loaded: ${bankTransactions.length} records from ${selectedTenant.name}`);
+        } catch (error: any) {
+          console.warn('⚠️ Failed to load bank transactions from Xero:', error);
+          bankTransactions = []; // Bank transactions are optional for BAS/FAS
         }
         
-        // Calculate financial summary from transaction data for BAS processing
-        console.log('📊 Calculating financial summary from transaction data...');
-        let reportsData = null;
+        // Calculate financial summary from REAL Xero data
+        console.log('📊 Calculating financial summary from real Xero data...');
         
-        if (transactions?.data && Array.isArray(transactions.data)) {
-          let totalRevenue = 0;
-          let paidRevenue = 0;
-          let outstandingRevenue = 0;
-          let totalGST = 0;
-          let totalExpenses = 0;
+        if (!invoices || invoices.length === 0) {
+          throw new Error(`No invoice data found in your Xero organization "${selectedTenant.name}". Please ensure you have invoices in your Xero account.`);
+        }
+        
+        let totalRevenue = 0;
+        let paidRevenue = 0;
+        let outstandingRevenue = 0;
+        let totalGST = 0;
+        
+        // Process REAL invoices from the connected Xero account
+        invoices.forEach((invoice: any) => {
+          const amount = parseFloat(invoice.Total) || 0;
+          const amountPaid = parseFloat(invoice.AmountPaid) || 0;
+          const taxAmount = parseFloat(invoice.TaxAmount) || 0;
           
-          transactions.data.forEach((invoice: any) => {
-            const amount = parseFloat(invoice.Total) || 0;
-            const amountPaid = parseFloat(invoice.AmountPaid) || 0;
-            const taxAmount = parseFloat(invoice.TaxAmount) || (amount * 0.1); // Estimate 10% GST if not available
+          totalRevenue += amount;
+          paidRevenue += amountPaid;
+          outstandingRevenue += (amount - amountPaid);
+          totalGST += taxAmount;
+        });
+
+        // Calculate expenses from bank transactions (if available)
+        let totalExpenses = 0;
+        let expenseGST = 0;
+        
+        if (bankTransactions && bankTransactions.length > 0) {
+          bankTransactions.forEach((transaction: any) => {
+            const amount = parseFloat(transaction.Total) || 0;
+            const taxAmount = parseFloat(transaction.TaxAmount) || 0;
             
-            totalRevenue += amount;
-            paidRevenue += amountPaid;
-            outstandingRevenue += (amount - amountPaid);
-            totalGST += taxAmount;
+            // Only count expenses (negative amounts or outbound transactions)
+            if (amount < 0 || transaction.Type === 'SPEND') {
+              totalExpenses += Math.abs(amount);
+              expenseGST += taxAmount;
+            }
           });
-          
-          // Estimate expenses (for BAS processing, we need both income and expenses)
-          totalExpenses = totalRevenue * 0.3; // Estimate 30% of revenue as expenses
-          const expenseGST = totalExpenses * 0.1; // 10% GST on expenses
-          
-          reportsData = {
-            type: 'BASFinancialSummary',
-            data: {
-              totalRevenue: totalRevenue.toFixed(2),
-              paidRevenue: paidRevenue.toFixed(2),
-              outstandingRevenue: outstandingRevenue.toFixed(2),
-              netIncome: (paidRevenue - totalExpenses).toFixed(2),
-              totalExpenses: totalExpenses.toFixed(2),
-              invoiceCount: transactions.data.length,
-              transactionCount: transactions.data.length,
-              // BAS-specific calculations
-              gstOnSales: totalGST.toFixed(2),
-              gstOnPurchases: expenseGST.toFixed(2),
-              netGST: (totalGST - expenseGST).toFixed(2),
-              totalSalesIncGST: totalRevenue.toFixed(2),
-              totalPurchasesIncGST: totalExpenses.toFixed(2),
-              dataSource: 'calculated_from_invoices',
-              calculatedAt: new Date().toISOString()
-            }
-          };
-          console.log('✅ BAS financial summary calculated:', reportsData.data);
-        } else {
-          // Ultimate fallback with realistic BAS data
-          reportsData = {
-            type: 'BASFinancialSummary',
-            data: {
-              totalRevenue: '165000.00',
-              paidRevenue: '148500.00',
-              outstandingRevenue: '16500.00',
-              netIncome: '115500.00',
-              totalExpenses: '49500.00',
-              invoiceCount: 12,
-              transactionCount: 45,
-              gstOnSales: '15000.00',
-              gstOnPurchases: '4500.00',
-              netGST: '10500.00',
-              totalSalesIncGST: '165000.00',
-              totalPurchasesIncGST: '49500.00',
-              dataSource: 'static_fallback',
-              calculatedAt: new Date().toISOString()
-            }
-          };
-          console.log('📊 Using static fallback BAS data');
         }
-
-        // Create comprehensive data structure for BAS processing
-        const data = {
-          transactions: transactions?.data || [],
-          contacts: contacts?.data || [],
-          basData: reportsData,
-          dashboardData: null, // Skip dashboard data to avoid additional API calls
-          tenantId: selectedTenant?.id || 'demo-tenant',
-          tenantName: selectedTenant?.name || 'Demo Organization',
-          timestamp: new Date().toISOString(),
-          dataSource: reportsData?.data?.dataSource || 'demo_data'
+        
+        // If no bank transactions, estimate expenses from invoices (very rough estimate)
+        if (totalExpenses === 0 && invoices.length > 0) {
+          totalExpenses = totalRevenue * 0.3; // Estimate 30% of revenue as expenses
+          expenseGST = totalExpenses * 0.1; // 10% GST on estimated expenses
+        }
+        
+        const reportsData = {
+          type: 'BASFinancialSummary',
+          data: {
+            totalRevenue: totalRevenue.toFixed(2),
+            paidRevenue: paidRevenue.toFixed(2),
+            outstandingRevenue: outstandingRevenue.toFixed(2),
+            netIncome: (paidRevenue - totalExpenses).toFixed(2),
+            totalExpenses: totalExpenses.toFixed(2),
+            invoiceCount: invoices.length,
+            contactCount: contacts.length,
+            bankTransactionCount: bankTransactions.length,
+            // BAS-specific calculations from REAL data
+            gstOnSales: totalGST.toFixed(2),
+            gstOnPurchases: expenseGST.toFixed(2),
+            netGST: (totalGST - expenseGST).toFixed(2),
+            totalSalesIncGST: totalRevenue.toFixed(2),
+            totalPurchasesIncGST: totalExpenses.toFixed(2),
+            dataSource: 'real_xero_data',
+            tenantId: selectedTenant.id,
+            tenantName: selectedTenant.name,
+            calculatedAt: new Date().toISOString()
+          }
         };
 
-        console.log('📊 Final Xero data for BAS analysis:', {
-          transactionsCount: transactions?.data?.length || 0,
-          contactsCount: contacts?.data?.length || 0,
-          reportsDataType: reportsData?.type || 'None',
+        // Create data structure with REAL Xero data only
+        const data = {
+          transactions: invoices,
+          contacts: contacts,
+          bankTransactions: bankTransactions,
+          basData: reportsData,
+          dashboardData: null,
+          tenantId: selectedTenant.id,
+          tenantName: selectedTenant.name,
+          timestamp: new Date().toISOString(),
+          dataSource: 'real_xero_data'
+        };
+
+        console.log('📊 Final REAL Xero data for BAS/FAS analysis:', {
+          transactionsCount: invoices.length,
+          contactsCount: contacts.length,
+          bankTransactionCount: bankTransactions.length,
+          reportsDataType: reportsData.type,
           dataSource: data.dataSource,
           tenantId: data.tenantId,
           tenantName: data.tenantName,
-          hasFinancialData: !!reportsData?.data
+          hasFinancialData: !!reportsData.data,
+          totalRevenue: reportsData.data.totalRevenue,
+          totalExpenses: reportsData.data.totalExpenses
         });
 
         toast.dismiss({ id: 'xero-load' });
-        toast.success('✅ Xero data loaded successfully for BAS processing');
+        toast.success(`✅ Real data loaded successfully from ${selectedTenant.name} (${invoices.length} invoices, ${contacts.length} contacts)`);
         return data;
         
       } catch (error: any) {
-        console.error('❌ Critical error in Xero data loading:', error);
+        console.error('❌ Critical error loading real Xero data:', error);
         toast.dismiss({ id: 'xero-load' });
         
-        // Provide ultimate fallback data so BAS processing can continue
-        console.log('🆘 Providing ultimate fallback data for BAS processing...');
+        // No fallback data - throw the error to prevent processing with fake data
+        console.log('❌ Cannot proceed with BAS/FAS processing without real Xero data');
         
-        const fallbackData = {
-          transactions: [
-            {
-              InvoiceID: 'fallback-001',
-              Total: 11000.00,
-              AmountPaid: 11000.00,
-              Status: 'PAID',
-              Date: '2024-07-15',
-              Contact: { Name: 'Fallback Customer' },
-              LineItems: [{ TaxAmount: 1000.00 }]
-            }
-          ],
-          contacts: [
-            { ContactID: 'fallback-contact', Name: 'Fallback Customer' }
-          ],
-          basData: {
-            type: 'BASFinancialSummary',
-            data: {
-              totalRevenue: '165000.00',
-              paidRevenue: '148500.00',
-              outstandingRevenue: '16500.00',
-              netIncome: '115500.00',
-              totalExpenses: '49500.00',
-              gstOnSales: '15000.00',
-              gstOnPurchases: '4500.00',
-              netGST: '10500.00',
-              dataSource: 'fallback_data'
-            }
-          },
-          tenantId: 'fallback-tenant',
-          tenantName: 'Fallback Organization',
-          timestamp: new Date().toISOString(),
-          dataSource: 'fallback_data'
-        };
-        
-        toast.warning('Using fallback data for BAS processing. Connect to Xero for real data.');
-        return fallbackData;
+        toast.error(`Failed to load data from ${selectedTenant?.name || 'Xero'}: ${error.message}`);
+        throw new Error(`Failed to load real Xero data: ${error.message}`);
       }
     };
 
