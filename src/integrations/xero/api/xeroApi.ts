@@ -318,7 +318,13 @@ export class XeroApiClient {
   // Data Access
   async loadData<T = any>(request: XeroDataRequest): Promise<XeroDataResponse<T>> {
     try {
+      console.log('🔧 loadData called with request:', request);
       const { resourceType, tenantId, page = 1, pageSize = 50, filters, dateFrom, dateTo } = request;
+      
+      if (!resourceType) {
+        console.error('❌ resourceType is undefined in request:', request);
+        throw new Error('Resource type is required');
+      }
       
       let url = `/${resourceType}`;
       const params: any = { page, pageSize };
