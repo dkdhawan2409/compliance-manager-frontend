@@ -260,23 +260,20 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
       dispatch({ type: 'SET_SETTINGS', payload: settings });
       
       // Update connection status based on settings
-      if (settings.isConnected) {
-        dispatch({ type: 'SET_CONNECTION_STATUS', payload: {
-          isConnected: true,
-          connectionStatus: 'connected',
-          message: 'Connected to Xero',
-          tenants: settings.tenants || [],
-          hasCredentials: true,
-        }});
-      } else {
-        dispatch({ type: 'SET_CONNECTION_STATUS', payload: {
-          isConnected: false,
-          connectionStatus: 'disconnected',
-          message: 'Not connected to Xero',
-          tenants: [],
-          hasCredentials: !!settings.clientId,
-        }});
-      }
+      // Backend returns 'connected' field, not 'isConnected'
+      const isConnected = settings.connected || settings.isConnected;
+      const connectionStatus = settings.connectionStatus || 'disconnected';
+      const message = settings.message || (isConnected ? 'Connected to Xero' : 'Not connected to Xero');
+      const tenants = settings.tenants || [];
+      const hasCredentials = settings.hasCredentials || !!settings.clientId;
+      
+      dispatch({ type: 'SET_CONNECTION_STATUS', payload: {
+        isConnected,
+        connectionStatus,
+        message,
+        tenants,
+        hasCredentials,
+      }});
       
     } catch (err: any) {
       console.error('❌ Failed to load settings:', err);
