@@ -204,6 +204,15 @@ export class XeroApiClient {
     }
   }
 
+  async softDisconnect(): Promise<void> {
+    try {
+      await this.client.post('/disconnect');
+    } catch (error) {
+      console.error('❌ Failed to disconnect Xero connection:', error);
+      throw error;
+    }
+  }
+
   // Connection Status
   async getConnectionStatus(): Promise<XeroConnectionStatus> {
     try {

@@ -534,9 +534,10 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
       localStorage.removeItem(XERO_LOCAL_STORAGE_KEYS.AUTHORIZED);
       localStorage.removeItem(XERO_LOCAL_STORAGE_KEYS.AUTH_TIMESTAMP);
       
-      await tempClient.deleteSettings();
+      // Use soft disconnect to preserve client credentials
+      await tempClient.softDisconnect();
       
-      toast.success(XERO_MESSAGES.DISCONNECT_SUCCESS);
+      toast.success('Xero connection disconnected successfully. Client credentials preserved.');
     } catch (err: any) {
       console.error('❌ Disconnect error:', err);
       const errorMessage = err.response?.data?.message || XERO_MESSAGES.DISCONNECT_ERROR;
