@@ -595,6 +595,12 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
     // Rate limiting is handled by the backend and the 1-second delays in the frontend
 
     try {
+      console.log('🔧 XeroProvider loadData called with request:', request);
+      if (!request || !request.resourceType) {
+        console.error('❌ XeroProvider: Invalid request object:', request);
+        throw new Error('Invalid request: resourceType is required');
+      }
+      
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null });
 
