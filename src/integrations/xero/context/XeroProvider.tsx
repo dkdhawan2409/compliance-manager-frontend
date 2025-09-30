@@ -596,33 +596,53 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
 
     try {
       console.log('🔧 XeroProvider loadData called with request:', request);
-      if (!request || !request.resourceType) {
-        console.error('❌ XeroProvider: Invalid request object:', request);
-        throw new Error('Invalid request: resourceType is required');
+      
+      // Validate request object
+      if (!request) {
+        console.error('❌ XeroProvider: Request object is null/undefined');
+        throw new Error('Request object is required');
       }
+      
+      if (!request.resourceType) {
+        console.error('❌ XeroProvider: resourceType is missing from request:', request);
+        throw new Error('Resource type is required');
+      }
+      
+      if (typeof request.resourceType !== 'string' || request.resourceType.trim() === '') {
+        console.error('❌ XeroProvider: resourceType is not a valid string:', request.resourceType);
+        throw new Error('Resource type must be a non-empty string');
+      }
+      
+      // Ensure resourceType is trimmed and valid
+      const validatedRequest = {
+        ...request,
+        resourceType: request.resourceType.trim()
+      };
+      
+      console.log('🔧 XeroProvider validated request:', validatedRequest);
       
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null });
 
       // Auto-select tenant if needed
-      if (!request.tenantId && state.selectedTenant) {
-        request.tenantId = state.selectedTenant.id;
+      if (!validatedRequest.tenantId && state.selectedTenant) {
+        validatedRequest.tenantId = state.selectedTenant.id;
       }
 
       // Try demo mode if enabled and not connected
       if (fullConfig.enableDemoMode && !state.isConnected) {
         try {
-          const data = await apiClient.getDemoData(request.resourceType);
+          const data = await apiClient.getDemoData(validatedRequest.resourceType);
           return data;
         } catch (demoError) {
           console.log('Demo data failed, trying real data...');
         }
       }
 
-      const data = await apiClient.loadData<T>(request);
+      const data = await apiClient.loadData<T>(validatedRequest);
       return data;
     } catch (err: any) {
-      console.error(`❌ Failed to load ${request.resourceType}:`, err);
+      console.error(`❌ Failed to load ${request?.resourceType || 'unknown'}:`, err);
       
       if (err.response?.status === 401 && err.response?.data?.action === 'reconnect_required') {
         dispatch({ type: 'CLEAR_STATE' });

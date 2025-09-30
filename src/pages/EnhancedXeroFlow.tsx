@@ -153,6 +153,13 @@ const EnhancedXeroFlow: React.FC = () => {
   };
 
   const loadSpecificData = async (dataType: string) => {
+    // Validate dataType parameter
+    if (!dataType || typeof dataType !== 'string' || dataType.trim() === '') {
+      console.error('❌ loadSpecificData: Invalid dataType:', dataType);
+      showLimitedToast('Invalid data type specified', 'error');
+      return;
+    }
+
     if (!selectedTenant) {
       showLimitedToast('Please select a tenant first', 'error');
       return;
@@ -176,10 +183,16 @@ const EnhancedXeroFlow: React.FC = () => {
     
     try {
       console.log(`📊 Loading ${dataType} data...`);
-      const result = await loadData({ 
-        resourceType: dataType as any, 
-        tenantId: selectedTenant.id 
-      });
+      
+      // Create a properly typed request object
+      const request = {
+        resourceType: dataType.trim() as any, // Ensure it's a string and trim whitespace
+        tenantId: selectedTenant.id
+      };
+      
+      console.log('🔧 loadSpecificData request object:', request);
+      
+      const result = await loadData(request);
       
       if (result.success) {
         setLoadedData(prev => ({ ...prev, [dataType]: result.data }));
@@ -248,10 +261,21 @@ const EnhancedXeroFlow: React.FC = () => {
       for (const type of dataTypes) {
         try {
           console.log(`📊 Loading ${type}...`);
-          const result = await loadData({ 
-            resourceType: type as any, 
-            tenantId: selectedTenant.id 
-          });
+          
+          // Validate and create proper request object
+          if (!type || typeof type !== 'string') {
+            console.error('❌ loadAllData: Invalid type in dataTypes array:', type);
+            continue;
+          }
+          
+          const request = {
+            resourceType: type.trim() as any,
+            tenantId: selectedTenant.id
+          };
+          
+          console.log('🔧 loadAllData request object:', request);
+          
+          const result = await loadData(request);
           if (result.success) {
             setLoadedData(prev => ({ ...prev, [type]: result.data }));
             successCount++;
