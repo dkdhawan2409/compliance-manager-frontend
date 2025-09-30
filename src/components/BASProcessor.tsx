@@ -340,6 +340,12 @@ Format your response as a structured analysis.`;
       return;
     }
 
+    // Check if Xero is connected before processing
+    if (!xeroData.isConnected) {
+      toast.error('Xero is not connected. Please connect to Xero first to process BAS data.');
+      return;
+    }
+
     setIsProcessing(true);
     setShowResults(false);
     
@@ -445,6 +451,21 @@ W2: $${finalBASData.BAS_Fields.W2.toLocaleString()}`;
       <div className="text-center">
         <h2 className="text-2xl font-bold text-gray-900">BAS Processing System</h2>
         <p className="text-gray-600 mt-2">Automated Business Activity Statement processing with AI analysis</p>
+        
+        {/* Xero Connection Status */}
+        <div className={`mt-4 p-3 rounded-lg ${xeroData.isConnected ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+          <div className="flex items-center justify-center gap-2">
+            <div className={`w-3 h-3 rounded-full ${xeroData.isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <span className="font-medium">
+              {xeroData.isConnected ? '✅ Xero Connected' : '❌ Xero Not Connected'}
+            </span>
+          </div>
+          {!xeroData.isConnected && (
+            <p className="text-sm mt-1">
+              Please connect to Xero first to process BAS data
+            </p>
+          )}
+        </div>
       </div>
 
       {/* BAS Period Selection */}
@@ -468,7 +489,7 @@ W2: $${finalBASData.BAS_Fields.W2.toLocaleString()}`;
           
           <button
             onClick={processBAS}
-            disabled={!basPeriod || isProcessing}
+            disabled={!basPeriod || isProcessing || !xeroData.isConnected}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isProcessing ? 'Processing...' : 'Start BAS Processing'}

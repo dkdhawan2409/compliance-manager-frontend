@@ -256,6 +256,12 @@ Format your response as a structured FBT analysis.`;
       return;
     }
 
+    // Check if Xero is connected before processing
+    if (!xeroData.isConnected) {
+      toast.error('Xero is not connected. Please connect to Xero first to process FAS data.');
+      return;
+    }
+
     setIsProcessing(true);
     setShowResults(false);
     
@@ -361,6 +367,21 @@ A9: ${finalFASData.FAS_Fields.A9}`;
       <div className="text-center">
         <h2 className="text-2xl font-bold text-gray-900">FAS Processing System</h2>
         <p className="text-gray-600 mt-2">Automated Fringe Benefits Tax Activity Statement processing with AI analysis</p>
+        
+        {/* Xero Connection Status */}
+        <div className={`mt-4 p-3 rounded-lg ${xeroData.isConnected ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+          <div className="flex items-center justify-center gap-2">
+            <div className={`w-3 h-3 rounded-full ${xeroData.isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <span className="font-medium">
+              {xeroData.isConnected ? '✅ Xero Connected' : '❌ Xero Not Connected'}
+            </span>
+          </div>
+          {!xeroData.isConnected && (
+            <p className="text-sm mt-1">
+              Please connect to Xero first to process FAS data
+            </p>
+          )}
+        </div>
       </div>
 
       {/* FAS Period Selection */}
@@ -381,7 +402,7 @@ A9: ${finalFASData.FAS_Fields.A9}`;
           
           <button
             onClick={processFAS}
-            disabled={!fasPeriod || isProcessing}
+            disabled={!fasPeriod || isProcessing || !xeroData.isConnected}
             className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isProcessing ? 'Processing...' : 'Start FAS Processing'}

@@ -54,6 +54,12 @@ export function withXeroData<T extends WithXeroDataProps>(
     const loadXeroDataForAnalysis = async () => {
       console.log('🔍 Starting Xero data loading for BAS analysis...');
       
+      // Check if Xero is connected first
+      if (!isConnected) {
+        console.log('❌ Xero is not connected - cannot load data for analysis');
+        throw new Error('Xero is not connected. Please connect to Xero first to load data for analysis.');
+      }
+      
       try {
         toast.loading('Loading Xero data for BAS analysis...', { id: 'xero-load' });
 

@@ -184,3 +184,4 @@ curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:3333/api/xero/status
 
 **The debug components will help identify exactly what's causing the blank page issue!** 🚀
 
+

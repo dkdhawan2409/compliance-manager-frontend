@@ -195,3 +195,4 @@ curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:3333/api/xero/status
 
 **The debug information will help identify exactly what's causing the connection detection issue!** 🚀
 
+

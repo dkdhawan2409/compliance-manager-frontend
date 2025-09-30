@@ -88,3 +88,4 @@ console.log('   ✅ JWT token: Valid for Company ID 1');
 console.log('   ✅ Xero settings: Available for Company ID 1');
 console.log('   ✅ Xero connect: Should work now');
 
+

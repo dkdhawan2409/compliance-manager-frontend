@@ -276,3 +276,4 @@ The frontend is ready, but you'll need to ensure your backend has these endpoint
 
 **The single Xero integration page is ready to use! Just ensure your backend is running and you can start connecting to Xero immediately.** 🚀
 
+

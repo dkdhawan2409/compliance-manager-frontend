@@ -269,3 +269,4 @@ Are you sure you want to disconnect from Xero? This will:
 
 **The Xero integration now has comprehensive remove/disconnect functionality!** 🎯
 
+
