@@ -388,8 +388,8 @@ const EnhancedXeroFlow: React.FC = () => {
     // Get the first item to determine table structure
     const firstItem = actualData[0];
     const columns = Object.keys(firstItem);
-      
-      return (
+    
+    return (
         <Box>
           <Box sx={{ 
             display: 'flex', 
