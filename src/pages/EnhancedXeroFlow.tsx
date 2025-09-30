@@ -244,6 +244,7 @@ const EnhancedXeroFlow: React.FC = () => {
         'invoices',
         'accounts',
         'bank-transactions',
+        'transactions',
         'items',
         'tax-rates',
         'tracking-categories',
@@ -253,7 +254,9 @@ const EnhancedXeroFlow: React.FC = () => {
         'manual-journals',
         'prepayments',
         'overpayments',
-        'quotes'
+        'quotes',
+        'payments',
+        'journals'
       ];
 
       let successCount = 0;
@@ -1096,6 +1099,7 @@ const EnhancedXeroFlow: React.FC = () => {
                   { type: 'invoices', label: 'Invoices', icon: <Receipt />, color: '#FF9800' },
                   { type: 'accounts', label: 'Accounts', icon: <Assessment />, color: '#9C27B0' },
                   { type: 'bank-transactions', label: 'Bank Transactions', icon: <AccountBalance />, color: '#00BCD4' },
+                  { type: 'transactions', label: 'Transactions', icon: <Receipt />, color: '#17a2b8' },
                   { type: 'items', label: 'Items', icon: <Settings />, color: '#795548' },
                   { type: 'tax-rates', label: 'Tax Rates', icon: <Assessment />, color: '#607D8B' },
                   { type: 'tracking-categories', label: 'Tracking Categories', icon: <Settings />, color: '#E91E63' },
@@ -1105,7 +1109,9 @@ const EnhancedXeroFlow: React.FC = () => {
                   { type: 'manual-journals', label: 'Manual Journals', icon: <Assessment />, color: '#673AB7' },
                   { type: 'prepayments', label: 'Prepayments', icon: <Receipt />, color: '#009688' },
                   { type: 'overpayments', label: 'Overpayments', icon: <Receipt />, color: '#CDDC39' },
-                  { type: 'quotes', label: 'Quotes', icon: <Receipt />, color: '#FFC107' }
+                  { type: 'quotes', label: 'Quotes', icon: <Receipt />, color: '#FFC107' },
+                  { type: 'payments', label: 'Payments', icon: <Receipt />, color: '#28a745' },
+                  { type: 'journals', label: 'Journals', icon: <Assessment />, color: '#6f42c1' }
                 ].map(({ type, label, icon, color }, index) => (
                   <Box key={type} sx={{ 
                     width: { xs: '100%', sm: 'calc(50% - 8px)', md: 'calc(33.333% - 11px)', lg: 'calc(25% - 12px)' },
