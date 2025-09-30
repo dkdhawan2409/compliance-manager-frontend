@@ -353,14 +353,41 @@ const EnhancedXeroFlow: React.FC = () => {
   const renderDataTable = (dataType: string, data: any) => {
     if (!data) return <Typography color="text.secondary">No data loaded</Typography>;
     
+    // Extract the actual data array from Xero API response
+    let actualData: any[] = [];
+    
     if (Array.isArray(data)) {
-      if (data.length === 0) {
-        return <Typography color="text.secondary">No {dataType} data available</Typography>;
+      actualData = data;
+    } else if (data && typeof data === 'object') {
+      // Try to extract the data array from common Xero API response patterns
+      const possibleKeys = [
+        dataType, // e.g., 'contacts'
+        dataType.charAt(0).toUpperCase() + dataType.slice(1), // e.g., 'Contacts'
+        'items',
+        'results',
+        'data'
+      ];
+      
+      for (const key of possibleKeys) {
+        if (data[key] && Array.isArray(data[key])) {
+          actualData = data[key];
+          break;
+        }
       }
+      
+      // If still no array found, treat as single object
+      if (actualData.length === 0) {
+        actualData = [data];
+      }
+    }
+    
+    if (actualData.length === 0) {
+      return <Typography color="text.secondary">No {dataType} data available</Typography>;
+    }
 
-      // Get the first item to determine table structure
-      const firstItem = data[0];
-      const columns = Object.keys(firstItem);
+    // Get the first item to determine table structure
+    const firstItem = actualData[0];
+    const columns = Object.keys(firstItem);
       
       return (
         <Box>
@@ -378,7 +405,7 @@ const EnhancedXeroFlow: React.FC = () => {
             }}>
               {dataType.charAt(0).toUpperCase() + dataType.slice(1)} 
               <Chip 
-                label={`${data.length} records`} 
+                label={`${actualData.length} records`} 
                 color="primary" 
                 size="small" 
                 sx={{ ml: 1, fontWeight: 'bold' }}
@@ -393,7 +420,7 @@ const EnhancedXeroFlow: React.FC = () => {
           
           {/* Mobile Card View */}
           <Box sx={{ display: { xs: 'block', sm: 'none' }, mb: 2 }}>
-            {data.map((item: any, index: number) => (
+            {actualData.map((item: any, index: number) => (
               <Card key={index} sx={{ mb: 1, p: 2 }}>
                 {Object.entries(item).slice(0, 8).map(([key, value]) => (
                   <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
@@ -412,9 +439,9 @@ const EnhancedXeroFlow: React.FC = () => {
                 )}
               </Card>
             ))}
-            {data.length > 0 && (
+            {actualData.length > 0 && (
               <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block' }}>
-                ✅ Showing all {data.length} records in mobile view
+                ✅ Showing all {actualData.length} records in mobile view
               </Typography>
             )}
           </Box>
@@ -495,7 +522,7 @@ const EnhancedXeroFlow: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {data.map((item: any, index: number) => (
+                {actualData.map((item: any, index: number) => (
                   <tr 
                     key={index} 
                     style={{ 
@@ -545,12 +572,12 @@ const EnhancedXeroFlow: React.FC = () => {
                 ))}
               </tbody>
             </table>
-            {data.length > 0 && (
+            {actualData.length > 0 && (
               <Box sx={{ mt: 2, textAlign: 'center' }}>
                 <Typography color="text.secondary" sx={{ mb: 1 }}>
-                  ✅ Showing all {data.length} records (fetched up to 1000 per request)
+                  ✅ Showing all {actualData.length} records (fetched up to 1000 per request)
                 </Typography>
-                {data.length >= 1000 && (
+                {actualData.length >= 1000 && (
                   <Typography color="warning.main" variant="caption">
                     Note: If you have more than 1000 records, only the first 1000 are shown. 
                     Contact support for bulk data export.
