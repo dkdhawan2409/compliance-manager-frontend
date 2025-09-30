@@ -187,7 +187,9 @@ const EnhancedXeroFlow: React.FC = () => {
       // Create a properly typed request object
       const request = {
         resourceType: dataType.trim() as any, // Ensure it's a string and trim whitespace
-        tenantId: selectedTenant.id
+        tenantId: selectedTenant.id,
+        page: 1,
+        pageSize: 1000  // Fetch up to 1000 records to get all data
       };
       
       console.log('🔧 loadSpecificData request object:', request);
@@ -270,7 +272,9 @@ const EnhancedXeroFlow: React.FC = () => {
           
           const request = {
             resourceType: type.trim() as any,
-            tenantId: selectedTenant.id
+            tenantId: selectedTenant.id,
+            page: 1,
+            pageSize: 1000  // Fetch up to 1000 records per request to get all data
           };
           
           console.log('🔧 loadAllData request object:', request);
@@ -353,9 +357,9 @@ const EnhancedXeroFlow: React.FC = () => {
           
           {/* Mobile Card View */}
           <Box sx={{ display: { xs: 'block', sm: 'none' }, mb: 2 }}>
-            {data.slice(0, 10).map((item: any, index: number) => (
+            {data.slice(0, 20).map((item: any, index: number) => (
               <Card key={index} sx={{ mb: 1, p: 2 }}>
-                {Object.entries(item).slice(0, 3).map(([key, value]) => (
+                {Object.entries(item).slice(0, 5).map(([key, value]) => (
                   <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
                     <Typography variant="caption" sx={{ fontWeight: 'bold', minWidth: '80px' }}>
                       {key}:
@@ -365,16 +369,16 @@ const EnhancedXeroFlow: React.FC = () => {
                     </Typography>
                   </Box>
                 ))}
-                {Object.keys(item).length > 3 && (
+                {Object.keys(item).length > 5 && (
                   <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                    +{Object.keys(item).length - 3} more fields
+                    +{Object.keys(item).length - 5} more fields
                   </Typography>
                 )}
               </Card>
             ))}
-            {data.length > 10 && (
+            {data.length > 20 && (
               <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block' }}>
-                Showing first 10 of {data.length} items
+                Showing first 20 of {data.length} items
               </Typography>
             )}
           </Box>
@@ -455,7 +459,7 @@ const EnhancedXeroFlow: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {data.slice(0, 50).map((item: any, index: number) => (
+                {data.map((item: any, index: number) => (
                   <tr 
                     key={index} 
                     style={{ 
