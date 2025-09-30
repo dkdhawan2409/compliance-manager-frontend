@@ -320,7 +320,7 @@ export class XeroApiClient {
     try {
       const { resourceType, tenantId, page = 1, pageSize = 50, filters, dateFrom, dateTo } = request;
       
-      let url = `/xero/${resourceType}`;
+      let url = `/${resourceType}`;
       const params: any = { page, pageSize };
       
       if (tenantId) params.tenantId = tenantId;
