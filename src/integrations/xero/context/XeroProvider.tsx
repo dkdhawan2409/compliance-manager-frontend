@@ -203,9 +203,9 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
   // Rate limiting protection - MOVED UP TO PREVENT CIRCULAR DEPENDENCY
   const canMakeApiCall = useCallback((): boolean => {
     const now = Date.now();
-    // Only block if the last call was very recent (within 500ms)
+    // Only block if the last call was extremely recent (within 100ms)
     // This prevents rapid-fire calls but allows legitimate sequential calls
-    if (now - lastApiCall < 500) {
+    if (now - lastApiCall < 100) {
       return false;
     }
     return true;
@@ -582,12 +582,12 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
 
   // Load data
   const loadData = async <T = any>(request: XeroDataRequest): Promise<XeroDataResponse<T>> => {
-    if (!apiClient || !canMakeApiCall()) {
-      throw new Error('API client not available or rate limited');
+    if (!apiClient) {
+      throw new Error('API client not available');
     }
 
-    // Set the last API call time when we actually make the call
-    setLastApiCall(Date.now());
+    // No rate limiting for data loading - allow sequential calls
+    // Rate limiting is handled by the backend and the 1-second delays in the frontend
 
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
