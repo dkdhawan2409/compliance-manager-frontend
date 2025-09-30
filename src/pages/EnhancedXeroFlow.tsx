@@ -589,7 +589,6 @@ const EnhancedXeroFlow: React.FC = () => {
           </Box>
         </Box>
       );
-    }
     
     // For non-array data, show as key-value pairs
     return (
