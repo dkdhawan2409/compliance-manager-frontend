@@ -203,10 +203,11 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
   // Rate limiting protection - MOVED UP TO PREVENT CIRCULAR DEPENDENCY
   const canMakeApiCall = useCallback((): boolean => {
     const now = Date.now();
-    if (now - lastApiCall < XERO_API_LIMITS.RETRY_DELAY_MS) {
+    // Only block if the last call was very recent (within 500ms)
+    // This prevents rapid-fire calls but allows legitimate sequential calls
+    if (now - lastApiCall < 500) {
       return false;
     }
-    setLastApiCall(now);
     return true;
   }, [lastApiCall]);
 
@@ -216,6 +217,9 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
       console.log('⏳ Rate limit: Too soon since last API call, skipping loadClientIdFromSettings...');
       return false;
     }
+    
+    // Set the last API call time when we actually make the call
+    setLastApiCall(Date.now());
     
     console.log('🔧 Loading client ID from existing Xero settings...');
     try {
@@ -242,14 +246,15 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
       return;
     }
     
-    const now = Date.now();
-    if (now - lastApiCall < 2000) { // 2 second cooldown
-      console.log('⏳ Too soon since last API call, skipping loadSettings...');
+    if (!canMakeApiCall()) {
+      console.log('⏳ Rate limit: Too soon since last API call, skipping loadSettings...');
       return;
     }
     
+    // Set the last API call time when we actually make the call
+    setLastApiCall(Date.now());
+    
     setIsLoadingSettings(true);
-    setLastApiCall(now);
     
     try {
       console.log('🔧 Loading Xero settings to check credentials...');
@@ -580,6 +585,9 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
     if (!apiClient || !canMakeApiCall()) {
       throw new Error('API client not available or rate limited');
     }
+
+    // Set the last API call time when we actually make the call
+    setLastApiCall(Date.now());
 
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
