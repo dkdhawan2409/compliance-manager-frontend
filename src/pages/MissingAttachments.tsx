@@ -16,6 +16,7 @@ import {
   Calendar
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import SidebarLayout from '../components/SidebarLayout';
 import {
   getMissingAttachmentConfig,
   updateMissingAttachmentConfig,
@@ -171,14 +172,17 @@ const MissingAttachments: React.FC = () => {
 
   if (loading && !config) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
+      <SidebarLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </SidebarLayout>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <SidebarLayout>
+      <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -619,7 +623,8 @@ const MissingAttachments: React.FC = () => {
           )}
         </div>
       )}
-    </div>
+      </div>
+    </SidebarLayout>
   );
 };
 
