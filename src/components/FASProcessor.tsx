@@ -124,9 +124,21 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
       console.log('✅ Xero FBT data extracted:', fasData);
       return fasData;
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error extracting Xero FBT data:', error);
-      throw new Error('Failed to extract Xero FBT data');
+      
+      // Provide more specific error messages based on the actual error
+      if (error.message.includes('Xero is not connected')) {
+        throw new Error('Xero is not connected. Please connect to Xero Flow first to extract FBT data.');
+      } else if (error.message.includes('No Xero organization selected')) {
+        throw new Error('No Xero organization selected. Please select an organization in Xero Flow.');
+      } else if (error.message.includes('Failed to load invoices from Xero')) {
+        throw new Error('Failed to load invoice data from Xero. Please check your Xero connection and try again.');
+      } else if (error.message.includes('No invoice data found')) {
+        throw new Error('No invoice data found in your Xero organization. Please ensure you have invoices in your Xero account.');
+      } else {
+        throw new Error(`Failed to extract Xero FBT data: ${error.message}`);
+      }
     }
   };
 
@@ -258,7 +270,13 @@ Format your response as a structured FBT analysis.`;
 
     // Check if Xero is connected before processing
     if (!xeroData.isConnected) {
-      toast.error('Xero is not connected. Please connect to Xero first to process FAS data.');
+      toast.error('Xero is not connected. Please connect to Xero Flow first to process FAS data.', {
+        duration: 5000,
+        action: {
+          label: 'Connect to Xero',
+          onClick: () => window.location.href = '/xero'
+        }
+      });
       return;
     }
 
@@ -377,9 +395,17 @@ A9: ${finalFASData.FAS_Fields.A9}`;
             </span>
           </div>
           {!xeroData.isConnected && (
-            <p className="text-sm mt-1">
-              Please connect to Xero first to process FAS data
-            </p>
+            <div className="text-center mt-2">
+              <p className="text-sm mb-2">
+                Please connect to Xero first to process FAS data
+              </p>
+              <a 
+                href="/xero" 
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                🔗 Connect to Xero Flow
+              </a>
+            </div>
           )}
         </div>
       </div>
