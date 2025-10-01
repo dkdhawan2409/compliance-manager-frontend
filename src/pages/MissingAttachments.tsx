@@ -100,8 +100,22 @@ const MissingAttachments: React.FC = () => {
       const errorMessage = error.response?.data?.error || error.message;
       if (errorMessage.includes('Xero not connected') || errorMessage.includes('access token not found')) {
         toast.error('Xero not connected. Please go to Xero Flow and connect your account first.');
+      } else if (errorMessage.includes('refresh token has expired') || errorMessage.includes('Please reconnect to Xero Flow')) {
+        toast.error('Xero connection expired. Please reconnect to Xero Flow to continue.', {
+          duration: 8000,
+          action: {
+            label: 'Go to Xero Flow',
+            onClick: () => window.open('/xero', '_blank')
+          }
+        });
       } else if (errorMessage.includes('token expired')) {
-        toast.error('Xero token expired. Please reconnect to Xero.');
+        toast.error('Xero token expired. Please reconnect to Xero.', {
+          duration: 6000,
+          action: {
+            label: 'Reconnect',
+            onClick: () => window.open('/xero', '_blank')
+          }
+        });
       } else if (errorMessage.includes('tenant not found')) {
         toast.error('Xero tenant not found. Please reconnect to Xero.');
       } else {
@@ -123,7 +137,28 @@ const MissingAttachments: React.FC = () => {
       await loadUploadLinks();
     } catch (error: any) {
       console.error('Error processing missing attachments:', error);
-      toast.error('Failed to process missing attachments');
+      
+      // Show specific error messages for Xero connection issues
+      const errorMessage = error.response?.data?.error || error.message;
+      if (errorMessage.includes('refresh token has expired') || errorMessage.includes('Please reconnect to Xero Flow')) {
+        toast.error('Xero connection expired. Please reconnect to Xero Flow to continue.', {
+          duration: 8000,
+          action: {
+            label: 'Go to Xero Flow',
+            onClick: () => window.open('/xero', '_blank')
+          }
+        });
+      } else if (errorMessage.includes('token expired')) {
+        toast.error('Xero token expired. Please reconnect to Xero.', {
+          duration: 6000,
+          action: {
+            label: 'Reconnect',
+            onClick: () => window.open('/xero', '_blank')
+          }
+        });
+      } else {
+        toast.error(`Failed to process missing attachments: ${errorMessage}`);
+      }
     } finally {
       setProcessing(false);
     }
@@ -322,6 +357,29 @@ const MissingAttachments: React.FC = () => {
                 <p className="text-sm text-yellow-800">
                   ⚠️ Real Xero data is not available. Please connect to Xero Flow to detect actual missing attachments.
                 </p>
+              </div>
+            )}
+            
+            {/* Token Status Warning */}
+            {xeroState.isConnected && xeroState.connectionStatus === 'error' && (
+              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+                <div className="flex items-center space-x-2">
+                  <AlertTriangle className="w-4 h-4 text-red-600" />
+                  <span className="text-sm font-medium text-red-800">
+                    Connection Issue Detected
+                  </span>
+                </div>
+                <p className="text-xs text-red-700 mt-1">
+                  Your Xero connection may have expired. Please reconnect to ensure all features work properly.
+                </p>
+                <div className="mt-2">
+                  <a 
+                    href="/xero" 
+                    className="inline-flex items-center px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors"
+                  >
+                    Reconnect Xero
+                  </a>
+                </div>
               </div>
             )}
           </div>
