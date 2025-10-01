@@ -428,9 +428,12 @@ const MissingAttachments: React.FC = () => {
                       type="tel"
                       value={config.phoneNumber || ''}
                       onChange={(e) => handleConfigUpdate({ phoneNumber: e.target.value })}
-                      placeholder="+61 4XX XXX XXX"
+                      placeholder="+61412345678 or 0412345678"
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Enter phone number in international format (+61412345678) or national format (0412345678)
+                    </p>
                   </div>
                 )}
                 
