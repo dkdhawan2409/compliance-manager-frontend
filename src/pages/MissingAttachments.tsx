@@ -90,6 +90,19 @@ const MissingAttachments: React.FC = () => {
   const handleDetectMissing = useCallback(async () => {
     try {
       setLoading(true);
+      
+      // Pre-flight check: Ensure Xero is connected before attempting detection
+      if (!xeroState.isConnected) {
+        toast.error('Xero not connected. Please connect to Xero Flow first.', {
+          duration: 6000,
+          action: {
+            label: 'Go to Xero Flow',
+            onClick: () => window.open('/xero', '_blank')
+          }
+        });
+        return;
+      }
+      
       const result = await detectMissingAttachments();
       setMissingTransactions(result.transactions);
       toast.success(`Found ${result.totalTransactions} transactions without attachments`);
@@ -129,6 +142,19 @@ const MissingAttachments: React.FC = () => {
   const handleProcessMissing = useCallback(async () => {
     try {
       setProcessing(true);
+      
+      // Pre-flight check: Ensure Xero is connected before attempting processing
+      if (!xeroState.isConnected) {
+        toast.error('Xero not connected. Please connect to Xero Flow first.', {
+          duration: 6000,
+          action: {
+            label: 'Go to Xero Flow',
+            onClick: () => window.open('/xero', '_blank')
+          }
+        });
+        return;
+      }
+      
       const result = await processMissingAttachments();
       toast.success(`Processed ${result.totalTransactions} transactions, sent ${result.smssSent} notifications`);
       
@@ -251,16 +277,18 @@ const MissingAttachments: React.FC = () => {
           </button>
           <button
             onClick={handleDetectMissing}
-            disabled={loading}
+            disabled={loading || !xeroState.isConnected}
             className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            title={!xeroState.isConnected ? "Xero not connected. Please connect to Xero Flow first." : ""}
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             <span>Scan for Missing</span>
           </button>
           <button
             onClick={handleProcessMissing}
-            disabled={processing}
+            disabled={processing || !xeroState.isConnected}
             className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+            title={!xeroState.isConnected ? "Xero not connected. Please connect to Xero Flow first." : ""}
           >
             <Send className={`w-4 h-4 ${processing ? 'animate-pulse' : ''}`} />
             <span>Send Notifications</span>
