@@ -50,7 +50,7 @@ export function withXeroData<T extends WithXeroDataProps>(
       hasSettings,
     } = state;
 
-    // Function to load Xero data for financial analysis - ONLY from connected account
+    // Function to load Xero data for financial analysis - FROM ALL ORGANIZATIONS
     const loadXeroDataForAnalysis = async () => {
       console.log('🔍 Starting Xero data loading for BAS/FAS analysis...');
       
@@ -60,58 +60,96 @@ export function withXeroData<T extends WithXeroDataProps>(
         throw new Error('Xero is not connected. Please connect to Xero first to load data for analysis.');
       }
 
-      // Check if we have a selected tenant
-      if (!selectedTenant) {
-        console.log('❌ No tenant selected - cannot load data for analysis');
-        throw new Error('No Xero organization selected. Please select an organization first.');
+      // Check if we have any tenants available
+      if (!tenants || tenants.length === 0) {
+        console.log('❌ No organizations available - cannot load data for analysis');
+        throw new Error('No Xero organizations available. Please complete the OAuth flow to access your organizations.');
       }
       
       try {
-        toast.loading(`Loading data from ${selectedTenant.name || 'Xero organization'}...`, { id: 'xero-load' });
+        toast.loading(`Loading data from ${tenants.length} Xero organization(s)...`, { id: 'xero-load' });
 
-        console.log(`📊 Loading real Xero data from tenant: ${selectedTenant.name} (${selectedTenant.id})`);
+        console.log(`📊 Loading real Xero data from ${tenants.length} organization(s):`, tenants.map(t => t.name));
         
-        // Load REAL invoices from the connected Xero account
-        let invoices;
-        try {
-          console.log('📋 Loading invoices from connected Xero account...');
-          const invoiceData = await loadData({ resourceType: 'invoices', tenantId: selectedTenant.id });
-          invoices = invoiceData?.data || invoiceData?.Invoices || [];
-          console.log(`✅ Real invoices loaded: ${invoices.length} records from ${selectedTenant.name}`);
-        } catch (error: any) {
-          console.error('❌ Failed to load invoices from Xero:', error);
-          throw new Error(`Failed to load invoices from Xero: ${error.message}`);
+        // Initialize arrays to store data from all organizations
+        let allInvoices = [];
+        let allContacts = [];
+        let allBankTransactions = [];
+        let organizationData = {};
+
+        // Load data from each organization
+        for (const tenant of tenants) {
+          console.log(`🔄 Processing organization: ${tenant.name} (${tenant.id})`);
+          
+          try {
+            // Load invoices from this organization
+            let invoices = [];
+            try {
+              console.log(`📋 Loading invoices from ${tenant.name}...`);
+              const invoiceData = await loadData({ resourceType: 'invoices', tenantId: tenant.id });
+              invoices = invoiceData?.data || invoiceData?.Invoices || [];
+              console.log(`✅ Loaded ${invoices.length} invoices from ${tenant.name}`);
+            } catch (error: any) {
+              console.warn(`⚠️ Failed to load invoices from ${tenant.name}:`, error);
+              invoices = [];
+            }
+
+            // Load contacts from this organization
+            let contacts = [];
+            try {
+              console.log(`👥 Loading contacts from ${tenant.name}...`);
+              const contactData = await loadData({ resourceType: 'contacts', tenantId: tenant.id });
+              contacts = contactData?.data || contactData?.Contacts || [];
+              console.log(`✅ Loaded ${contacts.length} contacts from ${tenant.name}`);
+            } catch (error: any) {
+              console.warn(`⚠️ Failed to load contacts from ${tenant.name}:`, error);
+              contacts = [];
+            }
+
+            // Load bank transactions from this organization
+            let bankTransactions = [];
+            try {
+              console.log(`🏦 Loading bank transactions from ${tenant.name}...`);
+              const bankData = await loadData({ resourceType: 'bank-transactions', tenantId: tenant.id });
+              bankTransactions = bankData?.data || bankData?.BankTransactions || [];
+              console.log(`✅ Loaded ${bankTransactions.length} bank transactions from ${tenant.name}`);
+            } catch (error: any) {
+              console.warn(`⚠️ Failed to load bank transactions from ${tenant.name}:`, error);
+              bankTransactions = [];
+            }
+
+            // Store organization-specific data
+            organizationData[tenant.id] = {
+              name: tenant.name,
+              invoices: invoices,
+              contacts: contacts,
+              bankTransactions: bankTransactions,
+              totalInvoices: invoices.length,
+              totalContacts: contacts.length,
+              totalBankTransactions: bankTransactions.length
+            };
+
+            // Add to combined arrays
+            allInvoices = allInvoices.concat(invoices.map(inv => ({ ...inv, organizationName: tenant.name, organizationId: tenant.id })));
+            allContacts = allContacts.concat(contacts.map(contact => ({ ...contact, organizationName: tenant.name, organizationId: tenant.id })));
+            allBankTransactions = allBankTransactions.concat(bankTransactions.map(txn => ({ ...txn, organizationName: tenant.name, organizationId: tenant.id })));
+
+          } catch (error: any) {
+            console.error(`❌ Failed to load data from ${tenant.name}:`, error);
+            // Continue with other organizations even if one fails
+          }
         }
 
-        // Load REAL contacts from the connected Xero account
-        let contacts;
-        try {
-          console.log('👥 Loading contacts from connected Xero account...');
-          const contactData = await loadData({ resourceType: 'contacts', tenantId: selectedTenant.id });
-          contacts = contactData?.data || contactData?.Contacts || [];
-          console.log(`✅ Real contacts loaded: ${contacts.length} records from ${selectedTenant.name}`);
-        } catch (error: any) {
-          console.error('❌ Failed to load contacts from Xero:', error);
-          throw new Error(`Failed to load contacts from Xero: ${error.message}`);
-        }
-
-        // Load REAL bank transactions from the connected Xero account
-        let bankTransactions;
-        try {
-          console.log('🏦 Loading bank transactions from connected Xero account...');
-          const bankData = await loadData({ resourceType: 'bank-transactions', tenantId: selectedTenant.id });
-          bankTransactions = bankData?.data || bankData?.BankTransactions || [];
-          console.log(`✅ Real bank transactions loaded: ${bankTransactions.length} records from ${selectedTenant.name}`);
-        } catch (error: any) {
-          console.warn('⚠️ Failed to load bank transactions from Xero:', error);
-          bankTransactions = []; // Bank transactions are optional for BAS/FAS
-        }
+        // Use combined data from all organizations
+        const invoices = allInvoices;
+        const contacts = allContacts;
+        const bankTransactions = allBankTransactions;
         
         // Calculate financial summary from REAL Xero data
         console.log('📊 Calculating financial summary from real Xero data...');
         
         if (!invoices || invoices.length === 0) {
-          throw new Error(`No invoice data found in your Xero organization "${selectedTenant.name}". Please ensure you have invoices in your Xero account.`);
+          throw new Error(`No invoice data found in any of your ${tenants.length} Xero organization(s). Please ensure you have invoices in your Xero account.`);
         }
         
         let totalRevenue = 0;
@@ -185,10 +223,13 @@ export function withXeroData<T extends WithXeroDataProps>(
           bankTransactions: bankTransactions,
           basData: reportsData,
           dashboardData: null,
-          tenantId: selectedTenant.id,
-          tenantName: selectedTenant.name,
+          organizationData: organizationData, // Data broken down by organization
+          totalOrganizations: tenants.length,
+          organizationNames: tenants.map(t => t.name),
+          primaryTenantId: selectedTenant?.id || tenants[0]?.id,
+          primaryTenantName: selectedTenant?.name || tenants[0]?.name,
           timestamp: new Date().toISOString(),
-          dataSource: 'real_xero_data'
+          dataSource: 'real_xero_data_all_organizations'
         };
 
         console.log('📊 Final REAL Xero data for BAS/FAS analysis:', {
@@ -197,15 +238,23 @@ export function withXeroData<T extends WithXeroDataProps>(
           bankTransactionCount: bankTransactions.length,
           reportsDataType: reportsData.type,
           dataSource: data.dataSource,
-          tenantId: data.tenantId,
-          tenantName: data.tenantName,
+          totalOrganizations: data.totalOrganizations,
+          organizationNames: data.organizationNames,
+          primaryTenantId: data.primaryTenantId,
+          primaryTenantName: data.primaryTenantName,
           hasFinancialData: !!reportsData.data,
           totalRevenue: reportsData.data.totalRevenue,
-          totalExpenses: reportsData.data.totalExpenses
+          totalExpenses: reportsData.data.totalExpenses,
+          organizationBreakdown: Object.keys(organizationData).map(orgId => ({
+            name: organizationData[orgId].name,
+            invoices: organizationData[orgId].totalInvoices,
+            contacts: organizationData[orgId].totalContacts,
+            bankTransactions: organizationData[orgId].totalBankTransactions
+          }))
         });
 
         toast.dismiss({ id: 'xero-load' });
-        toast.success(`✅ Real data loaded successfully from ${selectedTenant.name} (${invoices.length} invoices, ${contacts.length} contacts)`);
+        toast.success(`✅ Real data loaded successfully from ${data.totalOrganizations} organization(s) (${invoices.length} invoices, ${contacts.length} contacts total)`);
         return data;
         
       } catch (error: any) {

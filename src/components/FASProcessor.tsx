@@ -550,6 +550,39 @@ A9: ${finalFASData.FAS_Fields.A9}`;
               </div>
             </div>
             
+            {/* Organization Data Breakdown */}
+            {xeroData.organizationData && (
+              <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                <h4 className="font-medium text-gray-900 mb-3">📊 Data Source: {xeroData.totalOrganizations} Organization(s)</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Object.keys(xeroData.organizationData).map(orgId => {
+                    const orgData = xeroData.organizationData[orgId];
+                    return (
+                      <div key={orgId} className="bg-white p-3 rounded border">
+                        <h5 className="font-medium text-sm text-gray-900 mb-2">{orgData.name}</h5>
+                        <div className="space-y-1 text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Invoices:</span>
+                            <span className="font-medium">{orgData.totalInvoices}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Contacts:</span>
+                            <span className="font-medium">{orgData.totalContacts}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Bank Transactions:</span>
+                            <span className="font-medium">{orgData.totalBankTransactions}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-gray-600 mt-2">
+                  FAS calculations are based on combined data from all {xeroData.totalOrganizations} organization(s): {xeroData.organizationNames.join(', ')}
+                </p>
+              </div>
+            )}
 
           </div>
         </div>
