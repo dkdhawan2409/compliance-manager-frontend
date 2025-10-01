@@ -256,6 +256,13 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
       return;
     }
     
+    // Check if user is authenticated before making API calls
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.log('⚠️ No authentication token found, skipping Xero settings load');
+      return;
+    }
+    
     if (!canMakeApiCall()) {
       console.log('⏳ Rate limit: Too soon since last API call, skipping loadSettings...');
       return;
@@ -293,9 +300,31 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
       
     } catch (err: any) {
       console.error('❌ Failed to load settings:', err);
-      // Don't show error toast for settings load failure
-      // Just set hasSettings to false
-      dispatch({ type: 'SET_SETTINGS', payload: null });
+      
+      // Handle different types of errors gracefully
+      if (err.message?.includes('Server error') || err.message?.includes('Network error')) {
+        console.log('⚠️ Temporary server/network error, will retry later');
+        dispatch({ type: 'SET_CONNECTION_STATUS', payload: {
+          isConnected: false,
+          connectionStatus: 'error',
+          message: 'Unable to connect to server',
+          tenants: [],
+          hasCredentials: false,
+        }});
+      } else if (err.message?.includes('not found') || err.message?.includes('404')) {
+        console.log('ℹ️ No Xero settings found - this is normal for new users');
+        dispatch({ type: 'SET_CONNECTION_STATUS', payload: {
+          isConnected: false,
+          connectionStatus: 'not_configured',
+          message: 'No Xero settings configured',
+          tenants: [],
+          hasCredentials: false,
+        }});
+      } else {
+        // Don't show error toast for settings load failure
+        // Just set hasSettings to false
+        dispatch({ type: 'SET_SETTINGS', payload: null });
+      }
     } finally {
       setIsLoadingSettings(false);
     }

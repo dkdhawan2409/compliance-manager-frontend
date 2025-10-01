@@ -173,3 +173,4 @@ const { isXeroAuthenticated, requireXeroAuth, getXeroAuthStatus } = useXero();
 **The page should now load without any JavaScript errors!** 🚀
 
 
+
