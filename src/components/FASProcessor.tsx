@@ -129,9 +129,9 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
       
       // Provide more specific error messages based on the actual error
       if (error.message.includes('Xero is not connected')) {
-        throw new Error('Xero is not connected. Please connect to Xero Flow first to extract FBT data.');
+        throw new Error('Xero is not connected. Please complete the OAuth flow in Xero Flow to connect your account.');
       } else if (error.message.includes('No Xero organization selected')) {
-        throw new Error('No Xero organization selected. Please select an organization in Xero Flow.');
+        throw new Error('Xero OAuth completed but no organization selected. Please complete the full connection process in Xero Flow.');
       } else if (error.message.includes('Failed to load invoices from Xero')) {
         throw new Error('Failed to load invoice data from Xero. Please check your Xero connection and try again.');
       } else if (error.message.includes('No invoice data found')) {
@@ -270,10 +270,10 @@ Format your response as a structured FBT analysis.`;
 
     // Check if Xero is connected before processing
     if (!xeroData.isConnected) {
-      toast.error('Xero is not connected. Please connect to Xero Flow first to process FAS data.', {
-        duration: 5000,
+      toast.error('Xero OAuth not completed. Please complete the full connection process in Xero Flow.', {
+        duration: 6000,
         action: {
-          label: 'Connect to Xero',
+          label: 'Complete OAuth',
           onClick: () => window.location.href = '/xero'
         }
       });
@@ -397,14 +397,19 @@ A9: ${finalFASData.FAS_Fields.A9}`;
           {!xeroData.isConnected && (
             <div className="text-center mt-2">
               <p className="text-sm mb-2">
-                Please connect to Xero first to process FAS data
+                Complete the OAuth flow to connect your Xero account for FAS processing
               </p>
-              <a 
-                href="/xero" 
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                🔗 Connect to Xero Flow
-              </a>
+              <div className="space-y-2">
+                <a 
+                  href="/xero" 
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  🔗 Start Xero Connection
+                </a>
+                <p className="text-xs text-gray-600">
+                  You'll need to: 1) Authorize the app 2) Select your organization
+                </p>
+              </div>
             </div>
           )}
         </div>
