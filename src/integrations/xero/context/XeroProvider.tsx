@@ -647,8 +647,16 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
       dispatch({ type: 'SET_ERROR', payload: null });
 
       // Auto-select tenant if needed
-      if (!validatedRequest.tenantId && state.selectedTenant) {
-        validatedRequest.tenantId = state.selectedTenant.id;
+      if (!validatedRequest.tenantId) {
+        if (state.selectedTenant) {
+          validatedRequest.tenantId = state.selectedTenant.id;
+        } else if (state.tenants && state.tenants.length > 0) {
+          // If no tenant is selected but we have tenants available, use the first one
+          validatedRequest.tenantId = state.tenants[0].id;
+          console.log(`🔄 No tenant selected, using first available tenant: ${state.tenants[0].name}`);
+        } else {
+          throw new Error('No Xero organizations available. Please complete the OAuth flow to access your organizations.');
+        }
       }
 
       // Try demo mode if enabled and not connected
