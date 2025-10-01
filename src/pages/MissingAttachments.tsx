@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   Settings, 
   AlertTriangle, 
@@ -40,14 +40,25 @@ const MissingAttachments: React.FC = () => {
   const [uploadLinks, setUploadLinks] = useState<UploadLink[]>([]);
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState<number>(0);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async (forceRefresh = false) => {
+    const now = Date.now();
+    const timeSinceLastRefresh = now - lastRefresh;
+    
+    // Debounce API calls - only refresh if forced or if more than 5 seconds have passed
+    if (!forceRefresh && timeSinceLastRefresh < 5000) {
+      console.log('Skipping refresh - too soon since last call');
+      return;
+    }
+    
     try {
       setLoading(true);
+      setLastRefresh(now);
       const [configData, statsData] = await Promise.all([
         getMissingAttachmentConfig(),
         getMissingAttachmentStatistics(30)
@@ -61,9 +72,9 @@ const MissingAttachments: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [lastRefresh]);
 
-  const handleConfigUpdate = async (updates: Partial<MissingAttachmentConfig>) => {
+  const handleConfigUpdate = useCallback(async (updates: Partial<MissingAttachmentConfig>) => {
     if (!config) return;
     
     try {
@@ -74,9 +85,9 @@ const MissingAttachments: React.FC = () => {
       console.error('Error updating config:', error);
       toast.error('Failed to update configuration');
     }
-  };
+  }, [config]);
 
-  const handleDetectMissing = async () => {
+  const handleDetectMissing = useCallback(async () => {
     try {
       setLoading(true);
       const result = await detectMissingAttachments();
@@ -99,9 +110,9 @@ const MissingAttachments: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleProcessMissing = async () => {
+  const handleProcessMissing = useCallback(async () => {
     try {
       setProcessing(true);
       const result = await processMissingAttachments();
@@ -116,9 +127,9 @@ const MissingAttachments: React.FC = () => {
     } finally {
       setProcessing(false);
     }
-  };
+  }, [loadData]);
 
-  const loadUploadLinks = async (status: 'all' | 'active' | 'used' | 'expired' = 'all') => {
+  const loadUploadLinks = useCallback(async (status: 'all' | 'active' | 'used' | 'expired' = 'all') => {
     try {
       const result = await getUploadLinks(1, 50, status);
       setUploadLinks(result.links);
@@ -126,7 +137,16 @@ const MissingAttachments: React.FC = () => {
       console.error('Error loading upload links:', error);
       toast.error('Failed to load upload links');
     }
-  };
+  }, []);
+
+  const handleTabChange = useCallback((tab: 'overview' | 'config' | 'transactions' | 'links') => {
+    setActiveTab(tab);
+    
+    // Only load specific data when switching to certain tabs
+    if (tab === 'links' && uploadLinks.length === 0) {
+      loadUploadLinks();
+    }
+  }, [uploadLinks.length, loadUploadLinks]);
 
   const formatCurrency = (amount: number, currency = 'AUD') => {
     return new Intl.NumberFormat('en-AU', {
@@ -186,6 +206,14 @@ const MissingAttachments: React.FC = () => {
           <p className="text-gray-600">Monitor and manage transactions without receipts</p>
         </div>
         <div className="flex space-x-3">
+          <button
+            onClick={() => loadData(true)}
+            disabled={loading}
+            className="flex items-center space-x-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
+          </button>
           <button
             onClick={handleDetectMissing}
             disabled={loading}
@@ -250,7 +278,7 @@ const MissingAttachments: React.FC = () => {
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => handleTabChange(tab.id as any)}
               className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === tab.id
                   ? 'border-blue-500 text-blue-600'
