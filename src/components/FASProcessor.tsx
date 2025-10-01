@@ -126,6 +126,8 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
       
     } catch (error: any) {
       console.error('❌ Error extracting Xero FBT data:', error);
+      console.error('❌ Error message:', error.message);
+      console.error('❌ Error stack:', error.stack);
       
       // Provide more specific error messages based on the actual error
       if (error.message.includes('Xero is not connected')) {
