@@ -1,7 +1,7 @@
 // Xero Context Provider
 // Comprehensive React context for managing Xero integration state and actions
 
-import React, { createContext, useContext, useReducer, useEffect, useState, ReactNode, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useState, ReactNode, useCallback, useMemo, useRef } from 'react';
 import { toast } from 'react-hot-toast';
 // Removed dependency on old xeroService - using new API client instead
 import { 
@@ -168,7 +168,7 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
 
   const [state, dispatch] = useReducer(xeroReducer, initialState);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [lastApiCall, setLastApiCall] = useState<number>(0);
+  const lastApiCallRef = useRef<number>(0);
   const [apiClient, setApiClient] = useState<XeroApiClient | null>(null);
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
   const [apiCallCount, setApiCallCount] = useState(0);
@@ -203,13 +203,22 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
   // Rate limiting protection - MOVED UP TO PREVENT CIRCULAR DEPENDENCY
   const canMakeApiCall = useCallback((): boolean => {
     const now = Date.now();
-    // Only block if the last call was extremely recent (within 100ms)
-    // This prevents rapid-fire calls but allows legitimate sequential calls
-    if (now - lastApiCall < 100) {
+    // More aggressive rate limiting to prevent rapid API calls
+    const minInterval = 2000; // 2 seconds minimum between API calls
+    
+    if (now - lastApiCallRef.current < minInterval) {
+      console.log(`⏳ Rate limit: ${minInterval - (now - lastApiCallRef.current)}ms remaining`);
       return false;
     }
+    
+    // Check API call count
+    if (apiCallCount >= maxApiCalls) {
+      console.log(`⏳ Rate limit: Maximum ${maxApiCalls} API calls reached`);
+      return false;
+    }
+    
     return true;
-  }, [lastApiCall]);
+  }, [apiCallCount, maxApiCalls]); // Include these dependencies for proper rate limiting
 
   // Load client ID from existing Xero settings - RE-ENABLED FOR PRODUCTION
   const loadClientIdFromSettings = useCallback(async () => {
@@ -219,7 +228,8 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
     }
     
     // Set the last API call time when we actually make the call
-    setLastApiCall(Date.now());
+    lastApiCallRef.current = Date.now();
+    setApiCallCount(prev => prev + 1);
     
     console.log('🔧 Loading client ID from existing Xero settings...');
     try {
@@ -237,7 +247,7 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
       console.error('❌ Failed to load client ID from settings:', error);
       return false;
     }
-  }, [fullConfig, canMakeApiCall]);
+  }, [fullConfig]);
 
   // Load settings - RE-ENABLED TO CHECK CREDENTIALS
   const loadSettings = useCallback(async () => {
@@ -252,7 +262,8 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
     }
     
     // Set the last API call time when we actually make the call
-    setLastApiCall(Date.now());
+    lastApiCallRef.current = Date.now();
+    setApiCallCount(prev => prev + 1);
     
     setIsLoadingSettings(true);
     
@@ -288,7 +299,7 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
     } finally {
       setIsLoadingSettings(false);
     }
-  }, [fullConfig, isLoadingSettings, lastApiCall]);
+  }, [fullConfig, isLoadingSettings]);
 
   // Initialize on mount - RE-ENABLED TO LOAD SETTINGS
   useEffect(() => {
@@ -318,6 +329,16 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children, config = {
       localStorage.removeItem(XERO_LOCAL_STORAGE_KEYS.AUTH_TIMESTAMP);
     }
   }, [state.isConnected]);
+
+  // Reset API call count every minute
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setApiCallCount(0);
+      console.log('🔄 API call count reset');
+    }, 60000); // Reset every minute
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Start OAuth flow - RE-ENABLED BUT MODIFIED TO WORK
   const startAuth = async () => {
