@@ -140,10 +140,47 @@ const EnhancedXeroFlow: React.FC = () => {
     }
   }, [isConnected, hasSettings]);
 
-  // Refresh connection status when component mounts - DISABLED to prevent infinite loops
+  // Refresh connection status when component mounts and handle OAuth callback
   useEffect(() => {
-    console.log('🚫 Auto-refresh disabled to prevent infinite API loops');
-  }, []); // Empty dependency array - only run once on mount
+    const refreshOnMount = async () => {
+      try {
+        console.log('🔄 Refreshing Xero connection status...');
+        await loadSettings();
+        await refreshConnection();
+        
+        // Check if we just returned from OAuth (URL might have success parameter)
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('success') === 'true') {
+          console.log('🎉 OAuth completed successfully, refreshing state...');
+          showLimitedToast('Xero connection successful!', 'success');
+          
+          // Clear the URL parameter
+          window.history.replaceState({}, document.title, window.location.pathname);
+          
+          // Force refresh connection status to get latest data
+          setTimeout(async () => {
+            try {
+              console.log('🔄 Force refreshing connection after OAuth success...');
+              await loadSettings();
+              await refreshConnection();
+              
+              // If we have tenants but no selected tenant, auto-select the first one
+              if (state.tenants && state.tenants.length > 0 && !state.selectedTenant) {
+                console.log('🎯 Auto-selecting first tenant after OAuth success');
+                selectTenant(state.tenants[0].id);
+              }
+            } catch (error) {
+              console.log('⚠️ Failed to refresh after OAuth success:', error);
+            }
+          }, 1000);
+        }
+      } catch (error) {
+        console.log('⚠️ Failed to refresh connection status:', error);
+      }
+    };
+
+    refreshOnMount();
+  }, [loadSettings, refreshConnection, selectTenant, state.tenants, state.selectedTenant]);
 
   const handleOneClickConnect = async () => {
     if (isConnecting) return;
