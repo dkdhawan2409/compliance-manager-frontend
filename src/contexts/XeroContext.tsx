@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useState, useCallback, ReactNode } from 'react';
 import { toast } from 'react-hot-toast';
 import { 
   getXeroSettings, 
@@ -171,7 +171,7 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
   const [lastApiCall, setLastApiCall] = useState<number>(0);
   const API_RATE_LIMIT_MS = 2000; // 2 seconds between API calls
 
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     console.log('🔄 loadSettings called, current state:', {
       isLoading: state.isLoading,
       lastApiCall,
@@ -205,11 +205,15 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
       
       // Create settings object from status data
       const settingsData = {
+        id: 0, // Placeholder
+        companyId: 0, // Placeholder
         hasCredentials: statusData.hasCredentials || false,
         hasOAuthSettings: statusData.hasCredentials || false,
         isConnected: statusData.isConnected || false,
         connectionStatus: statusData.connectionStatus || 'unknown',
-        tenants: statusData.tenants || []
+        tenants: statusData.tenants || [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       };
       
       dispatch({ type: 'SET_SETTINGS', payload: settingsData });
@@ -247,18 +251,22 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
         console.log('ℹ️ No Xero settings found - user needs to configure settings first');
         // Set default settings for OAuth to work
         const defaultSettings = {
+          id: 0, // Placeholder
+          companyId: 0, // Placeholder
           hasCredentials: false,
           hasOAuthSettings: false,
           isConnected: false,
           connectionStatus: 'not_configured',
-          tenants: []
+          tenants: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
         };
         dispatch({ type: 'SET_SETTINGS', payload: defaultSettings });
       }
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
-  };
+  }, [state.isLoading, lastApiCall, state.selectedTenant]);
 
   // Load settings on mount (only once)
   useEffect(() => {
@@ -284,7 +292,7 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
 
 
 
-  const startAuth = async () => {
+  const startAuth = useCallback(async () => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null });
@@ -346,9 +354,9 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
-  };
+  }, [state.hasSettings, loadSettings]);
 
-  const handleCallback = async (code: string, state: string) => {
+  const handleCallback = useCallback(async (code: string, state: string) => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null });
@@ -423,9 +431,9 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
-  };
+  }, []);
 
-  const disconnect = async () => {
+  const disconnect = useCallback(async () => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null });
@@ -453,9 +461,9 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
-  };
+  }, []);
 
-  const refreshConnection = async () => {
+  const refreshConnection = useCallback(async () => {
     // Rate limiting protection
     const now = Date.now();
     if (now - lastApiCall < API_RATE_LIMIT_MS) {
@@ -477,9 +485,9 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
       console.error('❌ Failed to refresh connection:', error);
       dispatch({ type: 'SET_ERROR', payload: error.message || 'Failed to refresh connection' });
     }
-  };
+  }, [lastApiCall, loadSettings]);
 
-  const refreshToken = async () => {
+  const refreshToken = useCallback(async () => {
     // Rate limiting protection
     const now = Date.now();
     if (now - lastApiCall < API_RATE_LIMIT_MS) {
@@ -507,9 +515,9 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
-  };
+  }, [lastApiCall, loadSettings]);
 
-  const loadData = async (resourceType: XeroResourceType) => {
+  const loadData = useCallback(async (resourceType: XeroResourceType) => {
     // Rate limiting protection
     const now = Date.now();
     if (now - lastApiCall < API_RATE_LIMIT_MS) {
@@ -544,7 +552,7 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
       try {
         // Try real Xero data first
         const { getXeroData } = await import('../api/xeroService');
-        const data = await getXeroData(resourceType, state.selectedTenant.id);
+        const data = await getXeroData(resourceType, state.selectedTenant?.id || '');
         
         console.log(`✅ ${resourceType} data loaded:`, data);
         return data;
@@ -590,18 +598,18 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
-  };
+  }, [lastApiCall, state.isConnected, state.selectedTenant]);
 
-  const selectTenant = (tenantId: string) => {
+  const selectTenant = useCallback((tenantId: string) => {
     const tenant = state.tenants.find(t => t.id === tenantId);
     if (tenant) {
       dispatch({ type: 'SET_SELECTED_TENANT', payload: tenant });
     }
-  };
+  }, [state.tenants]);
 
-  const clearError = () => {
+  const clearError = useCallback(() => {
     dispatch({ type: 'SET_ERROR', payload: null });
-  };
+  }, []);
 
 
 
