@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { 
   Settings, 
   AlertTriangle, 
@@ -40,15 +40,11 @@ const MissingAttachments: React.FC = () => {
   const [uploadLinks, setUploadLinks] = useState<UploadLink[]>([]);
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [lastRefresh, setLastRefresh] = useState<number>(0);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  const lastRefreshRef = useRef<number>(0);
 
   const loadData = useCallback(async (forceRefresh = false) => {
     const now = Date.now();
-    const timeSinceLastRefresh = now - lastRefresh;
+    const timeSinceLastRefresh = now - lastRefreshRef.current;
     
     // Debounce API calls - only refresh if forced or if more than 5 seconds have passed
     if (!forceRefresh && timeSinceLastRefresh < 5000) {
@@ -58,7 +54,7 @@ const MissingAttachments: React.FC = () => {
     
     try {
       setLoading(true);
-      setLastRefresh(now);
+      lastRefreshRef.current = now;
       const [configData, statsData] = await Promise.all([
         getMissingAttachmentConfig(),
         getMissingAttachmentStatistics(30)
@@ -72,7 +68,11 @@ const MissingAttachments: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [lastRefresh]);
+  }, []); // No dependencies to prevent circular reference
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleConfigUpdate = useCallback(async (updates: Partial<MissingAttachmentConfig>) => {
     if (!config) return;
