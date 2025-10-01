@@ -15,7 +15,7 @@ export interface WithXeroDataProps {
     hasSettings: boolean;
   };
   xeroActions: {
-    loadData: (resourceType: string) => Promise<any>;
+    loadData: <T = any>(request: { resourceType: string; tenantId?: string; page?: number; pageSize?: number; filters?: Record<string, any>; dateFrom?: string; dateTo?: string; }) => Promise<any>;
     selectTenant: (tenantId: string) => void;
     loadSettings: () => Promise<void>;
     startAuth: () => Promise<void>;
@@ -75,7 +75,7 @@ export function withXeroData<T extends WithXeroDataProps>(
         let invoices;
         try {
           console.log('📋 Loading invoices from connected Xero account...');
-          const invoiceData = await loadData('invoices');
+          const invoiceData = await loadData({ resourceType: 'invoices', tenantId: selectedTenant.id });
           invoices = invoiceData?.data || invoiceData?.Invoices || [];
           console.log(`✅ Real invoices loaded: ${invoices.length} records from ${selectedTenant.name}`);
         } catch (error: any) {
@@ -87,7 +87,7 @@ export function withXeroData<T extends WithXeroDataProps>(
         let contacts;
         try {
           console.log('👥 Loading contacts from connected Xero account...');
-          const contactData = await loadData('contacts');
+          const contactData = await loadData({ resourceType: 'contacts', tenantId: selectedTenant.id });
           contacts = contactData?.data || contactData?.Contacts || [];
           console.log(`✅ Real contacts loaded: ${contacts.length} records from ${selectedTenant.name}`);
         } catch (error: any) {
@@ -99,7 +99,7 @@ export function withXeroData<T extends WithXeroDataProps>(
         let bankTransactions;
         try {
           console.log('🏦 Loading bank transactions from connected Xero account...');
-          const bankData = await loadData('bank-transactions');
+          const bankData = await loadData({ resourceType: 'bank-transactions', tenantId: selectedTenant.id });
           bankTransactions = bankData?.data || bankData?.BankTransactions || [];
           console.log(`✅ Real bank transactions loaded: ${bankTransactions.length} records from ${selectedTenant.name}`);
         } catch (error: any) {
