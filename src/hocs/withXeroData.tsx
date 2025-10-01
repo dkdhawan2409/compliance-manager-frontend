@@ -118,15 +118,43 @@ export function withXeroData<T extends WithXeroDataProps>(
               bankTransactions = [];
             }
 
+            // Load transactions from this organization (alternative to bank transactions)
+            let transactions = [];
+            try {
+              console.log(`💳 Loading transactions from ${tenant.name}...`);
+              const transactionData = await loadData({ resourceType: 'transactions', tenantId: tenant.id });
+              transactions = transactionData?.data || transactionData?.Transactions || [];
+              console.log(`✅ Loaded ${transactions.length} transactions from ${tenant.name}`);
+            } catch (error: any) {
+              console.warn(`⚠️ Failed to load transactions from ${tenant.name}:`, error);
+              transactions = [];
+            }
+
+            // Load payments from this organization
+            let payments = [];
+            try {
+              console.log(`💰 Loading payments from ${tenant.name}...`);
+              const paymentData = await loadData({ resourceType: 'payments', tenantId: tenant.id });
+              payments = paymentData?.data || paymentData?.Payments || [];
+              console.log(`✅ Loaded ${payments.length} payments from ${tenant.name}`);
+            } catch (error: any) {
+              console.warn(`⚠️ Failed to load payments from ${tenant.name}:`, error);
+              payments = [];
+            }
+
             // Store organization-specific data
             organizationData[tenant.id] = {
               name: tenant.name,
               invoices: invoices,
               contacts: contacts,
               bankTransactions: bankTransactions,
+              transactions: transactions,
+              payments: payments,
               totalInvoices: invoices.length,
               totalContacts: contacts.length,
-              totalBankTransactions: bankTransactions.length
+              totalBankTransactions: bankTransactions.length,
+              totalTransactions: transactions.length,
+              totalPayments: payments.length
             };
 
             // Add to combined arrays
@@ -148,8 +176,15 @@ export function withXeroData<T extends WithXeroDataProps>(
         // Calculate financial summary from REAL Xero data
         console.log('📊 Calculating financial summary from real Xero data...');
         
-        if (!invoices || invoices.length === 0) {
-          throw new Error(`No invoice data found in any of your ${tenants.length} Xero organization(s). Please ensure you have invoices in your Xero account.`);
+        // Check if we have any financial data available for FAS processing
+        const hasInvoices = invoices && invoices.length > 0;
+        const hasContacts = contacts && contacts.length > 0;
+        const hasBankTransactions = bankTransactions && bankTransactions.length > 0;
+        const hasTransactions = organizationData && Object.values(organizationData).some((org: any) => org.totalTransactions > 0);
+        const hasPayments = organizationData && Object.values(organizationData).some((org: any) => org.totalPayments > 0);
+        
+        if (!hasInvoices && !hasContacts && !hasBankTransactions && !hasTransactions && !hasPayments) {
+          throw new Error(`No financial data found in any of your ${tenants.length} Xero organization(s). Please ensure you have invoices, contacts, bank transactions, payments, or other financial data in your Xero account.`);
         }
         
         let totalRevenue = 0;
@@ -157,17 +192,58 @@ export function withXeroData<T extends WithXeroDataProps>(
         let outstandingRevenue = 0;
         let totalGST = 0;
         
-        // Process REAL invoices from the connected Xero account
-        invoices.forEach((invoice: any) => {
-          const amount = parseFloat(invoice.Total) || 0;
-          const amountPaid = parseFloat(invoice.AmountPaid) || 0;
-          const taxAmount = parseFloat(invoice.TaxAmount) || 0;
+        // Process REAL invoices from the connected Xero account (if available)
+        if (invoices && invoices.length > 0) {
+          invoices.forEach((invoice: any) => {
+            const amount = parseFloat(invoice.Total) || 0;
+            const amountPaid = parseFloat(invoice.AmountPaid) || 0;
+            const taxAmount = parseFloat(invoice.TaxAmount) || 0;
+            
+            totalRevenue += amount;
+            paidRevenue += amountPaid;
+            outstandingRevenue += (amount - amountPaid);
+            totalGST += taxAmount;
+          });
+        } else {
+          console.log('📋 No invoices found, using alternative data sources for financial calculations...');
           
-          totalRevenue += amount;
-          paidRevenue += amountPaid;
-          outstandingRevenue += (amount - amountPaid);
-          totalGST += taxAmount;
-        });
+          // Use bank transactions as alternative data source for financial calculations
+          if (bankTransactions && bankTransactions.length > 0) {
+            bankTransactions.forEach((transaction: any) => {
+              const amount = parseFloat(transaction.Total) || 0;
+              if (amount > 0) {
+                totalRevenue += amount;
+                paidRevenue += amount;
+              }
+            });
+          }
+          
+          // Use transactions as alternative data source
+          Object.values(organizationData).forEach((org: any) => {
+            if (org.transactions && org.transactions.length > 0) {
+              org.transactions.forEach((transaction: any) => {
+                const amount = parseFloat(transaction.Total) || 0;
+                if (amount > 0) {
+                  totalRevenue += amount;
+                  paidRevenue += amount;
+                }
+              });
+            }
+          });
+          
+          // Use payments as alternative data source
+          Object.values(organizationData).forEach((org: any) => {
+            if (org.payments && org.payments.length > 0) {
+              org.payments.forEach((payment: any) => {
+                const amount = parseFloat(payment.Amount) || 0;
+                if (amount > 0) {
+                  totalRevenue += amount;
+                  paidRevenue += amount;
+                }
+              });
+            }
+          });
+        }
 
         // Calculate expenses from bank transactions (if available)
         let totalExpenses = 0;
@@ -249,7 +325,9 @@ export function withXeroData<T extends WithXeroDataProps>(
             name: organizationData[orgId].name,
             invoices: organizationData[orgId].totalInvoices,
             contacts: organizationData[orgId].totalContacts,
-            bankTransactions: organizationData[orgId].totalBankTransactions
+            bankTransactions: organizationData[orgId].totalBankTransactions,
+            transactions: organizationData[orgId].totalTransactions,
+            payments: organizationData[orgId].totalPayments
           }))
         });
 

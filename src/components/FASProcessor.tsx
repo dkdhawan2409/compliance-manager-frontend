@@ -136,8 +136,8 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
         throw new Error('Xero OAuth completed but no organization selected. Please complete the full connection process in Xero Flow.');
       } else if (error.message.includes('Failed to load invoices from Xero')) {
         throw new Error('Failed to load invoice data from Xero. Please check your Xero connection and try again.');
-      } else if (error.message.includes('No invoice data found')) {
-        throw new Error('No invoice data found in your Xero organization. Please ensure you have invoices in your Xero account.');
+      } else if (error.message.includes('No financial data found')) {
+        throw new Error('No financial data found in your Xero organization(s). Please ensure you have invoices, contacts, or bank transactions in your Xero account.');
       } else {
         throw new Error(`Failed to extract Xero FBT data: ${error.message}`);
       }
@@ -574,6 +574,14 @@ A9: ${finalFASData.FAS_Fields.A9}`;
                           <div className="flex justify-between">
                             <span className="text-gray-600">Bank Transactions:</span>
                             <span className="font-medium">{orgData.totalBankTransactions}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Transactions:</span>
+                            <span className="font-medium">{orgData.totalTransactions}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Payments:</span>
+                            <span className="font-medium">{orgData.totalPayments}</span>
                           </div>
                         </div>
                       </div>
