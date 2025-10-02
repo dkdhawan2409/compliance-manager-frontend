@@ -31,10 +31,10 @@ import {
   Statistics,
   TokenStatus
 } from '../api/missingAttachmentService';
-import { useXero } from '../integrations/xero/context/XeroProvider';
+import { useXero } from '../contexts/XeroContext';
 
 const MissingAttachments: React.FC = () => {
-  const { state: xeroState } = useXero();
+  const { state: xeroState, refreshToken } = useXero();
   const [activeTab, setActiveTab] = useState<'overview' | 'config' | 'transactions' | 'links'>('overview');
   const [config, setConfig] = useState<MissingAttachmentConfig | null>(null);
   const [statistics, setStatistics] = useState<Statistics | null>(null);
@@ -138,6 +138,22 @@ const MissingAttachments: React.FC = () => {
       if (errorMessage.includes('Xero not connected') || errorMessage.includes('access token not found')) {
         toast.error('Xero not connected. Please go to Xero Flow and connect your account first.');
       } else if (errorMessage.includes('refresh token has expired') || errorMessage.includes('Please reconnect to Xero Flow')) {
+        // First attempt to refresh the token automatically
+        try {
+          console.log('🔄 Attempting automatic token refresh...');
+          await refreshToken();
+          
+          // If refresh was successful, retry the operation
+          console.log('✅ Token refresh successful, retrying detection...');
+          const result = await detectMissingAttachments();
+          setMissingTransactions(result.transactions);
+          toast.success(`Found ${result.totalTransactions} transactions without attachments`);
+          return; // Exit early on success
+        } catch (refreshError: any) {
+          console.error('❌ Token refresh failed:', refreshError);
+          // Fall through to show reconnect message
+        }
+        
         toast.error('Xero connection expired. Please reconnect to Xero Flow to continue.', {
           duration: 10000,
           action: {
@@ -152,6 +168,22 @@ const MissingAttachments: React.FC = () => {
           }
         });
       } else if (errorMessage.includes('token expired')) {
+        // First attempt to refresh the token automatically
+        try {
+          console.log('🔄 Attempting automatic token refresh...');
+          await refreshToken();
+          
+          // If refresh was successful, retry the operation
+          console.log('✅ Token refresh successful, retrying detection...');
+          const result = await detectMissingAttachments();
+          setMissingTransactions(result.transactions);
+          toast.success(`Found ${result.totalTransactions} transactions without attachments`);
+          return; // Exit early on success
+        } catch (refreshError: any) {
+          console.error('❌ Token refresh failed:', refreshError);
+          // Fall through to show reconnect message
+        }
+        
         toast.error('Xero token expired. Please reconnect to Xero.', {
           duration: 6000,
           action: {
@@ -167,7 +199,7 @@ const MissingAttachments: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshToken]);
 
   const handleProcessMissing = useCallback(async () => {
     try {
@@ -197,6 +229,25 @@ const MissingAttachments: React.FC = () => {
       // Show specific error messages for Xero connection issues
       const errorMessage = error.response?.data?.error || error.message;
       if (errorMessage.includes('refresh token has expired') || errorMessage.includes('Please reconnect to Xero Flow')) {
+        // First attempt to refresh the token automatically
+        try {
+          console.log('🔄 Attempting automatic token refresh...');
+          await refreshToken();
+          
+          // If refresh was successful, retry the operation
+          console.log('✅ Token refresh successful, retrying process...');
+          const result = await processMissingAttachments();
+          toast.success(`Processed ${result.totalTransactions} transactions, sent ${result.smssSent} notifications`);
+          
+          // Refresh data
+          await loadData();
+          await loadUploadLinks();
+          return; // Exit early on success
+        } catch (refreshError: any) {
+          console.error('❌ Token refresh failed:', refreshError);
+          // Fall through to show reconnect message
+        }
+        
         toast.error('Xero connection expired. Please reconnect to Xero Flow to continue.', {
           duration: 10000,
           action: {
@@ -211,6 +262,25 @@ const MissingAttachments: React.FC = () => {
           }
         });
       } else if (errorMessage.includes('token expired')) {
+        // First attempt to refresh the token automatically
+        try {
+          console.log('🔄 Attempting automatic token refresh...');
+          await refreshToken();
+          
+          // If refresh was successful, retry the operation
+          console.log('✅ Token refresh successful, retrying process...');
+          const result = await processMissingAttachments();
+          toast.success(`Processed ${result.totalTransactions} transactions, sent ${result.smssSent} notifications`);
+          
+          // Refresh data
+          await loadData();
+          await loadUploadLinks();
+          return; // Exit early on success
+        } catch (refreshError: any) {
+          console.error('❌ Token refresh failed:', refreshError);
+          // Fall through to show reconnect message
+        }
+        
         toast.error('Xero token expired. Please reconnect to Xero.', {
           duration: 6000,
           action: {
@@ -224,7 +294,7 @@ const MissingAttachments: React.FC = () => {
     } finally {
       setProcessing(false);
     }
-  }, [loadData]);
+  }, [loadData, refreshToken]);
 
   const loadUploadLinks = useCallback(async (status: 'all' | 'active' | 'used' | 'expired' = 'all') => {
     try {

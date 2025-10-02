@@ -502,16 +502,52 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
 
       console.log('🔄 Refreshing Xero token...');
       
-      // This would typically call a backend endpoint to refresh the token
-      // For now, we'll just reload settings to check token validity
+      // Call the backend token refresh endpoint
+      const response = await fetch(`${getApiUrl()}/api/xero/refresh-token`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to refresh token');
+      }
+
+      const result = await response.json();
+      console.log('✅ Token refresh successful:', result);
+      
+      // Update tokens if provided
+      if (result.data?.tokens) {
+        dispatch({ type: 'SET_TOKENS', payload: result.data.tokens });
+        localStorage.setItem('xero_tokens', JSON.stringify(result.data.tokens));
+      }
+      
+      // Reload settings to get updated connection status
       await loadSettings();
       
       toast.success('Token refreshed successfully');
     } catch (err: any) {
       console.error('❌ Token refresh error:', err);
-      const errorMessage = err.response?.data?.message || 'Failed to refresh token';
-      dispatch({ type: 'SET_ERROR', payload: errorMessage });
-      toast.error(errorMessage);
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to refresh token';
+      
+      // If refresh fails, clear the connection state
+      if (err.message?.includes('expired') || err.message?.includes('invalid')) {
+        console.log('🔄 Token refresh failed - clearing connection state');
+        dispatch({ type: 'CLEAR_STATE' });
+        localStorage.removeItem('xero_authorized');
+        localStorage.removeItem('xero_auth_timestamp');
+        localStorage.removeItem('xero_tokens');
+        
+        toast.error('Xero token has expired. Please reconnect to continue.', {
+          duration: 10000
+        });
+      } else {
+        dispatch({ type: 'SET_ERROR', payload: errorMessage });
+        toast.error(errorMessage);
+      }
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
