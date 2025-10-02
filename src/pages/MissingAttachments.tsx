@@ -24,10 +24,12 @@ import {
   processMissingAttachments,
   getUploadLinks,
   getMissingAttachmentStatistics,
+  checkTokenStatus,
   MissingAttachmentConfig,
   MissingTransaction,
   UploadLink,
-  Statistics
+  Statistics,
+  TokenStatus
 } from '../api/missingAttachmentService';
 import { useXero } from '../integrations/xero/context/XeroProvider';
 
@@ -38,6 +40,7 @@ const MissingAttachments: React.FC = () => {
   const [statistics, setStatistics] = useState<Statistics | null>(null);
   const [missingTransactions, setMissingTransactions] = useState<MissingTransaction[]>([]);
   const [uploadLinks, setUploadLinks] = useState<UploadLink[]>([]);
+  const [tokenStatus, setTokenStatus] = useState<TokenStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const lastRefreshRef = useRef<number>(0);
@@ -55,13 +58,34 @@ const MissingAttachments: React.FC = () => {
     try {
       setLoading(true);
       lastRefreshRef.current = now;
-      const [configData, statsData] = await Promise.all([
+      const [configData, statsData, tokenStatusData] = await Promise.all([
         getMissingAttachmentConfig(),
-        getMissingAttachmentStatistics(30)
+        getMissingAttachmentStatistics(30),
+        checkTokenStatus()
       ]);
       
       setConfig(configData);
       setStatistics(statsData);
+      setTokenStatus(tokenStatusData);
+      
+      // Show token expiry warnings
+      if (tokenStatusData.status === 'warning') {
+        toast.error(`⚠️ Xero token expires in ${tokenStatusData.daysUntilExpiry} days. Please reconnect soon.`, {
+          duration: 8000,
+          action: {
+            label: 'Reconnect Now',
+            onClick: () => window.location.href = '/xero'
+          }
+        });
+      } else if (tokenStatusData.status === 'expired') {
+        toast.error('❌ Xero token has expired. Please reconnect to continue using missing attachments detection.', {
+          duration: 10000,
+          action: {
+            label: 'Reconnect Now',
+            onClick: () => window.location.href = '/xero'
+          }
+        });
+      }
     } catch (error: any) {
       console.error('Error loading data:', error);
       toast.error('Failed to load missing attachments data');
@@ -115,10 +139,16 @@ const MissingAttachments: React.FC = () => {
         toast.error('Xero not connected. Please go to Xero Flow and connect your account first.');
       } else if (errorMessage.includes('refresh token has expired') || errorMessage.includes('Please reconnect to Xero Flow')) {
         toast.error('Xero connection expired. Please reconnect to Xero Flow to continue.', {
-          duration: 8000,
+          duration: 10000,
           action: {
-            label: 'Go to Xero Flow',
-            onClick: () => window.open('/xero', '_blank')
+            label: 'Reconnect Now',
+            onClick: () => {
+              // Clear any existing Xero state
+              localStorage.removeItem('xero_authorized');
+              localStorage.removeItem('xero_auth_timestamp');
+              // Redirect to Xero Flow page
+              window.location.href = '/xero';
+            }
           }
         });
       } else if (errorMessage.includes('token expired')) {
@@ -168,10 +198,16 @@ const MissingAttachments: React.FC = () => {
       const errorMessage = error.response?.data?.error || error.message;
       if (errorMessage.includes('refresh token has expired') || errorMessage.includes('Please reconnect to Xero Flow')) {
         toast.error('Xero connection expired. Please reconnect to Xero Flow to continue.', {
-          duration: 8000,
+          duration: 10000,
           action: {
-            label: 'Go to Xero Flow',
-            onClick: () => window.open('/xero', '_blank')
+            label: 'Reconnect Now',
+            onClick: () => {
+              // Clear any existing Xero state
+              localStorage.removeItem('xero_authorized');
+              localStorage.removeItem('xero_auth_timestamp');
+              // Redirect to Xero Flow page
+              window.location.href = '/xero';
+            }
           }
         });
       } else if (errorMessage.includes('token expired')) {
@@ -408,6 +444,60 @@ const MissingAttachments: React.FC = () => {
                     Reconnect Xero
                   </a>
                 </div>
+              </div>
+            )}
+            
+            {/* Token Expiry Status */}
+            {tokenStatus && tokenStatus.status !== 'healthy' && (
+              <div className={`mt-3 p-3 border rounded-md ${
+                tokenStatus.status === 'expired' ? 'bg-red-50 border-red-200' :
+                tokenStatus.status === 'warning' ? 'bg-yellow-50 border-yellow-200' :
+                tokenStatus.status === 'notice' ? 'bg-blue-50 border-blue-200' :
+                'bg-gray-50 border-gray-200'
+              }`}>
+                <div className="flex items-center space-x-2">
+                  {tokenStatus.status === 'expired' && <AlertTriangle className="w-4 h-4 text-red-600" />}
+                  {tokenStatus.status === 'warning' && <AlertTriangle className="w-4 h-4 text-yellow-600" />}
+                  {tokenStatus.status === 'notice' && <Clock className="w-4 h-4 text-blue-600" />}
+                  <span className={`text-sm font-medium ${
+                    tokenStatus.status === 'expired' ? 'text-red-800' :
+                    tokenStatus.status === 'warning' ? 'text-yellow-800' :
+                    tokenStatus.status === 'notice' ? 'text-blue-800' :
+                    'text-gray-800'
+                  }`}>
+                    {tokenStatus.status === 'expired' && 'Token Expired'}
+                    {tokenStatus.status === 'warning' && 'Token Expiring Soon'}
+                    {tokenStatus.status === 'notice' && 'Token Status'}
+                    {tokenStatus.status === 'no_tokens' && 'No Tokens Found'}
+                    {tokenStatus.status === 'error' && 'Token Error'}
+                  </span>
+                </div>
+                <p className={`text-xs mt-1 ${
+                  tokenStatus.status === 'expired' ? 'text-red-700' :
+                  tokenStatus.status === 'warning' ? 'text-yellow-700' :
+                  tokenStatus.status === 'notice' ? 'text-blue-700' :
+                  'text-gray-700'
+                }`}>
+                  {tokenStatus.message}
+                </p>
+                {tokenStatus.needsReconnection && (
+                  <div className="mt-2">
+                    <button 
+                      onClick={() => {
+                        localStorage.removeItem('xero_authorized');
+                        localStorage.removeItem('xero_auth_timestamp');
+                        window.location.href = '/xero';
+                      }}
+                      className={`inline-flex items-center px-2 py-1 text-white text-xs rounded hover:opacity-90 transition-colors ${
+                        tokenStatus.status === 'expired' ? 'bg-red-600 hover:bg-red-700' :
+                        tokenStatus.status === 'warning' ? 'bg-yellow-600 hover:bg-yellow-700' :
+                        'bg-blue-600 hover:bg-blue-700'
+                      }`}
+                    >
+                      Reconnect Xero
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

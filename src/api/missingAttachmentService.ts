@@ -97,6 +97,15 @@ export interface Statistics {
   totalTransactionsProcessed: number;
 }
 
+export interface TokenStatus {
+  status: 'healthy' | 'notice' | 'warning' | 'expired' | 'no_tokens' | 'error' | 'access_expired';
+  message: string;
+  daysUntilExpiry: number | null;
+  refreshTokenAgeDays: number | null;
+  accessTokenExpired: boolean;
+  needsReconnection: boolean;
+}
+
 export interface UploadLinksResponse {
   links: UploadLink[];
   pagination: {
@@ -218,5 +227,10 @@ export const getDuplicateStats = async (): Promise<{
   companyId: number;
 }> => {
   const response = await apiClient.get('/missing-attachments/duplicates');
+  return response.data.data;
+};
+
+export const checkTokenStatus = async (): Promise<TokenStatus> => {
+  const response = await apiClient.get('/missing-attachments/token-status');
   return response.data.data;
 };
