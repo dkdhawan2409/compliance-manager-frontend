@@ -159,6 +159,7 @@ interface XeroContextType {
 }
 
 const XeroContext = createContext<XeroContextType | undefined>(undefined);
+console.log('🔧 XeroContext created:', XeroContext);
 
 // Provider component
 interface XeroProviderProps {
@@ -166,6 +167,7 @@ interface XeroProviderProps {
 }
 
 export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
+  console.log('🚀 XeroProvider component rendering...');
   const [state, dispatch] = useReducer(xeroReducer, initialState);
   const [isInitialized, setIsInitialized] = useState(false);
   const [lastApiCall, setLastApiCall] = useState<number>(0);
@@ -662,6 +664,10 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
     clearError,
   };
 
+  console.log('🔧 XeroProvider providing context value:', value);
+  console.log('🔧 XeroProvider state:', state);
+  console.log('🔧 XeroProvider isInitialized:', isInitialized);
+
   return (
     <XeroContext.Provider value={value}>
       {children}
@@ -672,8 +678,16 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
 // Hook to use the context
 export const useXero = (): XeroContextType => {
   const context = useContext(XeroContext);
+  console.log('🔍 useXero hook called, context:', context);
+  console.log('🔍 useXero hook called, context === undefined:', context === undefined);
+  console.log('🔍 useXero hook called, context type:', typeof context);
+  
   if (context === undefined) {
+    console.error('❌ useXero hook called outside of XeroProvider context');
+    console.error('❌ Stack trace:', new Error().stack);
     throw new Error('useXero must be used within a XeroProvider');
   }
+  
+  console.log('✅ useXero hook returning context successfully');
   return context;
 };

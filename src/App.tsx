@@ -6,7 +6,7 @@ import { Toaster } from 'react-hot-toast';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { AuthProvider } from './contexts/AuthContext';
-import { XeroProvider } from './integrations/xero/context/XeroProvider';
+import { XeroProvider } from './contexts/XeroContext';
 // 🚨 GLOBAL EMERGENCY BRAKE - Import to activate
 import './utils/emergencyBrake';
 import { theme } from './theme/theme';

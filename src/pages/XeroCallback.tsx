@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { useXero } from '../integrations/xero/context/XeroProvider';
+import { useXero } from '../contexts/XeroContext';
 
 interface XeroTenant {
   id: string;

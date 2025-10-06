@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useXero } from '../integrations/xero/context/XeroProvider';
+import { useXero } from '../contexts/XeroContext';
 import { getApiUrl } from '../utils/envChecker';
 import toast from 'react-hot-toast';
 

@@ -1,5 +1,5 @@
 import React, { ComponentType } from 'react';
-import { useXero } from '../integrations/xero/context/XeroProvider';
+import { useXero } from '../contexts/XeroContext';
 import { getFinancialSummary, getDashboardData } from '../api/xeroService';
 import { toast } from 'react-hot-toast';
 import { getApiUrl } from '../utils/envChecker';

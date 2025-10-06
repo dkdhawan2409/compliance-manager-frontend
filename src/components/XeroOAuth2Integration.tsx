@@ -1,7 +1,7 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { getApiUrl } from '../utils/envChecker';
-import { useXero } from '../integrations/xero/context/XeroProvider';
+import { useXero } from '../contexts/XeroContext';
 
 interface Tenant {
   tenantId: string;
