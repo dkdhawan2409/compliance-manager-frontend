@@ -134,14 +134,21 @@ const MissingAttachments: React.FC = () => {
       console.error('Error detecting missing attachments:', error);
       
       // Show specific error messages for Xero connection issues
-      const errorMessage = error.response?.data?.error || error.message;
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message;
+      console.log('🔍 Error details:', { errorMessage, fullError: error });
+      
       if (errorMessage.includes('Xero not connected') || errorMessage.includes('access token not found')) {
         toast.error('Xero not connected. Please go to Xero Flow and connect your account first.');
-      } else if (errorMessage.includes('refresh token has expired') || errorMessage.includes('Please reconnect to Xero Flow')) {
+      } else if (errorMessage.includes('refresh token has expired') || 
+                 errorMessage.includes('Please reconnect to Xero Flow') ||
+                 errorMessage.includes('Xero refresh token has expired')) {
         // First attempt to refresh the token automatically
         try {
           console.log('🔄 Attempting automatic token refresh...');
           await refreshToken();
+          
+          // Wait a moment for the token to be processed
+          await new Promise(resolve => setTimeout(resolve, 1000));
           
           // If refresh was successful, retry the operation
           console.log('✅ Token refresh successful, retrying detection...');
@@ -151,6 +158,10 @@ const MissingAttachments: React.FC = () => {
           return; // Exit early on success
         } catch (refreshError: any) {
           console.error('❌ Token refresh failed:', refreshError);
+          // Show a more specific message about the refresh failure
+          toast.error('Automatic token refresh failed. Please reconnect to Xero manually.', {
+            duration: 8000
+          });
           // Fall through to show reconnect message
         }
         
@@ -162,6 +173,7 @@ const MissingAttachments: React.FC = () => {
               // Clear any existing Xero state
               localStorage.removeItem('xero_authorized');
               localStorage.removeItem('xero_auth_timestamp');
+              localStorage.removeItem('xero_tokens');
               // Redirect to Xero Flow page
               window.location.href = '/xero';
             }
@@ -194,7 +206,30 @@ const MissingAttachments: React.FC = () => {
       } else if (errorMessage.includes('tenant not found')) {
         toast.error('Xero tenant not found. Please reconnect to Xero.');
       } else {
-        toast.error(`Failed to detect missing attachments: ${errorMessage}`);
+        // Check if it's a general token expiration error
+        if (errorMessage.includes('expired') || errorMessage.includes('invalid token')) {
+          toast.error('Xero authentication expired. Please reconnect to Xero Flow to continue.', {
+            duration: 8000,
+            action: {
+              label: 'Reconnect to Xero',
+              onClick: () => {
+                localStorage.removeItem('xero_authorized');
+                localStorage.removeItem('xero_auth_timestamp');
+                localStorage.removeItem('xero_tokens');
+                window.location.href = '/xero';
+              }
+            }
+          });
+        } else {
+          // For any other errors, provide a helpful message
+          toast.error(`Failed to detect missing attachments: ${errorMessage}`, {
+            duration: 6000,
+            action: errorMessage.includes('expired') ? {
+              label: 'Reconnect Xero',
+              onClick: () => window.location.href = '/xero'
+            } : undefined
+          });
+        }
       }
     } finally {
       setLoading(false);
@@ -227,8 +262,12 @@ const MissingAttachments: React.FC = () => {
       console.error('Error processing missing attachments:', error);
       
       // Show specific error messages for Xero connection issues
-      const errorMessage = error.response?.data?.error || error.message;
-      if (errorMessage.includes('refresh token has expired') || errorMessage.includes('Please reconnect to Xero Flow')) {
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message;
+      console.log('🔍 Process error details:', { errorMessage, fullError: error });
+      
+      if (errorMessage.includes('refresh token has expired') || 
+          errorMessage.includes('Please reconnect to Xero Flow') ||
+          errorMessage.includes('Xero refresh token has expired')) {
         // First attempt to refresh the token automatically
         try {
           console.log('🔄 Attempting automatic token refresh...');
@@ -256,6 +295,7 @@ const MissingAttachments: React.FC = () => {
               // Clear any existing Xero state
               localStorage.removeItem('xero_authorized');
               localStorage.removeItem('xero_auth_timestamp');
+              localStorage.removeItem('xero_tokens');
               // Redirect to Xero Flow page
               window.location.href = '/xero';
             }
@@ -289,7 +329,23 @@ const MissingAttachments: React.FC = () => {
           }
         });
       } else {
-        toast.error(`Failed to process missing attachments: ${errorMessage}`);
+        // Check if it's a general token expiration error
+        if (errorMessage.includes('expired') || errorMessage.includes('invalid token')) {
+          toast.error('Xero authentication expired. Please reconnect to Xero Flow to continue.', {
+            duration: 8000,
+            action: {
+              label: 'Reconnect to Xero',
+              onClick: () => {
+                localStorage.removeItem('xero_authorized');
+                localStorage.removeItem('xero_auth_timestamp');
+                localStorage.removeItem('xero_tokens');
+                window.location.href = '/xero';
+              }
+            }
+          });
+        } else {
+          toast.error(`Failed to process missing attachments: ${errorMessage}`);
+        }
       }
     } finally {
       setProcessing(false);

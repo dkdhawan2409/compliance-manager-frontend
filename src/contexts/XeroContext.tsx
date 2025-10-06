@@ -159,7 +159,6 @@ interface XeroContextType {
 }
 
 const XeroContext = createContext<XeroContextType | undefined>(undefined);
-console.log('🔧 XeroContext created:', XeroContext);
 
 // Provider component
 interface XeroProviderProps {
@@ -167,7 +166,6 @@ interface XeroProviderProps {
 }
 
 export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
-  console.log('🚀 XeroProvider component rendering...');
   const [state, dispatch] = useReducer(xeroReducer, initialState);
   const [isInitialized, setIsInitialized] = useState(false);
   const [lastApiCall, setLastApiCall] = useState<number>(0);
@@ -504,28 +502,36 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
 
       console.log('🔄 Refreshing Xero token...');
       
-      // Call the backend token refresh endpoint
-      const response = await fetch(`${getApiUrl()}/api/xero/refresh-token`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to refresh token');
-      }
-
-      const result = await response.json();
-      console.log('✅ Token refresh successful:', result);
+      // Use the proper refresh token function from xeroService
+      const { refreshXeroToken } = await import('../api/xeroService');
       
-      // Update tokens if provided
-      if (result.data?.tokens) {
-        dispatch({ type: 'SET_TOKENS', payload: result.data.tokens });
-        localStorage.setItem('xero_tokens', JSON.stringify(result.data.tokens));
+      // Get company info from localStorage
+      const companyData = localStorage.getItem('company');
+      if (!companyData) {
+        throw new Error('Company information not found');
       }
+      
+      const company = JSON.parse(companyData);
+      
+      // Get stored refresh token
+      const storedTokens = localStorage.getItem('xero_tokens');
+      if (!storedTokens) {
+        throw new Error('No stored Xero tokens found');
+      }
+      
+      const tokens = JSON.parse(storedTokens);
+      if (!tokens.refreshToken) {
+        throw new Error('No refresh token available');
+      }
+      
+      // Call the refresh token function
+      const newTokens = await refreshXeroToken(tokens.refreshToken, company.id);
+      
+      console.log('✅ Token refresh successful:', newTokens);
+      
+      // Update tokens
+      dispatch({ type: 'SET_TOKENS', payload: newTokens });
+      localStorage.setItem('xero_tokens', JSON.stringify(newTokens));
       
       // Reload settings to get updated connection status
       await loadSettings();
@@ -664,9 +670,6 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
     clearError,
   };
 
-  console.log('🔧 XeroProvider providing context value:', value);
-  console.log('🔧 XeroProvider state:', state);
-  console.log('🔧 XeroProvider isInitialized:', isInitialized);
 
   return (
     <XeroContext.Provider value={value}>
@@ -678,16 +681,8 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
 // Hook to use the context
 export const useXero = (): XeroContextType => {
   const context = useContext(XeroContext);
-  console.log('🔍 useXero hook called, context:', context);
-  console.log('🔍 useXero hook called, context === undefined:', context === undefined);
-  console.log('🔍 useXero hook called, context type:', typeof context);
-  
   if (context === undefined) {
-    console.error('❌ useXero hook called outside of XeroProvider context');
-    console.error('❌ Stack trace:', new Error().stack);
     throw new Error('useXero must be used within a XeroProvider');
   }
-  
-  console.log('✅ useXero hook returning context successfully');
   return context;
 };
