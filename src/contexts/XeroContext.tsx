@@ -502,23 +502,41 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
 
       console.log('🔄 Attempting Xero token refresh...');
       
-      // Try to refresh by calling the connection status endpoint
-      // This will trigger the backend to attempt token refresh internally
-      const { getConnectionStatus } = await import('../api/xeroService');
+      // Use the proper refresh token function from xeroService
+      const { refreshXeroToken } = await import('../api/xeroService');
       
-      console.log('🔍 Calling getConnectionStatus to trigger token refresh...');
-      const connectionStatus = await getConnectionStatus();
-      
-      if (connectionStatus.isConnected) {
-        console.log('✅ Token refresh successful via connection status check');
-        
-        // Reload settings to get updated connection status
-        await loadSettings();
-        
-        toast.success('Xero connection refreshed successfully');
-      } else {
-        throw new Error('Token refresh failed - connection not restored');
+      // Get company info from localStorage
+      const companyData = localStorage.getItem('company');
+      if (!companyData) {
+        throw new Error('Company information not found');
       }
+      
+      const company = JSON.parse(companyData);
+      
+      // Get stored refresh token
+      const storedTokens = localStorage.getItem('xero_tokens');
+      if (!storedTokens) {
+        throw new Error('No stored Xero tokens found');
+      }
+      
+      const tokens = JSON.parse(storedTokens);
+      if (!tokens.refreshToken) {
+        throw new Error('No refresh token available');
+      }
+      
+      // Call the refresh token function
+      const newTokens = await refreshXeroToken(tokens.refreshToken, company.id);
+      
+      console.log('✅ Token refresh successful:', newTokens);
+      
+      // Update tokens
+      dispatch({ type: 'SET_TOKENS', payload: newTokens });
+      localStorage.setItem('xero_tokens', JSON.stringify(newTokens));
+      
+      // Reload settings to get updated connection status
+      await loadSettings();
+      
+      toast.success('Token refreshed successfully');
     } catch (err: any) {
       console.error('❌ Token refresh error:', err);
       
