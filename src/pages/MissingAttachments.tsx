@@ -148,7 +148,7 @@ const MissingAttachments: React.FC = () => {
           await refreshToken();
           
           // Wait a moment for the token to be processed
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, 2000));
           
           // If refresh was successful, retry the operation
           console.log('✅ Token refresh successful, retrying detection...');
@@ -158,11 +158,7 @@ const MissingAttachments: React.FC = () => {
           return; // Exit early on success
         } catch (refreshError: any) {
           console.error('❌ Token refresh failed:', refreshError);
-          // Show a more specific message about the refresh failure
-          toast.error('Automatic token refresh failed. Please reconnect to Xero manually.', {
-            duration: 8000
-          });
-          // Fall through to show reconnect message
+          // Don't show an additional error message here, let it fall through to the main error handling
         }
         
         toast.error('Xero connection expired. Please reconnect to Xero Flow to continue.', {
@@ -224,10 +220,10 @@ const MissingAttachments: React.FC = () => {
           // For any other errors, provide a helpful message
           toast.error(`Failed to detect missing attachments: ${errorMessage}`, {
             duration: 6000,
-            action: errorMessage.includes('expired') ? {
-              label: 'Reconnect Xero',
+            action: {
+              label: 'Try Xero Flow',
               onClick: () => window.location.href = '/xero'
-            } : undefined
+            }
           });
         }
       }

@@ -500,62 +500,63 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null });
 
-      console.log('🔄 Refreshing Xero token...');
+      console.log('🔄 Attempting Xero token refresh...');
       
-      // Use the proper refresh token function from xeroService
-      const { refreshXeroToken } = await import('../api/xeroService');
+      // Try to refresh by calling the connection status endpoint
+      // This will trigger the backend to attempt token refresh internally
+      const { getConnectionStatus } = await import('../api/xeroService');
       
-      // Get company info from localStorage
-      const companyData = localStorage.getItem('company');
-      if (!companyData) {
-        throw new Error('Company information not found');
+      console.log('🔍 Calling getConnectionStatus to trigger token refresh...');
+      const connectionStatus = await getConnectionStatus();
+      
+      if (connectionStatus.isConnected) {
+        console.log('✅ Token refresh successful via connection status check');
+        
+        // Reload settings to get updated connection status
+        await loadSettings();
+        
+        toast.success('Xero connection refreshed successfully');
+      } else {
+        throw new Error('Token refresh failed - connection not restored');
       }
-      
-      const company = JSON.parse(companyData);
-      
-      // Get stored refresh token
-      const storedTokens = localStorage.getItem('xero_tokens');
-      if (!storedTokens) {
-        throw new Error('No stored Xero tokens found');
-      }
-      
-      const tokens = JSON.parse(storedTokens);
-      if (!tokens.refreshToken) {
-        throw new Error('No refresh token available');
-      }
-      
-      // Call the refresh token function
-      const newTokens = await refreshXeroToken(tokens.refreshToken, company.id);
-      
-      console.log('✅ Token refresh successful:', newTokens);
-      
-      // Update tokens
-      dispatch({ type: 'SET_TOKENS', payload: newTokens });
-      localStorage.setItem('xero_tokens', JSON.stringify(newTokens));
-      
-      // Reload settings to get updated connection status
-      await loadSettings();
-      
-      toast.success('Token refreshed successfully');
     } catch (err: any) {
       console.error('❌ Token refresh error:', err);
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to refresh token';
       
-      // If refresh fails, clear the connection state
-      if (err.message?.includes('expired') || err.message?.includes('invalid')) {
-        console.log('🔄 Token refresh failed - clearing connection state');
-        dispatch({ type: 'CLEAR_STATE' });
-        localStorage.removeItem('xero_authorized');
-        localStorage.removeItem('xero_auth_timestamp');
-        localStorage.removeItem('xero_tokens');
-        
-        toast.error('Xero token has expired. Please reconnect to continue.', {
-          duration: 10000
-        });
-      } else {
-        dispatch({ type: 'SET_ERROR', payload: errorMessage });
-        toast.error(errorMessage);
-      }
+      // If refresh fails, clear the connection state and show reconnection message
+      console.log('🔄 Token refresh failed - clearing connection state');
+      dispatch({ type: 'CLEAR_STATE' });
+      localStorage.removeItem('xero_authorized');
+      localStorage.removeItem('xero_auth_timestamp');
+      localStorage.removeItem('xero_tokens');
+      
+      toast.error('Xero token has expired. Please reconnect to continue.', {
+        duration: 10000
+      });
+      
+      // Show a separate toast with action button
+      setTimeout(() => {
+        toast((t) => (
+          <span>
+            <button
+              onClick={() => {
+                toast.dismiss(t.id);
+                window.location.href = '/xero';
+              }}
+              style={{
+                background: '#007bff',
+                color: 'white',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                marginLeft: '10px'
+              }}
+            >
+              Reconnect Now
+            </button>
+          </span>
+        ), { duration: 8000 });
+      }, 1000);
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
