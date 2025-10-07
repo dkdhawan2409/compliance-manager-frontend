@@ -129,7 +129,13 @@ export const getConnectionStatus = async (): Promise<{
       isConnected: backendData.connected || false,
       connectionStatus: backendData.connected ? 'connected' : 'disconnected',
       message: backendData.connected ? 'Xero connected successfully' : 'Not connected to Xero',
-      tenants: backendData.tenants || [],
+      tenants: (backendData.tenants || []).map((tenant: any) => ({
+        id: tenant.tenantId,
+        name: tenant.tenantName || tenant.organisationName || 'Unnamed Organization',
+        organizationName: tenant.organisationName,
+        tenantName: tenant.tenantName,
+        tenantId: tenant.tenantId
+      })),
       hasCredentials: backendData.hasCredentials || false,
       needsOAuth: backendData.needsOAuth || false,
       tokenRefreshed: backendData.tokenRefreshed || false,
@@ -141,26 +147,6 @@ export const getConnectionStatus = async (): Promise<{
   } catch (error) {
     console.error('🔍 getConnectionStatus: Error:', error);
     throw error;
-  }
-};
-
-// Get Xero tenants/organizations
-export const getTenants = async (): Promise<XeroTenant[]> => {
-  try {
-    const response = await apiClient.get('/api/xero/tenants');
-    console.log('🔍 getTenants: Response:', response.data);
-    return response.data.data || [];
-  } catch (error: any) {
-    console.error('❌ getTenants: Error:', error);
-    // If tenants endpoint doesn't exist, try connections endpoint
-    try {
-      const response = await apiClient.get('/api/xero/connections');
-      console.log('🔍 getTenants (via connections): Response:', response.data);
-      return response.data.data || [];
-    } catch (connError) {
-      console.error('❌ getTenants (via connections): Error:', connError);
-      throw error; // Throw original error
-    }
   }
 };
 
