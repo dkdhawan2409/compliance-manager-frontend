@@ -323,7 +323,7 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
 
   const runGPTAnalysis = async (xeroData: any, anomalyData: any): Promise<any> => {
     console.log('🔍 Step 3: Running GPT analysis');
-    
+    debugger;
     try {
       const prompt = `Analyze the following BAS data for the period ${basPeriod}:
 
