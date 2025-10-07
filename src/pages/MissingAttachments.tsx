@@ -135,7 +135,51 @@ const MissingAttachments: React.FC = () => {
       
       // Show specific error messages for Xero connection issues
       const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message;
-      console.log('🔍 Error details:', { errorMessage, fullError: error });
+      const errorCode = error.response?.data?.errorCode || error.response?.data?.code;
+      console.log('🔍 Error details:', { errorMessage, errorCode, fullError: error });
+      
+      // Handle XERO_TOKEN_EXPIRED error code
+      if (errorCode === 'XERO_TOKEN_EXPIRED' || 
+          errorMessage.includes('XERO_TOKEN_EXPIRED') ||
+          errorMessage.includes('Token expired') ||
+          errorMessage.includes('token has expired')) {
+        
+        toast.error((t) => (
+          <div>
+            <strong>Xero Token Expired</strong>
+            <p style={{ margin: '8px 0', fontSize: '14px' }}>
+              Your Xero connection has expired. Please reconnect to Xero to continue accessing transaction data.
+            </p>
+            <button
+              onClick={() => {
+                toast.dismiss(t.id);
+                // Clear expired tokens
+                localStorage.removeItem('xero_authorized');
+                localStorage.removeItem('xero_auth_timestamp');
+                localStorage.removeItem('xero_tokens');
+                window.location.href = '/xero';
+              }}
+              style={{
+                background: '#dc3545',
+                color: 'white',
+                border: 'none',
+                padding: '10px 20px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                marginTop: '8px',
+                fontSize: '14px',
+                fontWeight: 'bold'
+              }}
+            >
+              Reconnect to Xero Now
+            </button>
+          </div>
+        ), {
+          duration: 20000,
+          icon: '🔄'
+        });
+        return; // Exit early
+      }
       
       if (errorMessage.includes('Xero not connected') || 
           errorMessage.includes('access token not found') ||
@@ -290,7 +334,50 @@ const MissingAttachments: React.FC = () => {
       
       // Show specific error messages for Xero connection issues
       const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message;
-      console.log('🔍 Process error details:', { errorMessage, fullError: error });
+      const errorCode = error.response?.data?.errorCode || error.response?.data?.code;
+      console.log('🔍 Process error details:', { errorMessage, errorCode, fullError: error });
+      
+      // Handle XERO_TOKEN_EXPIRED error code
+      if (errorCode === 'XERO_TOKEN_EXPIRED' || 
+          errorMessage.includes('XERO_TOKEN_EXPIRED') ||
+          errorMessage.includes('Token expired') ||
+          errorMessage.includes('token has expired')) {
+        
+        toast.error((t) => (
+          <div>
+            <strong>Xero Token Expired</strong>
+            <p style={{ margin: '8px 0', fontSize: '14px' }}>
+              Your Xero connection has expired. Please reconnect to Xero to continue.
+            </p>
+            <button
+              onClick={() => {
+                toast.dismiss(t.id);
+                localStorage.removeItem('xero_authorized');
+                localStorage.removeItem('xero_auth_timestamp');
+                localStorage.removeItem('xero_tokens');
+                window.location.href = '/xero';
+              }}
+              style={{
+                background: '#dc3545',
+                color: 'white',
+                border: 'none',
+                padding: '10px 20px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                marginTop: '8px',
+                fontSize: '14px',
+                fontWeight: 'bold'
+              }}
+            >
+              Reconnect to Xero Now
+            </button>
+          </div>
+        ), {
+          duration: 20000,
+          icon: '🔄'
+        });
+        return; // Exit early
+      }
       
       if (errorMessage.includes('refresh token has expired') || 
           errorMessage.includes('Please reconnect to Xero Flow') ||
