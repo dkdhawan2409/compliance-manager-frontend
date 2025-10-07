@@ -603,38 +603,63 @@ W2: $${finalBASData.BAS_Fields.W2.toLocaleString()}`;
       </div>
 
       {/* Xero Organization Selection */}
-      {xeroData.isConnected && xeroData.tenants && xeroData.tenants.length > 0 && (
+      {xeroData.isConnected && (
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Xero Organization</h3>
-          <div className="flex items-center gap-4">
-            <select
-              value={selectedOrganization}
-              onChange={(e) => {
-                setSelectedOrganization(e.target.value);
-                xeroActions.selectTenant(e.target.value);
-              }}
-              className="flex-1 border border-gray-300 rounded-lg px-3 py-2"
-              disabled={isProcessing}
-            >
-              <option value="">Select Xero Organization</option>
-              {xeroData.tenants.map((tenant: any) => (
-                <option key={tenant.id} value={tenant.id}>
-                  {tenant.name || tenant.organizationName || tenant.tenantName || tenant.id}
-                </option>
-              ))}
-            </select>
-            {xeroData.selectedTenant && (
-              <div className="text-sm text-green-600 flex items-center gap-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                {xeroData.selectedTenant.name || 'Selected'}
+          
+          {xeroData.tenants && xeroData.tenants.length > 0 ? (
+            <>
+              <div className="flex items-center gap-4">
+                <select
+                  value={selectedOrganization}
+                  onChange={(e) => {
+                    setSelectedOrganization(e.target.value);
+                    xeroActions.selectTenant(e.target.value);
+                  }}
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2"
+                  disabled={isProcessing}
+                >
+                  <option value="">Select Xero Organization</option>
+                  {xeroData.tenants.map((tenant: any) => (
+                    <option key={tenant.id} value={tenant.id}>
+                      {tenant.name || tenant.organizationName || tenant.tenantName || tenant.id}
+                    </option>
+                  ))}
+                </select>
+                {xeroData.selectedTenant && (
+                  <div className="text-sm text-green-600 flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    {xeroData.selectedTenant.name || 'Selected'}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-          <p className="text-sm text-gray-500 mt-2">
-            BAS data will be calculated from transactions in the selected organization
-          </p>
+              <p className="text-sm text-gray-500 mt-2">
+                BAS data will be calculated from transactions in the selected organization
+              </p>
+            </>
+          ) : (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <svg className="w-5 h-5 text-amber-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3l-7.5-13c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div>
+                  <p className="text-sm font-medium text-amber-800">No Xero Organizations Available</p>
+                  <p className="text-sm text-amber-700 mt-1">
+                    Please complete the Xero OAuth flow to access your organizations.
+                  </p>
+                  <button
+                    onClick={() => window.location.href = '/xero'}
+                    className="mt-3 px-4 py-2 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700 transition-colors"
+                  >
+                    Go to Xero Flow
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
