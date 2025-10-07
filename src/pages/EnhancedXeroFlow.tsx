@@ -1085,7 +1085,7 @@ const EnhancedXeroFlow: React.FC = () => {
         </Slide>
 
         {/* Enhanced Tenant Selection */}
-        {isConnected && tenants && tenants.length > 0 && (
+        {isConnected && (
           <Zoom in timeout={800}>
             <Card 
               elevation={2} 
@@ -1110,27 +1110,72 @@ const EnhancedXeroFlow: React.FC = () => {
                     </Typography>
                   </Box>
                 </Box>
-                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-                  {tenants.map((tenant) => (
-                    <Chip
-                      key={tenant.id}
-                      label={tenant.name}
-                      onClick={() => selectTenant(tenant.id)}
-                      color={selectedTenant?.id === tenant.id ? 'primary' : 'default'}
-                      variant={selectedTenant?.id === tenant.id ? 'filled' : 'outlined'}
-                      sx={{
-                        height: 40,
-                        fontSize: '0.9rem',
-                        fontWeight: selectedTenant?.id === tenant.id ? 'bold' : 'normal',
-                        transition: 'all 0.3s ease',
-                        '&:hover': {
-                          transform: 'translateY(-2px)',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                
+                {tenants && tenants.length > 0 ? (
+                  <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                    {tenants.map((tenant) => (
+                      <Chip
+                        key={tenant.id}
+                        label={tenant.name || tenant.organizationName || tenant.tenantName || 'Unnamed Organization'}
+                        onClick={() => {
+                          console.log('🎯 Selecting tenant:', tenant);
+                          selectTenant(tenant.id);
+                          showLimitedToast(`Selected organization: ${tenant.name || tenant.organizationName || 'Unnamed'}`, 'success');
+                        }}
+                        color={selectedTenant?.id === tenant.id ? 'primary' : 'default'}
+                        variant={selectedTenant?.id === tenant.id ? 'filled' : 'outlined'}
+                        icon={selectedTenant?.id === tenant.id ? <CheckCircle /> : undefined}
+                        sx={{
+                          height: 40,
+                          fontSize: '0.9rem',
+                          fontWeight: selectedTenant?.id === tenant.id ? 'bold' : 'normal',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            transform: 'translateY(-2px)',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                          }
+                        }}
+                      />
+                    ))}
+                  </Box>
+                ) : (
+                  <Alert severity="warning" sx={{ mt: 2 }}>
+                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>
+                      No Organizations Found
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 2 }}>
+                      Your Xero connection doesn't have any organizations loaded yet. 
+                      This usually means the OAuth callback didn't complete fully.
+                    </Typography>
+                    <Button
+                      variant="contained"
+                      color="warning"
+                      size="small"
+                      onClick={async () => {
+                        try {
+                          await refreshConnection();
+                          showLimitedToast('Refreshing connection and loading organizations...', 'success');
+                        } catch (error) {
+                          console.error('Failed to refresh:', error);
                         }
                       }}
-                    />
-                  ))}
-                </Box>
+                      startIcon={<Refresh />}
+                    >
+                      Refresh Connection
+                    </Button>
+                  </Alert>
+                )}
+                
+                {selectedTenant && (
+                  <Alert severity="success" sx={{ mt: 2 }} icon={<CheckCircle />}>
+                    <Typography variant="body2">
+                      <strong>Selected:</strong> {selectedTenant.name || selectedTenant.organizationName || 'Unnamed Organization'}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      All data operations will use this organization
+                    </Typography>
+                  </Alert>
+                )}
               </CardContent>
             </Card>
           </Zoom>
