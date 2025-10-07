@@ -137,43 +137,74 @@ const MissingAttachments: React.FC = () => {
       const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message;
       console.log('🔍 Error details:', { errorMessage, fullError: error });
       
-      if (errorMessage.includes('Xero not connected') || errorMessage.includes('access token not found')) {
-        toast.error('Xero not connected. Please go to Xero Flow and connect your account first.');
+      if (errorMessage.includes('Xero not connected') || 
+          errorMessage.includes('access token not found') ||
+          errorMessage.includes('Not connected to Xero') ||
+          errorMessage.includes('NOT_CONNECTED')) {
+        toast.error((t) => (
+          <div>
+            <strong>Xero Not Connected</strong>
+            <p style={{ margin: '8px 0', fontSize: '14px' }}>Please connect to Xero first to access transaction data.</p>
+            <button
+              onClick={() => {
+                toast.dismiss(t.id);
+                window.location.href = '/xero';
+              }}
+              style={{
+                background: '#007bff',
+                color: 'white',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                marginTop: '8px',
+                fontSize: '14px'
+              }}
+            >
+              Connect to Xero Now
+            </button>
+          </div>
+        ), {
+          duration: 15000
+        });
       } else if (errorMessage.includes('refresh token has expired') || 
                  errorMessage.includes('Please reconnect to Xero Flow') ||
-                 errorMessage.includes('Xero refresh token has expired')) {
-        // First attempt to refresh the token automatically
-        try {
-          console.log('🔄 Attempting automatic token refresh...');
-          await refreshToken();
-          
-          // Wait a moment for the token to be processed
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
-          // If refresh was successful, retry the operation
-          console.log('✅ Token refresh successful, retrying detection...');
-          const result = await detectMissingAttachments();
-          setMissingTransactions(result.transactions);
-          toast.success(`Found ${result.totalTransactions} transactions without attachments`);
-          return; // Exit early on success
-        } catch (refreshError: any) {
-          console.error('❌ Token refresh failed:', refreshError);
-          // Don't show an additional error message here, let it fall through to the main error handling
-        }
+                 errorMessage.includes('Xero refresh token has expired') ||
+                 errorMessage.includes('No refresh token available') ||
+                 errorMessage.includes('needs to re-authorize')) {
         
-        toast.error('Xero connection expired. Please reconnect to Xero Flow to continue.', {
-          duration: 10000,
-          action: {
-            label: 'Reconnect Now',
-            onClick: () => {
-              // Clear any existing Xero state
-              localStorage.removeItem('xero_authorized');
-              localStorage.removeItem('xero_auth_timestamp');
-              localStorage.removeItem('xero_tokens');
-              // Redirect to Xero Flow page
-              window.location.href = '/xero';
-            }
-          }
+        toast.error((t) => (
+          <div>
+            <strong>Xero Authorization Expired</strong>
+            <p style={{ margin: '8px 0', fontSize: '14px' }}>
+              Your Xero authorization has expired (tokens are valid for 60 days). 
+              Please reconnect to Xero to continue.
+            </p>
+            <button
+              onClick={() => {
+                toast.dismiss(t.id);
+                // Clear expired tokens
+                localStorage.removeItem('xero_authorized');
+                localStorage.removeItem('xero_auth_timestamp');
+                localStorage.removeItem('xero_tokens');
+                window.location.href = '/xero';
+              }}
+              style={{
+                background: '#dc3545',
+                color: 'white',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                marginTop: '8px',
+                fontSize: '14px'
+              }}
+            >
+              Reconnect to Xero
+            </button>
+          </div>
+        ), {
+          duration: 15000
         });
       } else if (errorMessage.includes('token expired')) {
         // First attempt to refresh the token automatically
