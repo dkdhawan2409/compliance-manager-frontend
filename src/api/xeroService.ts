@@ -144,6 +144,26 @@ export const getConnectionStatus = async (): Promise<{
   }
 };
 
+// Get Xero tenants/organizations
+export const getTenants = async (): Promise<XeroTenant[]> => {
+  try {
+    const response = await apiClient.get('/api/xero/tenants');
+    console.log('🔍 getTenants: Response:', response.data);
+    return response.data.data || [];
+  } catch (error: any) {
+    console.error('❌ getTenants: Error:', error);
+    // If tenants endpoint doesn't exist, try connections endpoint
+    try {
+      const response = await apiClient.get('/api/xero/connections');
+      console.log('🔍 getTenants (via connections): Response:', response.data);
+      return response.data.data || [];
+    } catch (connError) {
+      console.error('❌ getTenants (via connections): Error:', connError);
+      throw error; // Throw original error
+    }
+  }
+};
+
 // Delete Xero settings for the authenticated company
 export const deleteXeroSettings = async (): Promise<void> => {
   await apiClient.delete('/api/xero/settings');

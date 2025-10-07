@@ -229,11 +229,35 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
       console.log('🔧 Setting connection status:', connectionStatus);
       dispatch({ type: 'SET_CONNECTION_STATUS', payload: connectionStatus });
       
-      // Auto-select first tenant if available and none selected
-      if (connectionStatus.tenants && connectionStatus.tenants.length > 0 && !state.selectedTenant) {
-        const firstTenant = connectionStatus.tenants[0];
-        console.log('🎯 Auto-selecting first tenant:', firstTenant);
-        dispatch({ type: 'SET_SELECTED_TENANT', payload: firstTenant });
+      // Set tenants in state
+      if (statusData.tenants && statusData.tenants.length > 0) {
+        console.log('🔧 Setting tenants from status:', statusData.tenants);
+        dispatch({ type: 'SET_TENANTS', payload: statusData.tenants });
+        
+        // Auto-select first tenant if available and none selected
+        if (!state.selectedTenant) {
+          const firstTenant = statusData.tenants[0];
+          console.log('🎯 Auto-selecting first tenant:', firstTenant);
+          dispatch({ type: 'SET_SELECTED_TENANT', payload: firstTenant });
+        }
+      } else if (statusData.isConnected) {
+        // If connected but no tenants in status, try to fetch them explicitly
+        console.log('⚠️ Connected but no tenants in status, attempting to load tenants...');
+        try {
+          const { getTenants } = await import('../api/xeroService');
+          const tenantsData = await getTenants();
+          console.log('✅ Loaded tenants:', tenantsData);
+          
+          if (tenantsData && tenantsData.length > 0) {
+            dispatch({ type: 'SET_TENANTS', payload: tenantsData });
+            
+            if (!state.selectedTenant) {
+              dispatch({ type: 'SET_SELECTED_TENANT', payload: tenantsData[0] });
+            }
+          }
+        } catch (tenantError) {
+          console.error('❌ Failed to load tenants:', tenantError);
+        }
       }
     } catch (err: any) {
       console.log('Settings load error:', err.response?.status, err.response?.data);
@@ -480,12 +504,34 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
       const status = await getConnectionStatus();
       dispatch({ type: 'SET_CONNECTION_STATUS', payload: status });
       
+      // Explicitly try to load tenants if connected
+      if (status.isConnected) {
+        try {
+          const { getTenants } = await import('../api/xeroService');
+          const tenantsData = await getTenants();
+          console.log('✅ Loaded tenants during refresh:', tenantsData);
+          
+          if (tenantsData && tenantsData.length > 0) {
+            dispatch({ type: 'SET_TENANTS', payload: tenantsData });
+            
+            // Auto-select first tenant if none selected
+            if (!state.selectedTenant) {
+              dispatch({ type: 'SET_SELECTED_TENANT', payload: tenantsData[0] });
+              console.log('🎯 Auto-selected first tenant during refresh:', tenantsData[0]);
+            }
+          }
+        } catch (tenantError) {
+          console.error('❌ Failed to load tenants during refresh:', tenantError);
+          // Not a critical error, continue
+        }
+      }
+      
       console.log('✅ Connection refreshed successfully');
     } catch (error: any) {
       console.error('❌ Failed to refresh connection:', error);
       dispatch({ type: 'SET_ERROR', payload: error.message || 'Failed to refresh connection' });
     }
-  }, [lastApiCall, loadSettings]);
+  }, [lastApiCall, loadSettings, state.selectedTenant]);
 
   const refreshToken = useCallback(async () => {
     // Rate limiting protection
