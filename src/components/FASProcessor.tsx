@@ -73,6 +73,7 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [finalFASData, setFinalFASData] = useState<FASData | null>(null);
   const [showResults, setShowResults] = useState(false);
+  const [selectedOrganization, setSelectedOrganization] = useState<string>('');
 
   // Initialize FAS period to current FBT year
   useEffect(() => {
@@ -82,6 +83,20 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
     const fbtYear = now.getMonth() >= 3 ? year : year - 1;
     setFasPeriod(`${fbtYear}-${fbtYear + 1}`);
   }, []);
+  
+  // Auto-select organization when available
+  useEffect(() => {
+    if (xeroData.selectedTenant && !selectedOrganization) {
+      setSelectedOrganization(xeroData.selectedTenant.id);
+      console.log('✅ FAS: Auto-selected organization:', xeroData.selectedTenant);
+    } else if (xeroData.tenants && xeroData.tenants.length > 0 && !selectedOrganization) {
+      // Auto-select first tenant if none selected
+      const firstTenant = xeroData.tenants[0];
+      setSelectedOrganization(firstTenant.id);
+      xeroActions.selectTenant(firstTenant.id);
+      console.log('✅ FAS: Auto-selected first organization:', firstTenant);
+    }
+  }, [xeroData.selectedTenant, xeroData.tenants, selectedOrganization, xeroActions]);
 
   const updateStepStatus = (stepId: string, status: ProcessingStep['status'], data?: any, error?: string) => {
     setProcessingSteps(prev => prev.map(step => 
@@ -537,25 +552,62 @@ A9: ${finalFASData.FAS_Fields.A9}`;
         </div>
       </div>
 
+      {/* Xero Organization Selection */}
+      {xeroData.isConnected && xeroData.tenants && xeroData.tenants.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Xero Organization</h3>
+          <div className="flex items-center gap-4">
+            <select
+              value={selectedOrganization}
+              onChange={(e) => {
+                setSelectedOrganization(e.target.value);
+                xeroActions.selectTenant(e.target.value);
+              }}
+              className="flex-1 border border-gray-300 rounded-lg px-3 py-2"
+              disabled={isProcessing}
+            >
+              <option value="">Select Xero Organization</option>
+              {xeroData.tenants.map((tenant: any) => (
+                <option key={tenant.id} value={tenant.id}>
+                  {tenant.name || tenant.organizationName || tenant.tenantName || tenant.id}
+                </option>
+              ))}
+            </select>
+            {xeroData.selectedTenant && (
+              <div className="text-sm text-green-600 flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                {xeroData.selectedTenant.name || 'Selected'}
+              </div>
+            )}
+          </div>
+          <p className="text-sm text-gray-500 mt-2">
+            FAS data will be calculated from FBT transactions in the selected organization
+          </p>
+        </div>
+      )}
+
       {/* FAS Period Selection */}
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">FAS Period</h3>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
           <select
             value={fasPeriod}
             onChange={(e) => setFasPeriod(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2"
+            className="border border-gray-300 rounded-lg px-3 py-2 min-w-[200px]"
             disabled={isProcessing}
           >
             <option value="">Select FAS Period</option>
-            <option value="2023-2024">2023-2024 FBT Year</option>
-            <option value="2024-2025">2024-2025 FBT Year</option>
-            <option value="2025-2026">2025-2026 FBT Year</option>
+            <option value="2022-2023">2022-2023 FBT Year (Apr 2022 - Mar 2023)</option>
+            <option value="2023-2024">2023-2024 FBT Year (Apr 2023 - Mar 2024)</option>
+            <option value="2024-2025">2024-2025 FBT Year (Apr 2024 - Mar 2025)</option>
+            <option value="2025-2026">2025-2026 FBT Year (Apr 2025 - Mar 2026)</option>
           </select>
           
           <button
             onClick={processFAS}
-            disabled={!fasPeriod || isProcessing || !xeroData.isConnected}
+            disabled={!fasPeriod || isProcessing || !xeroData.isConnected || !selectedOrganization}
             className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isProcessing ? 'Processing...' : 'Start FAS Processing'}
@@ -570,6 +622,14 @@ A9: ${finalFASData.FAS_Fields.A9}`;
             </button>
           )}
         </div>
+        {!selectedOrganization && xeroData.isConnected && (
+          <p className="text-sm text-amber-600 mt-2 flex items-center gap-1">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3l-7.5-13c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            Please select a Xero organization above to continue
+          </p>
+        )}
       </div>
 
       {/* Processing Steps */}

@@ -73,6 +73,7 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [finalBASData, setFinalBASData] = useState<BASData | null>(null);
   const [showResults, setShowResults] = useState(false);
+  const [selectedOrganization, setSelectedOrganization] = useState<string>('');
 
   // Initialize BAS period to current quarter
   useEffect(() => {
@@ -88,6 +89,20 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
     
     setBasPeriod(`${year}-${quarter}`);
   }, []);
+  
+  // Auto-select organization when available
+  useEffect(() => {
+    if (xeroData.selectedTenant && !selectedOrganization) {
+      setSelectedOrganization(xeroData.selectedTenant.id);
+      console.log('✅ Auto-selected organization:', xeroData.selectedTenant);
+    } else if (xeroData.tenants && xeroData.tenants.length > 0 && !selectedOrganization) {
+      // Auto-select first tenant if none selected
+      const firstTenant = xeroData.tenants[0];
+      setSelectedOrganization(firstTenant.id);
+      xeroActions.selectTenant(firstTenant.id);
+      console.log('✅ Auto-selected first organization:', firstTenant);
+    }
+  }, [xeroData.selectedTenant, xeroData.tenants, selectedOrganization, xeroActions]);
 
   const updateStepStatus = (stepId: string, status: ProcessingStep['status'], data?: any, error?: string) => {
     setProcessingSteps(prev => prev.map(step => 
@@ -587,14 +602,50 @@ W2: $${finalBASData.BAS_Fields.W2.toLocaleString()}`;
         </div>
       </div>
 
+      {/* Xero Organization Selection */}
+      {xeroData.isConnected && xeroData.tenants && xeroData.tenants.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Xero Organization</h3>
+          <div className="flex items-center gap-4">
+            <select
+              value={selectedOrganization}
+              onChange={(e) => {
+                setSelectedOrganization(e.target.value);
+                xeroActions.selectTenant(e.target.value);
+              }}
+              className="flex-1 border border-gray-300 rounded-lg px-3 py-2"
+              disabled={isProcessing}
+            >
+              <option value="">Select Xero Organization</option>
+              {xeroData.tenants.map((tenant: any) => (
+                <option key={tenant.id} value={tenant.id}>
+                  {tenant.name || tenant.organizationName || tenant.tenantName || tenant.id}
+                </option>
+              ))}
+            </select>
+            {xeroData.selectedTenant && (
+              <div className="text-sm text-green-600 flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                {xeroData.selectedTenant.name || 'Selected'}
+              </div>
+            )}
+          </div>
+          <p className="text-sm text-gray-500 mt-2">
+            BAS data will be calculated from transactions in the selected organization
+          </p>
+        </div>
+      )}
+
       {/* BAS Period Selection */}
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">BAS Period</h3>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
           <select
             value={basPeriod}
             onChange={(e) => setBasPeriod(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2"
+            className="border border-gray-300 rounded-lg px-3 py-2 min-w-[200px]"
             disabled={isProcessing}
           >
             <option value="">Select BAS Period</option>
@@ -610,7 +661,7 @@ W2: $${finalBASData.BAS_Fields.W2.toLocaleString()}`;
           
           <button
             onClick={processBAS}
-            disabled={!basPeriod || isProcessing || !xeroData.isConnected}
+            disabled={!basPeriod || isProcessing || !xeroData.isConnected || !selectedOrganization}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isProcessing ? 'Processing...' : 'Start BAS Processing'}
@@ -625,6 +676,14 @@ W2: $${finalBASData.BAS_Fields.W2.toLocaleString()}`;
             </button>
           )}
         </div>
+        {!selectedOrganization && xeroData.isConnected && (
+          <p className="text-sm text-amber-600 mt-2 flex items-center gap-1">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3l-7.5-13c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            Please select a Xero organization above to continue
+          </p>
+        )}
       </div>
 
       {/* Processing Steps */}
