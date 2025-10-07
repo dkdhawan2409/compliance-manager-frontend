@@ -97,6 +97,72 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
     ));
   };
 
+  // Helper function to get date range for a quarter
+  const getQuarterDateRange = (period: string): { startDate: Date; endDate: Date } => {
+    const [year, quarter] = period.split('-');
+    const yearNum = parseInt(year);
+    
+    let startMonth: number, endMonth: number;
+    
+    // Australian financial year quarters (July-June)
+    switch (quarter) {
+      case 'Q1': // Jul-Sep
+        startMonth = 6; // July (0-indexed)
+        endMonth = 8; // September
+        break;
+      case 'Q2': // Oct-Dec
+        startMonth = 9; // October
+        endMonth = 11; // December
+        break;
+      case 'Q3': // Jan-Mar
+        startMonth = 0; // January
+        endMonth = 2; // March
+        break;
+      case 'Q4': // Apr-Jun
+        startMonth = 3; // April
+        endMonth = 5; // June
+        break;
+      default:
+        // Default to current quarter
+        startMonth = 0;
+        endMonth = 2;
+    }
+    
+    const startDate = new Date(yearNum, startMonth, 1);
+    const endDate = new Date(yearNum, endMonth + 1, 0); // Last day of end month
+    
+    return { startDate, endDate };
+  };
+  
+  // Helper function to filter transactions by quarter
+  const filterTransactionsByQuarter = (transactions: any[], period: string): any[] => {
+    const { startDate, endDate } = getQuarterDateRange(period);
+    
+    console.log(`📅 Filtering transactions for period ${period}:`, {
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0]
+    });
+    
+    const filtered = transactions.filter((transaction: any) => {
+      // Try different date field names that Xero uses
+      const transactionDateStr = transaction.Date || 
+                                 transaction.DateString || 
+                                 transaction.UpdatedDateUTC || 
+                                 transaction.date || 
+                                 transaction.InvoiceDate;
+      
+      if (!transactionDateStr) {
+        return false; // Skip transactions without dates
+      }
+      
+      const transactionDate = new Date(transactionDateStr);
+      return transactionDate >= startDate && transactionDate <= endDate;
+    });
+    
+    console.log(`✅ Filtered transactions: ${filtered.length} out of ${transactions.length} total`);
+    return filtered;
+  };
+
   const extractXeroData = async (): Promise<any> => {
     console.log('🔍 Step 1: Extracting Xero data for BAS period:', basPeriod);
     
@@ -118,9 +184,14 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
       });
       
       // Extract relevant transaction data
-      const transactions = xeroData?.transactions || [];
+      const allTransactions = xeroData?.transactions || [];
       const contacts = xeroData?.contacts || [];
       const financialData = xeroData?.basData?.data || {};
+      
+      // Filter transactions by the selected quarter
+      const transactions = filterTransactionsByQuarter(allTransactions, basPeriod);
+      
+      console.log(`📊 Filtered ${transactions.length} transactions for period ${basPeriod}`);
       
       // Calculate BAS fields from actual Xero data
       let basData;
@@ -479,12 +550,14 @@ W2: $${finalBASData.BAS_Fields.W2.toLocaleString()}`;
             disabled={isProcessing}
           >
             <option value="">Select BAS Period</option>
-            <option value="2024-Q1">2024 Q1 (Jul-Sep)</option>
-            <option value="2024-Q2">2024 Q2 (Oct-Dec)</option>
-            <option value="2024-Q3">2024 Q3 (Jan-Mar)</option>
-            <option value="2024-Q4">2024 Q4 (Apr-Jun)</option>
-            <option value="2025-Q1">2025 Q1 (Jul-Sep)</option>
-            <option value="2025-Q2">2025 Q2 (Oct-Dec)</option>
+            <option value="2023-Q3">FY2023 Q3 (Jan-Mar 2024)</option>
+            <option value="2023-Q4">FY2023 Q4 (Apr-Jun 2024)</option>
+            <option value="2024-Q1">FY2024 Q1 (Jul-Sep 2024)</option>
+            <option value="2024-Q2">FY2024 Q2 (Oct-Dec 2024)</option>
+            <option value="2024-Q3">FY2024 Q3 (Jan-Mar 2025)</option>
+            <option value="2024-Q4">FY2024 Q4 (Apr-Jun 2025)</option>
+            <option value="2025-Q1">FY2025 Q1 (Jul-Sep 2025)</option>
+            <option value="2025-Q2">FY2025 Q2 (Oct-Dec 2025)</option>
           </select>
           
           <button

@@ -91,6 +91,46 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
     ));
   };
 
+  // Helper function to get date range for FBT year (April 1 - March 31)
+  const getFBTYearDateRange = (period: string): { startDate: Date; endDate: Date } => {
+    const [startYear, endYear] = period.split('-').map(y => parseInt(y));
+    
+    // FBT year runs from April 1 to March 31
+    const startDate = new Date(startYear, 3, 1); // April 1
+    const endDate = new Date(endYear, 2, 31); // March 31
+    
+    return { startDate, endDate };
+  };
+  
+  // Helper function to filter transactions by FBT year
+  const filterTransactionsByFBTYear = (transactions: any[], period: string): any[] => {
+    const { startDate, endDate } = getFBTYearDateRange(period);
+    
+    console.log(`📅 Filtering transactions for FBT year ${period}:`, {
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0]
+    });
+    
+    const filtered = transactions.filter((transaction: any) => {
+      // Try different date field names that Xero uses
+      const transactionDateStr = transaction.Date || 
+                                 transaction.DateString || 
+                                 transaction.UpdatedDateUTC || 
+                                 transaction.date || 
+                                 transaction.InvoiceDate;
+      
+      if (!transactionDateStr) {
+        return false; // Skip transactions without dates
+      }
+      
+      const transactionDate = new Date(transactionDateStr);
+      return transactionDate >= startDate && transactionDate <= endDate;
+    });
+    
+    console.log(`✅ Filtered transactions for FBT: ${filtered.length} out of ${transactions.length} total`);
+    return filtered;
+  };
+
   const extractXeroData = async (): Promise<any> => {
     console.log('🔍 Step 1: Extracting Xero data for FAS period:', fasPeriod);
     
@@ -98,10 +138,27 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
       // Load Xero data for the specified period
       const xeroData = await loadXeroDataForAnalysis();
       
+      if (!xeroData) {
+        throw new Error('No Xero data available - data loading failed');
+      }
+      
+      console.log('📊 Raw Xero data received:', {
+        hasTransactions: !!xeroData.transactions,
+        transactionCount: xeroData.transactions?.length || 0,
+        hasContacts: !!xeroData.contacts,
+        contactCount: xeroData.contacts?.length || 0
+      });
+      
       // Extract relevant FBT transaction data
-      const transactions = xeroData?.transactions || [];
-      const invoices = xeroData?.invoices || [];
+      const allTransactions = xeroData?.transactions || [];
+      const allInvoices = xeroData?.invoices || [];
       const contacts = xeroData?.contacts || [];
+      
+      // Filter transactions by the selected FBT year
+      const transactions = filterTransactionsByFBTYear(allTransactions, fasPeriod);
+      const invoices = filterTransactionsByFBTYear(allInvoices, fasPeriod);
+      
+      console.log(`📊 Filtered ${transactions.length} transactions for FBT period ${fasPeriod}`);
       
       // Calculate FAS fields from Xero data (FBT-specific calculations)
       const fasData = {
