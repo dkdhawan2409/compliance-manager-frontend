@@ -160,43 +160,106 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
       
       console.log(`📊 Filtered ${transactions.length} transactions for FBT period ${fasPeriod}`);
       
-      // Calculate FAS fields from Xero data (FBT-specific calculations)
+      // Must have transactions to process FAS
+      if (transactions.length === 0 && invoices.length === 0) {
+        throw new Error(`No transactions found for FBT year ${fasPeriod}. Please ensure Xero has transaction data for this period.`);
+      }
+      
+      // Calculate FAS fields from REAL Xero transaction data (FBT-specific)
+      let totalFringeBenefits = 0;
+      let exemptBenefits = 0;
+      let reportableBenefits = 0;
+      
+      console.log(`📊 Calculating FBT from ${transactions.length} filtered transactions`);
+      
+      // Look for FBT-related transactions (entertainment, motor vehicles, etc.)
+      transactions.forEach((transaction: any, index: number) => {
+        const total = parseFloat(transaction.Total) || 0;
+        const description = (transaction.Description || transaction.Narration || '').toLowerCase();
+        
+        // Log first few transactions for debugging
+        if (index < 5) {
+          console.log(`FBT Transaction ${index + 1}:`, {
+            total: total,
+            description: transaction.Description,
+            date: transaction.Date || transaction.DateString
+          });
+        }
+        
+        // Identify FBT-related expenses based on description
+        if (description.includes('car') || 
+            description.includes('vehicle') || 
+            description.includes('parking') ||
+            description.includes('entertainment') ||
+            description.includes('meal') ||
+            description.includes('accommodation') ||
+            description.includes('gift')) {
+          totalFringeBenefits += total;
+          
+          // Determine if exempt or reportable
+          if (description.includes('exempt') || total < 300) {
+            exemptBenefits += total;
+          } else {
+            reportableBenefits += total;
+          }
+        }
+      });
+      
+      console.log(`💰 Calculated FBT totals from ${transactions.length} transactions:`, {
+        totalFringeBenefits,
+        exemptBenefits,
+        reportableBenefits
+      });
+      
+      // If no FBT transactions found, throw informative error
+      if (totalFringeBenefits === 0) {
+        throw new Error(`No FBT-related transactions found for period ${fasPeriod}. FBT transactions typically include: car/vehicle expenses, entertainment, meals, accommodation, or gifts. Please ensure Xero has these types of transactions for this FBT year.`);
+      }
+      
+      // Calculate FBT payable and reportable amounts
+      const reportableAmount = reportableBenefits * 2.0802; // Type 1 gross-up
+      const fbtPayable = reportableAmount * 0.47; // 47% FBT rate
+      
       const fasData = {
         period: fasPeriod,
         transactions: transactions.length,
         invoices: invoices.length,
         contacts: contacts.length,
-        // Mock FBT calculations - in real implementation, these would be calculated from actual FBT data
-        totalFringeBenefits: Math.round(Math.random() * 50000 + 10000), // Total fringe benefits taxable value
-        exemptBenefits: Math.round(Math.random() * 10000 + 2000), // Exempt benefits
-        reportableBenefits: Math.round(Math.random() * 30000 + 5000), // Reportable fringe benefits
-        reportableAmount: Math.round(Math.random() * 40000 + 8000), // Reportable fringe benefits amount
-        fbtPayable: Math.round(Math.random() * 25000 + 5000), // FBT payable
+        dataSource: 'calculated_from_filtered_transactions',
+        // FBT calculations from REAL Xero data
+        totalFringeBenefits: Math.round(totalFringeBenefits),
+        exemptBenefits: Math.round(exemptBenefits),
+        reportableBenefits: Math.round(reportableBenefits),
+        reportableAmount: Math.round(reportableAmount),
+        fbtPayable: Math.round(fbtPayable),
         fbtRate: 47, // Current FBT rate
         grossUpRate: 2.0802, // Type 1 gross-up rate
         type1GrossUpRate: 2.0802, // Type 1 gross-up rate
         type2GrossUpRate: 1.8868, // Type 2 gross-up rate
       };
       
-      console.log('✅ Xero FBT data extracted:', fasData);
+      console.log('✅ Xero FBT data extracted from real transactions:', fasData);
       return fasData;
       
     } catch (error: any) {
       console.error('❌ Error extracting Xero FBT data:', error);
-      console.error('❌ Error message:', error.message);
-      console.error('❌ Error stack:', error.stack);
       
-      // Provide more specific error messages based on the actual error
-      if (error.message.includes('Xero is not connected')) {
-        throw new Error('Xero is not connected. Please complete the OAuth flow in Xero Flow to connect your account.');
-      } else if (error.message.includes('No Xero organization selected')) {
-        throw new Error('Xero OAuth completed but no organization selected. Please complete the full connection process in Xero Flow.');
-      } else if (error.message.includes('Failed to load invoices from Xero')) {
-        throw new Error('Failed to load invoice data from Xero. Please check your Xero connection and try again.');
-      } else if (error.message.includes('No financial data found')) {
-        throw new Error('No financial data found in your Xero organization(s). Please ensure you have invoices, contacts, or bank transactions in your Xero account.');
+      // Don't use fallback data - throw error with clear message
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message;
+      
+      // Check for specific error codes
+      if (errorMessage.includes('XERO_TOKEN_EXPIRED') || 
+          errorMessage.includes('Token expired') ||
+          errorMessage.includes('token has expired')) {
+        throw new Error('Xero tokens have expired. Please reconnect to Xero Flow to get fresh tokens, then try FAS processing again.');
+      } else if (errorMessage.includes('Not connected to Xero') || 
+                 errorMessage.includes('NOT_CONNECTED')) {
+        throw new Error('Xero is not connected. Please go to Xero Flow and connect your account, then try FAS processing again.');
+      } else if (errorMessage.includes('No Xero data available')) {
+        throw new Error('Failed to load Xero data. Please ensure Xero is properly connected with valid tokens.');
       } else {
-        throw new Error(`Failed to extract Xero FBT data: ${error.message}`);
+        // Re-throw the original error message (it's already descriptive)
+        throw error;
       }
     }
   };

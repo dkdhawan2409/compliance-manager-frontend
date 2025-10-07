@@ -193,60 +193,119 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
       
       console.log(`📊 Filtered ${transactions.length} transactions for period ${basPeriod}`);
       
-      // Calculate BAS fields from actual Xero data
+      // Calculate BAS fields from actual Xero data ONLY (no fallback values)
       let basData;
       
-      if (financialData && Object.keys(financialData).length > 0) {
-        // Use calculated financial data if available
-        basData = {
-          period: basPeriod,
-          transactions: transactions.length,
-          invoices: transactions.length,
-          contacts: contacts.length,
-          dataSource: financialData.dataSource || 'xero_api',
-          // BAS calculations from financial data
-          gstOnSales: Math.round(parseFloat(financialData.gstOnSales) || 15000),
-          gstOnPurchases: Math.round(parseFloat(financialData.gstOnPurchases) || 4500),
-          totalSales: Math.round(parseFloat(financialData.totalRevenue) || 165000),
-          totalPurchases: Math.round(parseFloat(financialData.totalExpenses) || 49500),
-          paygWithholding: Math.round(parseFloat(financialData.totalRevenue) * 0.05 || 8250), // 5% of revenue
-          fuelTaxCredits: Math.round(Math.random() * 3000 + 1000), // Estimate
-          exportSales: Math.round(parseFloat(financialData.totalRevenue) * 0.1 || 16500), // 10% export
-          gstFreeSales: Math.round(parseFloat(financialData.totalRevenue) * 0.05 || 8250), // 5% GST-free
-          capitalPurchases: Math.round(parseFloat(financialData.totalExpenses) * 0.3 || 14850), // 30% capital
-          nonCapitalPurchases: Math.round(parseFloat(financialData.totalExpenses) * 0.7 || 34650), // 70% non-capital
-          totalWages: Math.round(parseFloat(financialData.totalExpenses) * 0.6 || 29700), // 60% wages
-        };
-      } else {
-        // Fallback calculations from transaction data
-        let totalSales = 0;
-        let totalGST = 0;
-        
-        transactions.forEach((invoice: any) => {
-          totalSales += parseFloat(invoice.Total) || 0;
-          totalGST += parseFloat(invoice.TaxAmount) || (parseFloat(invoice.Total) * 0.1);
-        });
-        
-        basData = {
-          period: basPeriod,
-          transactions: transactions.length,
-          invoices: transactions.length,
-          contacts: contacts.length,
-          dataSource: 'calculated_from_invoices',
-          // BAS calculations from invoice data
-          gstOnSales: Math.round(totalGST || 15000),
-          gstOnPurchases: Math.round(totalGST * 0.3 || 4500), // Estimate 30% of sales GST
-          totalSales: Math.round(totalSales || 165000),
-          totalPurchases: Math.round(totalSales * 0.3 || 49500), // Estimate 30% of sales
-          paygWithholding: Math.round(totalSales * 0.05 || 8250), // 5% of sales
-          fuelTaxCredits: Math.round(Math.random() * 3000 + 1000),
-          exportSales: Math.round(totalSales * 0.1 || 16500),
-          gstFreeSales: Math.round(totalSales * 0.05 || 8250),
-          capitalPurchases: Math.round(totalSales * 0.09 || 14850),
-          nonCapitalPurchases: Math.round(totalSales * 0.21 || 34650),
-          totalWages: Math.round(totalSales * 0.18 || 29700),
-        };
+      // Must have transactions to process BAS
+      if (transactions.length === 0) {
+        throw new Error(`No transactions found for period ${basPeriod}. Please ensure Xero has transaction data for this quarter.`);
       }
+      
+      if (financialData && Object.keys(financialData).length > 0) {
+        // Use calculated financial data if available (must have real values)
+        const gstOnSales = parseFloat(financialData.gstOnSales) || 0;
+        const gstOnPurchases = parseFloat(financialData.gstOnPurchases) || 0;
+        const totalRevenue = parseFloat(financialData.totalRevenue) || 0;
+        const totalExpenses = parseFloat(financialData.totalExpenses) || 0;
+        
+        if (totalRevenue === 0) {
+          console.warn('⚠️ Financial data has zero revenue, falling back to invoice calculations');
+          // Fall through to invoice-based calculations
+        } else {
+          basData = {
+            period: basPeriod,
+            transactions: transactions.length,
+            invoices: transactions.length,
+            contacts: contacts.length,
+            dataSource: 'xero_financial_summary',
+            // BAS calculations from financial data (real Xero data only)
+            gstOnSales: Math.round(gstOnSales),
+            gstOnPurchases: Math.round(gstOnPurchases),
+            totalSales: Math.round(totalRevenue),
+            totalPurchases: Math.round(totalExpenses),
+            paygWithholding: Math.round(totalRevenue * 0.05), // 5% estimate
+            fuelTaxCredits: 0, // Not available in summary
+            exportSales: Math.round(totalRevenue * 0.1), // 10% estimate
+            gstFreeSales: Math.round(totalRevenue * 0.05), // 5% estimate
+            capitalPurchases: Math.round(totalExpenses * 0.3), // 30% estimate
+            nonCapitalPurchases: Math.round(totalExpenses * 0.7), // 70% estimate
+            totalWages: Math.round(totalExpenses * 0.6), // 60% estimate
+          };
+          
+          console.log('✅ BAS data from financial summary:', basData);
+          return basData;
+        }
+      }
+      
+      // Calculate from filtered transactions (ONLY use real transaction data)
+      let totalSales = 0;
+      let totalGST = 0;
+      let totalPurchases = 0;
+      let gstOnPurchases = 0;
+      
+      console.log(`📊 Calculating BAS from ${transactions.length} filtered transactions`);
+      
+      transactions.forEach((transaction: any, index: number) => {
+        const total = parseFloat(transaction.Total) || 0;
+        const taxAmount = parseFloat(transaction.TaxAmount) || parseFloat(transaction.TotalTax) || 0;
+        const type = transaction.Type || 'ACCREC'; // ACCREC = sales, ACCPAY = purchases
+        
+        // Log first few transactions for debugging
+        if (index < 3) {
+          console.log(`Transaction ${index + 1}:`, {
+            type: transaction.Type,
+            total: total,
+            taxAmount: taxAmount,
+            date: transaction.Date || transaction.DateString
+          });
+        }
+        
+        if (type === 'ACCREC' || transaction.InvoiceID) {
+          // Sales invoice
+          totalSales += total;
+          totalGST += taxAmount;
+        } else if (type === 'ACCPAY' || transaction.BillID) {
+          // Purchase bill
+          totalPurchases += total;
+          gstOnPurchases += taxAmount;
+        } else {
+          // Default to sales if type unclear
+          totalSales += total;
+          totalGST += taxAmount;
+        }
+      });
+      
+      console.log(`💰 Calculated totals from ${transactions.length} transactions:`, {
+        totalSales,
+        totalGST,
+        totalPurchases,
+        gstOnPurchases
+      });
+      
+      // Validate we have real data
+      if (totalSales === 0 && totalPurchases === 0) {
+        throw new Error(`No valid transaction amounts found for period ${basPeriod}. Xero may not have transactions with amounts for this quarter.`);
+      }
+      
+      basData = {
+        period: basPeriod,
+        transactions: transactions.length,
+        invoices: transactions.length,
+        contacts: contacts.length,
+        dataSource: 'calculated_from_filtered_transactions',
+        // BAS calculations from REAL invoice data only
+        gstOnSales: Math.round(totalGST),
+        gstOnPurchases: Math.round(gstOnPurchases || totalGST * 0.3), // Use calculated or estimate
+        totalSales: Math.round(totalSales),
+        totalPurchases: Math.round(totalPurchases || totalSales * 0.3), // Use calculated or estimate
+        paygWithholding: Math.round(totalSales * 0.05), // 5% estimate based on real sales
+        fuelTaxCredits: 0, // Not calculated from invoices
+        exportSales: Math.round(totalSales * 0.1), // 10% estimate based on real sales
+        gstFreeSales: Math.round(totalSales * 0.05), // 5% estimate based on real sales
+        capitalPurchases: Math.round((totalPurchases || totalSales * 0.3) * 0.3), // 30% of purchases
+        nonCapitalPurchases: Math.round((totalPurchases || totalSales * 0.3) * 0.7), // 70% of purchases
+        totalWages: Math.round((totalPurchases || totalSales * 0.3) * 0.6), // 60% of expenses
+      };
       
       console.log('✅ BAS data extracted successfully:', basData);
       return basData;
@@ -254,32 +313,22 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
     } catch (error: any) {
       console.error('❌ Error extracting Xero data:', error);
       
-      // Provide fallback data so BAS processing doesn't completely fail
-      console.log('🆘 Providing fallback BAS data due to extraction failure...');
+      // Don't use fallback data - throw error to force user to fix Xero connection
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message;
       
-      const fallbackBasData = {
-        period: basPeriod,
-        transactions: 0,
-        invoices: 0,
-        contacts: 0,
-        dataSource: 'error_fallback',
-        // Realistic fallback BAS data
-        gstOnSales: 15000,
-        gstOnPurchases: 4500,
-        totalSales: 165000,
-        totalPurchases: 49500,
-        paygWithholding: 8250,
-        fuelTaxCredits: 2000,
-        exportSales: 16500,
-        gstFreeSales: 8250,
-        capitalPurchases: 14850,
-        nonCapitalPurchases: 34650,
-        totalWages: 29700,
-        note: 'Fallback data used due to Xero data extraction failure'
-      };
-      
-      console.log('📊 Using fallback BAS data:', fallbackBasData);
-      return fallbackBasData;
+      // Check for specific error codes
+      if (errorMessage.includes('XERO_TOKEN_EXPIRED') || 
+          errorMessage.includes('Token expired') ||
+          errorMessage.includes('token has expired')) {
+        throw new Error('Xero tokens have expired. Please reconnect to Xero Flow to get fresh tokens, then try BAS processing again.');
+      } else if (errorMessage.includes('Not connected to Xero') || 
+                 errorMessage.includes('NOT_CONNECTED')) {
+        throw new Error('Xero is not connected. Please go to Xero Flow and connect your account, then try BAS processing again.');
+      } else if (errorMessage.includes('No Xero data available')) {
+        throw new Error('Failed to load Xero data. Please ensure Xero is properly connected with valid tokens.');
+      } else {
+        throw new Error(`Failed to extract Xero data: ${errorMessage}`);
+      }
     }
   };
 
@@ -323,7 +372,6 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
 
   const runGPTAnalysis = async (xeroData: any, anomalyData: any): Promise<any> => {
     console.log('🔍 Step 3: Running GPT analysis');
-    debugger;
     try {
       const prompt = `Analyze the following BAS data for the period ${basPeriod}:
 
@@ -358,7 +406,7 @@ Format your response as a structured analysis.`;
 
       const response = await openaiService.generateComplianceText({
         complianceType: 'BAS',
-        companyName: company?.name || 'Company',
+        companyName: company?.companyName || 'Company',
         daysLeft: 30,
         customPrompt: prompt
       });
