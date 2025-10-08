@@ -149,8 +149,15 @@ const EnhancedXeroFlow: React.FC = () => {
     const refreshOnMount = async () => {
       try {
         console.log('🔄 Refreshing Xero connection status...');
-        await loadSettings();
-        await refreshConnection();
+        console.log('🔐 Authentication status:', { isAuthenticated, hasToken: !!token });
+        
+        // Only load Xero data if authenticated
+        if (isAuthenticated) {
+          await loadSettings();
+          await refreshConnection();
+        } else {
+          console.log('⚠️ Not authenticated - skipping Xero data load');
+        }
         
         // Check if we just returned from OAuth (URL might have success parameter)
         const urlParams = new URLSearchParams(window.location.search);
@@ -1088,6 +1095,52 @@ const EnhancedXeroFlow: React.FC = () => {
         </Card>
         </Slide>
 
+        {/* Authentication Check */}
+        {!isAuthenticated && (
+          <Zoom in timeout={800}>
+            <Card 
+              elevation={2} 
+              sx={{ 
+                mb: 3, 
+                borderRadius: 2,
+                border: '2px solid #f44336',
+                background: 'linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%)'
+              }}
+            >
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                  <Avatar sx={{ bgcolor: '#f44336', width: 40, height: 40 }}>
+                    <Security />
+                  </Avatar>
+                  <Box>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                      Authentication Required
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      You need to log in to access Xero integration
+                    </Typography>
+                  </Box>
+                </Box>
+                
+                <Button
+                  variant="contained"
+                  color="error"
+                  onClick={() => {
+                    window.location.href = '/login';
+                  }}
+                  startIcon={<Security />}
+                >
+                  Go to Login Page
+                </Button>
+                
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
+                  The Xero data cannot load without proper authentication
+                </Typography>
+              </CardContent>
+            </Card>
+          </Zoom>
+        )}
+
         {/* Debug Login Button - Remove in production */}
         {!tenants || tenants.length === 0 ? (
           <Zoom in timeout={800}>
@@ -1188,9 +1241,15 @@ const EnhancedXeroFlow: React.FC = () => {
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                     • Current URL: {getEnvironmentInfo().currentOrigin}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                    • Backend URL: http://localhost:3333
-                  </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                  • Backend URL: http://localhost:3333
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                  • Authenticated: {String(isAuthenticated)}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                  • Auth Token: {token ? 'Present' : 'Missing'}
+                </Typography>
                 </Box>
               </CardContent>
             </Card>
