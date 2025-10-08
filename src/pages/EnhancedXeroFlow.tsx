@@ -78,6 +78,7 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
+// Version: 2025-10-08-fix-token-reference
 const EnhancedXeroFlow: React.FC = () => {
   const { state, startAuth, handleCallback, disconnect, loadSettings, refreshConnection, selectTenant, clearError, loadData } = useXero();
   const { isAuthenticated, token } = useAuth();
@@ -149,7 +150,10 @@ const EnhancedXeroFlow: React.FC = () => {
     const refreshOnMount = async () => {
       try {
         console.log('🔄 Refreshing Xero connection status...');
-        console.log('🔐 Authentication status:', { isAuthenticated, hasToken: !!token });
+        console.log('🔐 Authentication status:', { 
+          isAuthenticated, 
+          hasToken: typeof token !== 'undefined' ? !!token : 'token undefined' 
+        });
         
         // Only load Xero data if authenticated
         if (isAuthenticated) {
@@ -1248,7 +1252,7 @@ const EnhancedXeroFlow: React.FC = () => {
                   • Authenticated: {String(isAuthenticated)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                  • Auth Token: {token ? 'Present' : 'Missing'}
+                  • Auth Token: {typeof token !== 'undefined' ? (token ? 'Present' : 'Missing') : 'Undefined'}
                 </Typography>
                 </Box>
               </CardContent>
