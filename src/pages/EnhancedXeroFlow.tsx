@@ -1115,24 +1115,43 @@ const EnhancedXeroFlow: React.FC = () => {
                   </Box>
                 </Box>
                 
-                <Button
-                  variant="contained"
-                  color="warning"
-                  onClick={async () => {
-                    try {
-                      showLimitedToast('Testing login with demo credentials...', 'info');
-                      // This would normally be handled by the auth system
-                      await loadSettings();
-                      showLimitedToast('Login test completed - check if organizations loaded', 'success');
-                    } catch (error) {
-                      console.error('Login test failed:', error);
-                      showLimitedToast('Login test failed - check console for errors', 'error');
-                    }
-                  }}
-                  startIcon={<Business />}
-                >
-                  Test Login (Demo Credentials)
-                </Button>
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  <Button
+                    variant="contained"
+                    color="warning"
+                    onClick={async () => {
+                      try {
+                        showLimitedToast('Testing login with demo credentials...', 'info');
+                        // This would normally be handled by the auth system
+                        await loadSettings();
+                        showLimitedToast('Login test completed - check if organizations loaded', 'success');
+                      } catch (error) {
+                        console.error('Login test failed:', error);
+                        showLimitedToast('Login test failed - check console for errors', 'error');
+                      }
+                    }}
+                    startIcon={<Business />}
+                  >
+                    Test Login (Demo Credentials)
+                  </Button>
+                  
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    onClick={() => {
+                      console.log('🔍 Current Xero State:', {
+                        isConnected,
+                        hasSettings,
+                        tenants,
+                        selectedTenant,
+                        tenantsLength: tenants?.length
+                      });
+                      showLimitedToast('Check browser console for state details', 'info');
+                    }}
+                  >
+                    Debug State
+                  </Button>
+                </Box>
                 
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
                   This will attempt to load Xero data with demo credentials
@@ -1150,6 +1169,9 @@ const EnhancedXeroFlow: React.FC = () => {
                   </Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                   • tenants: {tenants ? `${tenants.length} items` : 'null'}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                  • tenant data: {tenants ? JSON.stringify(tenants) : 'none'}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                   • Company ID: {localStorage.getItem('companyId') || 'unknown'}
