@@ -1085,7 +1085,7 @@ const EnhancedXeroFlow: React.FC = () => {
         </Slide>
 
         {/* Enhanced Tenant Selection */}
-        {isConnected && (
+        {(isConnected || (tenants && tenants.length > 0)) && (
           <Zoom in timeout={800}>
             <Card 
               elevation={2} 
@@ -1144,8 +1144,10 @@ const EnhancedXeroFlow: React.FC = () => {
                       No Organizations Found
                     </Typography>
                     <Typography variant="body2" sx={{ mb: 2 }}>
-                      Your Xero connection doesn't have any organizations loaded yet. 
-                      This usually means the OAuth callback didn't complete fully.
+                      {!isConnected && hasSettings 
+                        ? 'Your Xero tokens have expired. Organizations are not available until you reconnect.'
+                        : 'Your Xero connection doesn\'t have any organizations loaded yet. This usually means the OAuth callback didn\'t complete fully.'
+                      }
                     </Typography>
                     <Button
                       variant="contained"
@@ -1177,6 +1179,7 @@ const EnhancedXeroFlow: React.FC = () => {
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                       All data operations will use this organization
+                      {!isConnected && ' (Note: Tokens expired - may need to reconnect for data access)'}
                     </Typography>
                   </Alert>
                 )}
