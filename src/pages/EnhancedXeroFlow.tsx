@@ -80,7 +80,7 @@ function TabPanel(props: TabPanelProps) {
 
 const EnhancedXeroFlow: React.FC = () => {
   const { state, startAuth, handleCallback, disconnect, loadSettings, refreshConnection, selectTenant, clearError, loadData } = useXero();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, token } = useAuth();
   
   const [isConnecting, setIsConnecting] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
