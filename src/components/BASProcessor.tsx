@@ -615,6 +615,10 @@ W2: $${finalBASData.BAS_Fields.W2.toLocaleString()}`;
                   onChange={(e) => {
                     setSelectedOrganization(e.target.value);
                     xeroActions.selectTenant(e.target.value);
+                    // Clear cached data to force reload with new organization
+                    setFinalBASData(null);
+                    setShowResults(false);
+                    console.log('🔄 Organization changed, clearing cached BAS data');
                   }}
                   className="flex-1 border border-gray-300 rounded-lg px-3 py-2"
                   disabled={isProcessing}

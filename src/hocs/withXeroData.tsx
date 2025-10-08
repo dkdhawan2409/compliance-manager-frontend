@@ -77,8 +77,8 @@ export function withXeroData<T extends WithXeroDataProps>(
         let allBankTransactions = [];
         let organizationData = {};
 
-        // Load data from each organization
-        for (const tenant of tenants) {
+        // Load data from selected organization only (or all if none selected)
+        for (const tenant of (selectedTenant ? [selectedTenant] : tenants)) {
           console.log(`🔄 Processing organization: ${tenant.name} (${tenant.id})`);
           
           try {
