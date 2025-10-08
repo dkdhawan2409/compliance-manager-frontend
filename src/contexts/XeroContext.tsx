@@ -240,7 +240,7 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
         console.log('⚠️ No tenants found in status data, trying tenants endpoint...');
         // Try the dedicated tenants endpoint as fallback
         try {
-          const { apiClient } = await import('../api/client');
+          const apiClient = (await import('../api/client')).default;
           console.log('🔍 DEBUG: Making request to /api/xero/tenants');
           const tenantsResponse = await apiClient.get('/api/xero/tenants');
           console.log('🔍 DEBUG: Tenants response:', JSON.stringify(tenantsResponse.data, null, 2));
