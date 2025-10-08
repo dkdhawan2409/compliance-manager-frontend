@@ -219,6 +219,10 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
       dispatch({ type: 'SET_SETTINGS', payload: settingsData });
 
       // Set tenants in the main state
+      console.log('🔍 DEBUG: statusData received:', JSON.stringify(statusData, null, 2));
+      console.log('🔍 DEBUG: statusData.tenants:', statusData.tenants);
+      console.log('🔍 DEBUG: statusData.tenants length:', statusData.tenants?.length);
+      
       if (statusData.tenants && statusData.tenants.length > 0) {
         console.log('🏢 Loading tenants from status:', statusData.tenants);
         console.log('🏢 Tenant structure:', statusData.tenants.map(t => ({
@@ -228,12 +232,15 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
           tenantId: t.tenantId
         })));
         dispatch({ type: 'SET_TENANTS', payload: statusData.tenants });
+        console.log('✅ Tenants dispatched to state');
       } else {
         console.log('⚠️ No tenants found in status data, trying tenants endpoint...');
         // Try the dedicated tenants endpoint as fallback
         try {
           const { apiClient } = await import('../api/client');
+          console.log('🔍 DEBUG: Making request to /api/xero/tenants');
           const tenantsResponse = await apiClient.get('/api/xero/tenants');
+          console.log('🔍 DEBUG: Tenants response:', JSON.stringify(tenantsResponse.data, null, 2));
           if (tenantsResponse.data.success && tenantsResponse.data.data) {
             const tenants = tenantsResponse.data.data.map((tenant: any) => ({
               id: tenant.tenantId,
@@ -244,6 +251,7 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
             }));
             console.log('🏢 Loading tenants from tenants endpoint:', tenants);
             dispatch({ type: 'SET_TENANTS', payload: tenants });
+            console.log('✅ Tenants dispatched to state from fallback');
           }
         } catch (tenantsError) {
           console.error('❌ Failed to load tenants from tenants endpoint:', tenantsError);
