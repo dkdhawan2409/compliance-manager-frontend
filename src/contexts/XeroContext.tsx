@@ -220,7 +220,7 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
 
       // Set tenants in the main state
       if (statusData.tenants && statusData.tenants.length > 0) {
-        console.log('🏢 Loading tenants:', statusData.tenants);
+        console.log('🏢 Loading tenants from status:', statusData.tenants);
         console.log('🏢 Tenant structure:', statusData.tenants.map(t => ({
           id: t.id,
           name: t.name,
@@ -229,7 +229,25 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
         })));
         dispatch({ type: 'SET_TENANTS', payload: statusData.tenants });
       } else {
-        console.log('⚠️ No tenants found in status data:', statusData);
+        console.log('⚠️ No tenants found in status data, trying tenants endpoint...');
+        // Try the dedicated tenants endpoint as fallback
+        try {
+          const { apiClient } = await import('../api/client');
+          const tenantsResponse = await apiClient.get('/api/xero/tenants');
+          if (tenantsResponse.data.success && tenantsResponse.data.data) {
+            const tenants = tenantsResponse.data.data.map((tenant: any) => ({
+              id: tenant.tenantId,
+              name: tenant.tenantName || tenant.organisationName || 'Unnamed Organization',
+              organizationName: tenant.organisationName,
+              tenantName: tenant.tenantName,
+              tenantId: tenant.tenantId
+            }));
+            console.log('🏢 Loading tenants from tenants endpoint:', tenants);
+            dispatch({ type: 'SET_TENANTS', payload: tenants });
+          }
+        } catch (tenantsError) {
+          console.error('❌ Failed to load tenants from tenants endpoint:', tenantsError);
+        }
       }
 
       // Set connection status

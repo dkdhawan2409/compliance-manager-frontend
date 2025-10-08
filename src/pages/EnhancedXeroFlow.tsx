@@ -1153,10 +1153,14 @@ const EnhancedXeroFlow: React.FC = () => {
                       size="small"
                       onClick={async () => {
                         try {
-                          await refreshConnection();
                           showLimitedToast('Refreshing connection and loading organizations...', 'success');
+                          await refreshConnection();
+                          // Force reload settings to get fresh tenant data
+                          await loadSettings();
+                          showLimitedToast('Connection refreshed successfully', 'success');
                         } catch (error) {
                           console.error('Failed to refresh:', error);
+                          showLimitedToast('Failed to refresh connection', 'error');
                         }
                       }}
                       startIcon={<Refresh />}
