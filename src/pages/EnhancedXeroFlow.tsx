@@ -1166,6 +1166,9 @@ const EnhancedXeroFlow: React.FC = () => {
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                     • Current URL: {getEnvironmentInfo().currentOrigin}
                   </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    • Backend URL: http://localhost:3333
+                  </Typography>
                 </Box>
               </CardContent>
             </Card>
@@ -1266,7 +1269,7 @@ const EnhancedXeroFlow: React.FC = () => {
                         color="primary"
                         size="small"
                         onClick={() => {
-                          window.location.href = '/api/xero/connect';
+                          window.location.href = 'http://localhost:3333/api/xero/connect';
                         }}
                         startIcon={<Business />}
                       >
