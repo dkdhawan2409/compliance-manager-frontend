@@ -1084,6 +1084,78 @@ const EnhancedXeroFlow: React.FC = () => {
         </Card>
         </Slide>
 
+        {/* Debug Login Button - Remove in production */}
+        {!tenants || tenants.length === 0 ? (
+          <Zoom in timeout={800}>
+            <Card 
+              elevation={2} 
+              sx={{ 
+                mb: 3, 
+                borderRadius: 2,
+                border: '2px solid #ff9800',
+                background: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)'
+              }}
+            >
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                  <Avatar sx={{ bgcolor: '#ff9800', width: 40, height: 40 }}>
+                    <Business />
+                  </Avatar>
+                  <Box>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                      Debug: Test Login
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      If no organizations are showing, try logging in first
+                    </Typography>
+                  </Box>
+                </Box>
+                
+                <Button
+                  variant="contained"
+                  color="warning"
+                  onClick={async () => {
+                    try {
+                      showLimitedToast('Testing login with demo credentials...', 'info');
+                      // This would normally be handled by the auth system
+                      await loadSettings();
+                      showLimitedToast('Login test completed - check if organizations loaded', 'success');
+                    } catch (error) {
+                      console.error('Login test failed:', error);
+                      showLimitedToast('Login test failed - check console for errors', 'error');
+                    }
+                  }}
+                  startIcon={<Business />}
+                >
+                  Test Login (Demo Credentials)
+                </Button>
+                
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
+                  This will attempt to load Xero data with demo credentials
+                </Typography>
+                
+                <Box sx={{ mt: 2, p: 2, bgcolor: 'rgba(0,0,0,0.05)', borderRadius: 1 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold' }}>
+                    Current State Debug:
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    • isConnected: {String(isConnected)}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    • hasSettings: {String(hasSettings)}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    • tenants: {tenants ? `${tenants.length} items` : 'null'}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    • selectedTenant: {selectedTenant ? selectedTenant.name : 'none'}
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Zoom>
+        ) : null}
+
         {/* Enhanced Tenant Selection */}
         {(isConnected || (tenants && tenants.length > 0)) && (
           <Zoom in timeout={800}>
