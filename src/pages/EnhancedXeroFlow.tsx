@@ -1148,9 +1148,12 @@ const EnhancedXeroFlow: React.FC = () => {
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                     • hasSettings: {String(hasSettings)}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                    • tenants: {tenants ? `${tenants.length} items` : 'null'}
-                  </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                  • tenants: {tenants ? `${tenants.length} items` : 'null'}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                  • Company ID: {localStorage.getItem('companyId') || 'unknown'}
+                </Typography>
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                     • selectedTenant: {selectedTenant ? selectedTenant.name : 'none'}
                   </Typography>
@@ -1231,29 +1234,45 @@ const EnhancedXeroFlow: React.FC = () => {
                     <Typography variant="body2" sx={{ mb: 2 }}>
                       {!isConnected && hasSettings 
                         ? 'Your Xero tokens have expired. Organizations are not available until you reconnect.'
+                        : tenants && tenants.length === 0
+                        ? 'No organizations found for your company. You may need to complete the Xero OAuth flow to connect your organization.'
                         : 'Your Xero connection doesn\'t have any organizations loaded yet. This usually means the OAuth callback didn\'t complete fully.'
                       }
                     </Typography>
-                    <Button
-                      variant="contained"
-                      color="warning"
-                      size="small"
-                      onClick={async () => {
-                        try {
-                          showLimitedToast('Refreshing connection and loading organizations...', 'success');
-                          await refreshConnection();
-                          // Force reload settings to get fresh tenant data
-                          await loadSettings();
-                          showLimitedToast('Connection refreshed successfully', 'success');
-                        } catch (error) {
-                          console.error('Failed to refresh:', error);
-                          showLimitedToast('Failed to refresh connection', 'error');
-                        }
-                      }}
-                      startIcon={<Refresh />}
-                    >
-                      Refresh Connection
-                    </Button>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                      <Button
+                        variant="contained"
+                        color="warning"
+                        size="small"
+                        onClick={async () => {
+                          try {
+                            showLimitedToast('Refreshing connection and loading organizations...', 'success');
+                            await refreshConnection();
+                            // Force reload settings to get fresh tenant data
+                            await loadSettings();
+                            showLimitedToast('Connection refreshed successfully', 'success');
+                          } catch (error) {
+                            console.error('Failed to refresh:', error);
+                            showLimitedToast('Failed to refresh connection', 'error');
+                          }
+                        }}
+                        startIcon={<Refresh />}
+                      >
+                        Refresh Connection
+                      </Button>
+                      
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        size="small"
+                        onClick={() => {
+                          window.location.href = '/api/xero/connect';
+                        }}
+                        startIcon={<Business />}
+                      >
+                        Connect to Xero
+                      </Button>
+                    </Box>
                   </Alert>
                 )}
                 
