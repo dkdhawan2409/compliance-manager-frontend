@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import SidebarLayout from '../components/SidebarLayout';
 import { useXero } from '../contexts/XeroContext';
 import { useAuth } from '../contexts/AuthContext';
+import { logLocalhostConfiguration, getEnvironmentInfo } from '../utils/localhostChecker';
 import { 
   Card, 
   CardContent, 
@@ -142,6 +143,9 @@ const EnhancedXeroFlow: React.FC = () => {
 
   // Refresh connection status when component mounts and handle OAuth callback
   useEffect(() => {
+    // Log localhost configuration on mount
+    logLocalhostConfiguration();
+    
     const refreshOnMount = async () => {
       try {
         console.log('🔄 Refreshing Xero connection status...');
@@ -1151,13 +1155,13 @@ const EnhancedXeroFlow: React.FC = () => {
                     • selectedTenant: {selectedTenant ? selectedTenant.name : 'none'}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                    • API URL: {import.meta.env.VITE_API_URL || 'http://localhost:3333/api'}
+                    • API URL: {getEnvironmentInfo().apiUrl}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                    • Environment: {import.meta.env.MODE}
+                    • Environment: {getEnvironmentInfo().mode}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                    • Current URL: {window.location.origin}
+                    • Current URL: {getEnvironmentInfo().currentOrigin}
                   </Typography>
                 </Box>
               </CardContent>
