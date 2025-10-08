@@ -178,6 +178,9 @@ export const XeroProvider: React.FC<XeroProviderProps> = ({ children }) => {
       now: Date.now(),
       timeSinceLastCall: Date.now() - lastApiCall
     });
+    console.log('🔧 API URL being used:', import.meta.env.VITE_API_URL || 'http://localhost:3333/api');
+    console.log('🔧 Environment mode:', import.meta.env.MODE);
+    console.log('🔧 Current window location:', window.location.origin);
 
     // Prevent multiple simultaneous calls
     if (state.isLoading) {

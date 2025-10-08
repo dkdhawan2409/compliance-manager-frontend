@@ -1150,6 +1150,15 @@ const EnhancedXeroFlow: React.FC = () => {
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                     • selectedTenant: {selectedTenant ? selectedTenant.name : 'none'}
                   </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    • API URL: {import.meta.env.VITE_API_URL || 'http://localhost:3333/api'}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    • Environment: {import.meta.env.MODE}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    • Current URL: {window.location.origin}
+                  </Typography>
                 </Box>
               </CardContent>
             </Card>
