@@ -13,6 +13,12 @@ const getSmartApiUrl = (): string => {
     return 'https://compliance-manager-backend.onrender.com/api';
   }
 
+  // FORCE LOCALHOST FOR LOCAL DEVELOPMENT - regardless of build mode
+  if (typeof window !== 'undefined' && window.location.hostname.includes('localhost')) {
+    console.log('🔧 LOCALHOST detected - forcing local API URL');
+    return 'http://localhost:3333/api';
+  }
+
   // If in production build but not on production domain (e.g., local production build)
   if (import.meta.env.PROD) {
     return import.meta.env.VITE_API_URL || 'https://compliance-manager-backend.onrender.com/api';

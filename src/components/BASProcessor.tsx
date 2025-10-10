@@ -474,9 +474,29 @@ Format your response as a structured analysis.`;
       return;
     }
 
-    // Check if Xero is connected before processing
+    // Enhanced connection validation
     if (!xeroData.isConnected) {
-      toast.error('Xero is not connected. Please connect to Xero first to process BAS data.');
+      toast.error('❌ Xero is not connected. Please go to Xero Flow and connect first.', {
+        duration: 6000,
+        icon: '🔗'
+      });
+      return;
+    }
+
+    if (!selectedOrganization) {
+      toast.error('❌ Please select a Xero organization first', {
+        duration: 4000,
+        icon: '🏢'
+      });
+      return;
+    }
+
+    // Validate that we have tenants
+    if (!xeroData.tenants || xeroData.tenants.length === 0) {
+      toast.error('❌ No Xero organizations available. Please reconnect to Xero.', {
+        duration: 6000,
+        icon: '🔄'
+      });
       return;
     }
 

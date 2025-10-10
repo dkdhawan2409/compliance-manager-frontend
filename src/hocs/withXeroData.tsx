@@ -82,11 +82,17 @@ export function withXeroData<T extends WithXeroDataProps>(
           console.log(`🔄 Processing organization: ${tenant.name} (${tenant.id})`);
           
           try {
+            // Select this tenant before loading its data
+            selectTenant(tenant.id);
+            
+            // Small delay to ensure tenant selection is processed
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
             // Load invoices from this organization
             let invoices = [];
             try {
               console.log(`📋 Loading invoices from ${tenant.name}...`);
-              const invoiceData = await loadData({ resourceType: 'invoices', tenantId: tenant.id });
+              const invoiceData = await loadData('invoices');
               invoices = invoiceData?.data || invoiceData?.Invoices || [];
               console.log(`✅ Loaded ${invoices.length} invoices from ${tenant.name}`);
             } catch (error: any) {
@@ -98,7 +104,7 @@ export function withXeroData<T extends WithXeroDataProps>(
             let contacts = [];
             try {
               console.log(`👥 Loading contacts from ${tenant.name}...`);
-              const contactData = await loadData({ resourceType: 'contacts', tenantId: tenant.id });
+              const contactData = await loadData('contacts');
               contacts = contactData?.data || contactData?.Contacts || [];
               console.log(`✅ Loaded ${contacts.length} contacts from ${tenant.name}`);
             } catch (error: any) {
@@ -110,7 +116,7 @@ export function withXeroData<T extends WithXeroDataProps>(
             let bankTransactions = [];
             try {
               console.log(`🏦 Loading bank transactions from ${tenant.name}...`);
-              const bankData = await loadData({ resourceType: 'bank-transactions', tenantId: tenant.id });
+              const bankData = await loadData('bank-transactions');
               bankTransactions = bankData?.data || bankData?.BankTransactions || [];
               console.log(`✅ Loaded ${bankTransactions.length} bank transactions from ${tenant.name}`);
             } catch (error: any) {
@@ -122,7 +128,7 @@ export function withXeroData<T extends WithXeroDataProps>(
             let transactions = [];
             try {
               console.log(`💳 Loading transactions from ${tenant.name}...`);
-              const transactionData = await loadData({ resourceType: 'transactions', tenantId: tenant.id });
+              const transactionData = await loadData('transactions');
               transactions = transactionData?.data || transactionData?.Transactions || [];
               console.log(`✅ Loaded ${transactions.length} transactions from ${tenant.name}`);
             } catch (error: any) {
@@ -134,7 +140,7 @@ export function withXeroData<T extends WithXeroDataProps>(
             let payments = [];
             try {
               console.log(`💰 Loading payments from ${tenant.name}...`);
-              const paymentData = await loadData({ resourceType: 'payments', tenantId: tenant.id });
+              const paymentData = await loadData('payments');
               payments = paymentData?.data || paymentData?.Payments || [];
               console.log(`✅ Loaded ${payments.length} payments from ${tenant.name}`);
             } catch (error: any) {
