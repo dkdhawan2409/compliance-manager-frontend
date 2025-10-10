@@ -768,7 +768,8 @@ const EnhancedXeroFlow: React.FC = () => {
                         size="small"
                         onClick={() => {
                           if (typeof window !== 'undefined') {
-                            window.location.href = 'http://localhost:3333/api/xero/connect';
+                            const apiUrl = import.meta.env.VITE_API_URL || 'https://compliance-manager-backend.onrender.com/api';
+                            window.location.href = `${apiUrl}/xero/connect`;
                           }
                         }}
                         startIcon={<Business />}
