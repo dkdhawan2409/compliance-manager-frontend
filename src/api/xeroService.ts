@@ -495,6 +495,106 @@ export const getReports = async (reportID: string, tenantId?: string): Promise<X
 };
 
 // Available resource types
+// BAS (Business Activity Statement) Data API
+export const getBASData = async (options?: {
+  fromDate?: string;
+  toDate?: string;
+  useCache?: boolean;
+}): Promise<XeroDataResponse<any>> => {
+  const params = new URLSearchParams();
+  if (options?.fromDate) params.append('fromDate', options.fromDate);
+  if (options?.toDate) params.append('toDate', options.toDate);
+  if (options?.useCache !== undefined) params.append('useCache', options.useCache.toString());
+  
+  const url = `/xero/bas-data${params.toString() ? `?${params.toString()}` : ''}`;
+  const response = await apiClient.get(url);
+  return response.data;
+};
+
+export const getCurrentBASData = async (): Promise<XeroDataResponse<any>> => {
+  const response = await apiClient.get('/xero/bas-data/current');
+  return response.data;
+};
+
+export const getBASSummary = async (): Promise<XeroDataResponse<any>> => {
+  const response = await apiClient.get('/xero/bas-data/summary');
+  return response.data;
+};
+
+export const getBASCalculation = async (options?: {
+  fromDate?: string;
+  toDate?: string;
+}): Promise<XeroDataResponse<any>> => {
+  const params = new URLSearchParams();
+  if (options?.fromDate) params.append('fromDate', options.fromDate);
+  if (options?.toDate) params.append('toDate', options.toDate);
+  
+  const url = `/xero/bas-data/calculation${params.toString() ? `?${params.toString()}` : ''}`;
+  const response = await apiClient.get(url);
+  return response.data;
+};
+
+export const syncBASData = async (options?: {
+  fromDate?: string;
+  toDate?: string;
+}): Promise<XeroDataResponse<any>> => {
+  const response = await apiClient.post('/xero/sync/bas', options || {});
+  return response.data;
+};
+
+// FAS (Fringe Benefits Tax Activity Statement) Data API
+export const getFASData = async (options?: {
+  fromDate?: string;
+  toDate?: string;
+  useCache?: boolean;
+}): Promise<XeroDataResponse<any>> => {
+  const params = new URLSearchParams();
+  if (options?.fromDate) params.append('fromDate', options.fromDate);
+  if (options?.toDate) params.append('toDate', options.toDate);
+  if (options?.useCache !== undefined) params.append('useCache', options.useCache.toString());
+  
+  const url = `/xero/fas-data${params.toString() ? `?${params.toString()}` : ''}`;
+  const response = await apiClient.get(url);
+  return response.data;
+};
+
+export const getCurrentFASData = async (): Promise<XeroDataResponse<any>> => {
+  const response = await apiClient.get('/xero/fas-data/current');
+  return response.data;
+};
+
+export const getFASSummary = async (): Promise<XeroDataResponse<any>> => {
+  const response = await apiClient.get('/xero/fas-data/summary');
+  return response.data;
+};
+
+export const getFASCalculation = async (options?: {
+  fromDate?: string;
+  toDate?: string;
+}): Promise<XeroDataResponse<any>> => {
+  const params = new URLSearchParams();
+  if (options?.fromDate) params.append('fromDate', options.fromDate);
+  if (options?.toDate) params.append('toDate', options.toDate);
+  
+  const url = `/xero/fas-data/calculation${params.toString() ? `?${params.toString()}` : ''}`;
+  const response = await apiClient.get(url);
+  return response.data;
+};
+
+export const getFBTCategories = async (): Promise<XeroDataResponse<any>> => {
+  const response = await apiClient.get('/xero/fas-data/categories');
+  return response.data;
+};
+
+export const syncFASData = async (options?: {
+  fromDate?: string;
+  toDate?: string;
+}): Promise<XeroDataResponse<any>> => {
+  const response = await apiClient.post('/xero/sync/fas', options || {});
+  return response.data;
+};
+
+// Available resource types
 export const XERO_RESOURCE_TYPES = [
   'invoices',
   'contacts',
