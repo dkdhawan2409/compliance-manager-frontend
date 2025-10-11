@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Container,
@@ -27,6 +27,10 @@ import {
   TableHead,
   TableRow,
   Paper,
+  List,
+  ListItemButton,
+  ListItemText,
+  Divider,
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
@@ -278,6 +282,14 @@ const EnhancedXeroFlow: React.FC = () => {
   const [sectionState, setSectionState] = useState<Record<SectionId, SectionState>>(
     () => buildInitialSectionState(),
   );
+  const [activeSection, setActiveSection] = useState<SectionId | null>(null);
+  const sectionRefs = useRef<Record<SectionId, HTMLDivElement | null>>({
+    organization: null,
+    'financial-summary': null,
+    invoices: null,
+    contacts: null,
+    accounts: null,
+  });
 
   const tenantIdentifier = selectedTenant?.tenantId || selectedTenant?.id || null;
 
@@ -331,8 +343,28 @@ const EnhancedXeroFlow: React.FC = () => {
       loadAllSections();
     } else {
       setSectionState(buildInitialSectionState());
+      setActiveSection(null);
     }
   }, [status.connected, tenantIdentifier, loadAllSections]);
+
+  useEffect(() => {
+    if (!tenantIdentifier) {
+      setActiveSection(null);
+      return;
+    }
+
+    if (activeSection && sectionState[activeSection]?.status === 'success') {
+      return;
+    }
+
+    const firstReadySection = DATA_SECTIONS.find(
+      (section) => sectionState[section.id]?.status === 'success',
+    );
+
+    if (firstReadySection) {
+      setActiveSection(firstReadySection.id);
+    }
+  }, [sectionState, tenantIdentifier, activeSection]);
 
   const handleTenantChange = (event: any) => {
     const value = event.target.value;
@@ -366,6 +398,50 @@ const EnhancedXeroFlow: React.FC = () => {
   const handleRefreshSection = async (section: SectionConfig) => {
     await fetchSectionData(section);
   };
+
+  const handleScrollToSection = (sectionId: SectionId) => {
+    const target = sectionRefs.current[sectionId];
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+      setActiveSection(sectionId);
+    }
+  };
+
+  const renderSideMenu = () => (
+    <Card sx={{ position: 'sticky', top: 24 }}>
+      <CardContent sx={{ p: 0 }}>
+        <List component="nav" dense>
+          <ListItemButton onClick={handleConnectionRefresh} disabled={connectionRefreshing}>
+            <ListItemText primary="Refresh All Data" />
+          </ListItemButton>
+          <Divider />
+          {DATA_SECTIONS.map((section) => {
+            const state = sectionState[section.id];
+            const disabled = !tenantIdentifier || state.status === 'idle';
+            return (
+              <ListItemButton
+                key={section.id}
+                onClick={() => handleScrollToSection(section.id)}
+                disabled={disabled}
+                selected={activeSection === section.id}
+              >
+                <ListItemText
+                  primary={section.title}
+                  secondary={
+                    state.status === 'loading'
+                      ? 'Loading...'
+                      : state.status === 'error'
+                      ? 'Unavailable'
+                      : undefined
+                  }
+                />
+              </ListItemButton>
+            );
+          })}
+        </List>
+      </CardContent>
+    </Card>
+  );
 
   const renderConnectionStatus = () => (
     <Card sx={{ mb: 3 }}>
@@ -695,47 +771,60 @@ const EnhancedXeroFlow: React.FC = () => {
 
         {renderConnectionStatus()}
 
-      {!tenantIdentifier && (
-        <Alert severity="info" sx={{ mb: 3 }}>
-          Select an organization to load Xero data.
-        </Alert>
-      )}
+        {!tenantIdentifier && (
+          <Alert severity="info" sx={{ mb: 3 }}>
+            Select an organization to load Xero data.
+          </Alert>
+        )}
 
-      {tenantIdentifier &&
-        DATA_SECTIONS.map((section) => (
-          <Card key={section.id} sx={{ mb: 3 }}>
-            <CardContent>
-              <Box
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  mb: section.description ? 1 : 0,
-                }}
-              >
-                <Typography variant="h6">{section.title}</Typography>
-                <Tooltip title={`Refresh ${section.title}`}>
-                  <span>
-                    <IconButton
-                      onClick={() => handleRefreshSection(section)}
-                      disabled={sectionState[section.id]?.status === 'loading'}
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={3} lg={2} sx={{ display: { xs: 'none', md: 'block' } }}>
+            {renderSideMenu()}
+          </Grid>
+          <Grid item xs={12} md={9} lg={10}>
+            {tenantIdentifier &&
+              DATA_SECTIONS.map((section) => (
+                <Card
+                  key={section.id}
+                  sx={{ mb: 3 }}
+                  ref={(el) => {
+                    sectionRefs.current[section.id] = el;
+                  }}
+                >
+                  <CardContent>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        mb: section.description ? 1 : 0,
+                      }}
                     >
-                      <RefreshIcon fontSize="small" />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-              </Box>
+                      <Typography variant="h6">{section.title}</Typography>
+                      <Tooltip title={`Refresh ${section.title}`}>
+                        <span>
+                          <IconButton
+                            onClick={() => handleRefreshSection(section)}
+                            disabled={sectionState[section.id]?.status === 'loading'}
+                          >
+                            <RefreshIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    </Box>
 
-              {section.description && (
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  {section.description}
-                </Typography>
-              )}
+                    {section.description && (
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        {section.description}
+                      </Typography>
+                    )}
 
-              {renderSectionContent(section)}
-            </CardContent>
-          </Card>
-        ))}
+                    {renderSectionContent(section)}
+                  </CardContent>
+                </Card>
+              ))}
+          </Grid>
+        </Grid>
 
       <Dialog open={settingsOpen} onClose={() => setSettingsOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Xero Settings</DialogTitle>
