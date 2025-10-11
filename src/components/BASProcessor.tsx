@@ -100,6 +100,7 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
   // Load BAS data when tenant or dates change
   const loadBASData = useCallback(async () => {
     if (!selectedTenant || !fromDate || !toDate) {
+      setCalculationError('Please select an organization and date range first.');
       return;
     }
 
@@ -117,8 +118,24 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
       console.log('✅ BAS data loaded successfully');
     } catch (error: any) {
       console.error('❌ Error loading BAS data:', error);
-      setCalculationError(error.message || 'Failed to load BAS data');
-      onBASError?.(error.message || 'Failed to load BAS data');
+      
+      // Provide more helpful error messages
+      let errorMessage = error.message || 'Failed to load BAS data';
+      
+      if (error.response?.status === 404) {
+        errorMessage = 'BAS data endpoint not found. Please ensure you are connected to Xero and try again.';
+      } else if (error.response?.status === 401) {
+        errorMessage = 'Authentication failed. Please reconnect to Xero.';
+      } else if (error.response?.status === 403) {
+        errorMessage = 'Access denied. Please check your Xero permissions.';
+      } else if (error.message?.includes('Not connected')) {
+        errorMessage = 'Not connected to Xero. Please connect first.';
+      } else if (error.message?.includes('No organization selected')) {
+        errorMessage = 'Please select a Xero organization first.';
+      }
+      
+      setCalculationError(errorMessage);
+      onBASError?.(errorMessage);
     }
   }, [selectedTenant, fromDate, toDate, useCache, loadXeroData, onBASError]);
 
@@ -386,6 +403,33 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
           </Button>
         </Box>
 
+        {/* Instructions Panel */}
+        {!isConnected && (
+          <Alert severity="info" sx={{ mb: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              📋 Getting Started with BAS Processing
+            </Typography>
+            <Typography variant="body2" sx={{ mb: 2 }}>
+              To process BAS data, you need to:
+            </Typography>
+            <Box component="ol" sx={{ pl: 2, mb: 2 }}>
+              <Typography component="li" variant="body2">Connect to your Xero account</Typography>
+              <Typography component="li" variant="body2">Select the organization to process</Typography>
+              <Typography component="li" variant="body2">Choose the date range for BAS calculation</Typography>
+              <Typography component="li" variant="body2">Load and review the BAS data</Typography>
+            </Box>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={connectToXero}
+              disabled={isLoading}
+              sx={{ mt: 1 }}
+            >
+              {isLoading ? <CircularProgress size={20} /> : 'Connect to Xero'}
+            </Button>
+          </Alert>
+        )}
+
         {/* Error Display */}
         {(connectionError || dataError || calculationError) && (
           <Alert severity="error" sx={{ mb: 3 }}>
@@ -405,6 +449,19 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
               >
                 Reconnect to Xero
               </Button>
+            )}
+            {calculationError && calculationError.includes('endpoint not found') && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="body2" sx={{ mb: 1 }}>
+                  Troubleshooting steps:
+                </Typography>
+                <Box component="ol" sx={{ pl: 2 }}>
+                  <Typography component="li" variant="body2">Ensure you are connected to Xero</Typography>
+                  <Typography component="li" variant="body2">Select a valid organization</Typography>
+                  <Typography component="li" variant="body2">Check that your Xero account has BAS reporting enabled</Typography>
+                  <Typography component="li" variant="body2">Try refreshing the connection</Typography>
+                </Box>
+              </Box>
             )}
           </Alert>
         )}
