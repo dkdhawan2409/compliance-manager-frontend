@@ -37,6 +37,7 @@ import FASProcessing from './pages/FASProcessing';
 import XeroOAuth2Page from './pages/XeroOAuth2Page';
 import XeroDataDisplay from './pages/XeroDataDisplay';
 import XeroFlow from './pages/XeroFlow';
+import EnhancedXeroFlow from './pages/EnhancedXeroFlow';
 import SuperAdminXeroManagement from './pages/SuperAdminXeroManagement';
 import MissingAttachments from './pages/MissingAttachments';
 import UploadReceipt from './pages/UploadReceipt';
@@ -108,7 +109,7 @@ function App() {
                 path="/xero"
                 element={
                   <ProtectedRoute>
-                    <XeroFlow />
+                    <EnhancedXeroFlow />
                   </ProtectedRoute>
                 }
               />

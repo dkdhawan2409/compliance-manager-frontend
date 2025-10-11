@@ -1,845 +1,486 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Card,
+  CardContent,
+  Typography,
+  Button,
+  Box,
+  Alert,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  TextField,
+  Grid,
+  Chip,
+  Divider,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  IconButton,
+  Tooltip
+} from '@mui/material';
+import {
+  Refresh as RefreshIcon,
+  Download as DownloadIcon,
+  Warning as WarningIcon,
+  CheckCircle as CheckCircleIcon,
+  Error as ErrorIcon
+} from '@mui/icons-material';
+import { withXeroData, XeroDataProps } from '../hocs/withXeroData';
 import { useAuth } from '../contexts/AuthContext';
-import { withXeroData, WithXeroDataProps } from '../hocs/withXeroData';
-import { useAnomalyDetection } from '../hooks/useAnomalyDetection';
-import openaiService from '../api/openaiService';
-import toast from 'react-hot-toast';
 
-interface BASData {
-  BAS_Period: string;
-  BAS_Fields: {
-    G1: number; // Total sales
-    G2: number; // Export sales
-    G3: number; // Other GST-free sales
-    G10: number; // Capital purchases
-    G11: number; // Non-capital purchases
-    '1A': number; // GST on sales
-    '1B': number; // GST on purchases
-    W1: number; // Total salary/wages
-    W2: number; // Amounts withheld (PAYG)
+interface BASProcessorProps extends XeroDataProps {
+  // Additional props specific to BAS processing
+  onBASComplete?: (data: any) => void;
+  onBASError?: (error: string) => void;
+}
+
+interface BASCalculationResult {
+  totalSales: number;
+  totalPurchases: number;
+  gstOnSales: number;
+  gstOnPurchases: number;
+  netGST: number;
+  period: {
+    fromDate: string;
+    toDate: string;
   };
+  lastUpdated: string;
 }
 
-interface BASProcessorProps extends WithXeroDataProps {
-  onBASGenerated?: (basData: BASData) => void;
-}
-
-interface ProcessingStep {
-  id: string;
-  title: string;
-  description: string;
-  status: 'pending' | 'processing' | 'completed' | 'error';
-  data?: any;
-  error?: string;
-}
-
-const BASProcessor: React.FC<BASProcessorProps> = ({ 
-  xeroData, 
-  xeroActions, 
-  loadXeroDataForAnalysis,
-  onBASGenerated 
+const BASProcessor: React.FC<BASProcessorProps> = ({
+  // Xero data props
+  isConnected,
+  isTokenValid,
+  connectionError,
+  isLoading,
+  selectedTenant,
+  availableTenants,
+  onTenantSelect,
+  xeroData,
+  dataLoading,
+  dataError,
+  connectToXero,
+  disconnectFromXero,
+  refreshConnection,
+  loadXeroData,
+  clearCache,
+  // BAS specific props
+  onBASComplete,
+  onBASError
 }) => {
+  // State
+  const [basData, setBasData] = useState<any>(null);
+  const [calculationResult, setCalculationResult] = useState<BASCalculationResult | null>(null);
+  const [fromDate, setFromDate] = useState<string>('');
+  const [toDate, setToDate] = useState<string>('');
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [calculationError, setCalculationError] = useState<string | null>(null);
+  const [useCache, setUseCache] = useState(true);
+
   const { company } = useAuth();
-  const { models, isTraining, trainModelWithDefaults } = useAnomalyDetection();
-  
-  const [processingSteps, setProcessingSteps] = useState<ProcessingStep[]>([
-    {
-      id: 'step1',
-      title: 'Step 1: Xero Data Extraction',
-      description: 'Extract transaction data for BAS reporting period',
-      status: 'pending'
-    },
-    {
-      id: 'step2',
-      title: 'Step 2: Anomaly Detection',
-      description: 'Analyze data for anomalies and inconsistencies',
-      status: 'pending'
-    },
-    {
-      id: 'step3',
-      title: 'Step 3: GPT Analysis',
-      description: 'AI-powered analysis and validation',
-      status: 'pending'
-    },
-    {
-      id: 'step4',
-      title: 'Step 4: BAS Form Generation',
-      description: 'Generate final BAS form with ATO labels',
-      status: 'pending'
-    }
-  ]);
 
-  const [basPeriod, setBasPeriod] = useState<string>('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [finalBASData, setFinalBASData] = useState<BASData | null>(null);
-  const [showResults, setShowResults] = useState(false);
-  const [selectedOrganization, setSelectedOrganization] = useState<string>('');
-
-  // Initialize BAS period to current quarter
+  // Initialize date range (current quarter)
   useEffect(() => {
     const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth() + 1;
-    let quarter = '';
-    
-    if (month >= 1 && month <= 3) quarter = 'Q1';
-    else if (month >= 4 && month <= 6) quarter = 'Q2';
-    else if (month >= 7 && month <= 9) quarter = 'Q3';
-    else quarter = 'Q4';
-    
-    setBasPeriod(`${year}-${quarter}`);
+    const currentQuarter = Math.floor(now.getMonth() / 3);
+    const quarterStart = new Date(now.getFullYear(), currentQuarter * 3, 1);
+    const quarterEnd = new Date(now.getFullYear(), (currentQuarter + 1) * 3, 0);
+
+    setFromDate(quarterStart.toISOString().split('T')[0]);
+    setToDate(quarterEnd.toISOString().split('T')[0]);
   }, []);
-  
-  // Auto-select organization when available
-  useEffect(() => {
-    if (xeroData.selectedTenant && !selectedOrganization) {
-      setSelectedOrganization(xeroData.selectedTenant.id);
-      console.log('✅ Auto-selected organization:', xeroData.selectedTenant);
-    } else if (xeroData.tenants && xeroData.tenants.length > 0 && !selectedOrganization) {
-      // Auto-select first tenant if none selected
-      const firstTenant = xeroData.tenants[0];
-      setSelectedOrganization(firstTenant.id);
-      xeroActions.selectTenant(firstTenant.id);
-      console.log('✅ Auto-selected first organization:', firstTenant);
+
+  // Load BAS data when tenant or dates change
+  const loadBASData = useCallback(async () => {
+    if (!selectedTenant || !fromDate || !toDate) {
+      return;
     }
-  }, [xeroData.selectedTenant, xeroData.tenants, selectedOrganization, xeroActions]);
 
-  const updateStepStatus = (stepId: string, status: ProcessingStep['status'], data?: any, error?: string) => {
-    setProcessingSteps(prev => prev.map(step => 
-      step.id === stepId 
-        ? { ...step, status, data, error }
-        : step
-    ));
-  };
-
-  // Helper function to get date range for a quarter
-  const getQuarterDateRange = (period: string): { startDate: Date; endDate: Date } => {
-    const [year, quarter] = period.split('-');
-    const yearNum = parseInt(year);
-    
-    let startMonth: number, endMonth: number;
-    
-    // Australian financial year quarters (July-June)
-    switch (quarter) {
-      case 'Q1': // Jul-Sep
-        startMonth = 6; // July (0-indexed)
-        endMonth = 8; // September
-        break;
-      case 'Q2': // Oct-Dec
-        startMonth = 9; // October
-        endMonth = 11; // December
-        break;
-      case 'Q3': // Jan-Mar
-        startMonth = 0; // January
-        endMonth = 2; // March
-        break;
-      case 'Q4': // Apr-Jun
-        startMonth = 3; // April
-        endMonth = 5; // June
-        break;
-      default:
-        // Default to current quarter
-        startMonth = 0;
-        endMonth = 2;
-    }
-    
-    const startDate = new Date(yearNum, startMonth, 1);
-    const endDate = new Date(yearNum, endMonth + 1, 0); // Last day of end month
-    
-    return { startDate, endDate };
-  };
-  
-  // Helper function to filter transactions by quarter
-  const filterTransactionsByQuarter = (transactions: any[], period: string): any[] => {
-    const { startDate, endDate } = getQuarterDateRange(period);
-    
-    console.log(`📅 Filtering transactions for period ${period}:`, {
-      startDate: startDate.toISOString().split('T')[0],
-      endDate: endDate.toISOString().split('T')[0]
-    });
-    
-    const filtered = transactions.filter((transaction: any) => {
-      // Try different date field names that Xero uses
-      const transactionDateStr = transaction.Date || 
-                                 transaction.DateString || 
-                                 transaction.UpdatedDateUTC || 
-                                 transaction.date || 
-                                 transaction.InvoiceDate;
-      
-      if (!transactionDateStr) {
-        return false; // Skip transactions without dates
-      }
-      
-      const transactionDate = new Date(transactionDateStr);
-      return transactionDate >= startDate && transactionDate <= endDate;
-    });
-    
-    console.log(`✅ Filtered transactions: ${filtered.length} out of ${transactions.length} total`);
-    return filtered;
-  };
-
-  const extractXeroData = async (): Promise<any> => {
-    console.log('🔍 Step 1: Extracting Xero data for BAS period:', basPeriod);
-    
     try {
-      // Load Xero data with robust error handling
-      const xeroData = await loadXeroDataForAnalysis();
+      setCalculationError(null);
+      console.log(`📊 Loading BAS data for ${selectedTenant.name} from ${fromDate} to ${toDate}`);
       
-      if (!xeroData) {
-        throw new Error('No Xero data available - data loading failed');
-      }
-      
-      console.log('📊 Raw Xero data received:', {
-        hasTransactions: !!xeroData.transactions,
-        transactionCount: xeroData.transactions?.length || 0,
-        hasContacts: !!xeroData.contacts,
-        contactCount: xeroData.contacts?.length || 0,
-        hasBasData: !!xeroData.basData,
-        dataSource: xeroData.dataSource
+      const data = await loadXeroData('basData', {
+        fromDate,
+        toDate,
+        useCache
       });
+
+      setBasData(data);
+      console.log('✅ BAS data loaded successfully');
+    } catch (error: any) {
+      console.error('❌ Error loading BAS data:', error);
+      setCalculationError(error.message || 'Failed to load BAS data');
+      onBASError?.(error.message || 'Failed to load BAS data');
+    }
+  }, [selectedTenant, fromDate, toDate, useCache, loadXeroData, onBASError]);
+
+  // Calculate BAS
+  const calculateBAS = useCallback(async () => {
+    if (!basData) {
+      setCalculationError('No BAS data available. Please load data first.');
+      return;
+    }
+
+    try {
+      setIsCalculating(true);
+      setCalculationError(null);
       
-      // Extract relevant transaction data
-      const allTransactions = xeroData?.transactions || [];
-      const contacts = xeroData?.contacts || [];
-      const financialData = xeroData?.basData?.data || {};
+      console.log('🧮 Calculating BAS...');
+
+      // Extract relevant data from BAS response
+      const reports = basData.Reports || [];
+      const basReport = reports.find((report: any) => report.ReportType === 'BAS');
       
-      // Filter transactions by the selected quarter
-      const transactions = filterTransactionsByQuarter(allTransactions, basPeriod);
-      
-      console.log(`📊 Filtered ${transactions.length} transactions for period ${basPeriod}`);
-      
-      // Calculate BAS fields from actual Xero data ONLY (no fallback values)
-      let basData;
-      
-      // Must have transactions to process BAS
-      if (transactions.length === 0) {
-        throw new Error(`No transactions found for period ${basPeriod}. Please ensure Xero has transaction data for this quarter.`);
+      if (!basReport) {
+        throw new Error('BAS report not found in Xero data');
       }
-      
-      if (financialData && Object.keys(financialData).length > 0) {
-        // Use calculated financial data if available (must have real values)
-        const gstOnSales = parseFloat(financialData.gstOnSales) || 0;
-        const gstOnPurchases = parseFloat(financialData.gstOnPurchases) || 0;
-        const totalRevenue = parseFloat(financialData.totalRevenue) || 0;
-        const totalExpenses = parseFloat(financialData.totalExpenses) || 0;
-        
-        if (totalRevenue === 0) {
-          console.warn('⚠️ Financial data has zero revenue, falling back to invoice calculations');
-          // Fall through to invoice-based calculations
-        } else {
-          basData = {
-            period: basPeriod,
-            transactions: transactions.length,
-            invoices: transactions.length,
-            contacts: contacts.length,
-            dataSource: 'xero_financial_summary',
-            // BAS calculations from financial data (real Xero data only)
-            gstOnSales: Math.round(gstOnSales),
-            gstOnPurchases: Math.round(gstOnPurchases),
-            totalSales: Math.round(totalRevenue),
-            totalPurchases: Math.round(totalExpenses),
-            paygWithholding: Math.round(totalRevenue * 0.05), // 5% estimate
-            fuelTaxCredits: 0, // Not available in summary
-            exportSales: Math.round(totalRevenue * 0.1), // 10% estimate
-            gstFreeSales: Math.round(totalRevenue * 0.05), // 5% estimate
-            capitalPurchases: Math.round(totalExpenses * 0.3), // 30% estimate
-            nonCapitalPurchases: Math.round(totalExpenses * 0.7), // 70% estimate
-            totalWages: Math.round(totalExpenses * 0.6), // 60% estimate
-          };
-          
-          console.log('✅ BAS data from financial summary:', basData);
-          return basData;
-        }
-      }
-      
-      // Calculate from filtered transactions (ONLY use real transaction data)
+
+      // Extract values from BAS report rows
+      const rows = basReport.Rows || [];
       let totalSales = 0;
-      let totalGST = 0;
       let totalPurchases = 0;
+      let gstOnSales = 0;
       let gstOnPurchases = 0;
-      
-      console.log(`📊 Calculating BAS from ${transactions.length} filtered transactions`);
-      
-      transactions.forEach((transaction: any, index: number) => {
-        const total = parseFloat(transaction.Total) || 0;
-        const taxAmount = parseFloat(transaction.TaxAmount) || parseFloat(transaction.TotalTax) || 0;
-        const type = transaction.Type || 'ACCREC'; // ACCREC = sales, ACCPAY = purchases
-        
-        // Log first few transactions for debugging
-        if (index < 3) {
-          console.log(`Transaction ${index + 1}:`, {
-            type: transaction.Type,
-            total: total,
-            taxAmount: taxAmount,
-            date: transaction.Date || transaction.DateString
-          });
-        }
-        
-        if (type === 'ACCREC' || transaction.InvoiceID) {
-          // Sales invoice
-          totalSales += total;
-          totalGST += taxAmount;
-        } else if (type === 'ACCPAY' || transaction.BillID) {
-          // Purchase bill
-          totalPurchases += total;
-          gstOnPurchases += taxAmount;
-        } else {
-          // Default to sales if type unclear
-          totalSales += total;
-          totalGST += taxAmount;
+
+      // Process BAS report rows
+      rows.forEach((row: any) => {
+        if (row.Cells && row.Cells.length > 0) {
+          const cells = row.Cells;
+          const description = cells[0]?.Value || '';
+          const value = parseFloat(cells[cells.length - 1]?.Value || '0');
+
+          // Map BAS line items
+          if (description.includes('Sales') && description.includes('GST')) {
+            totalSales += Math.abs(value);
+          } else if (description.includes('Purchases') && description.includes('GST')) {
+            totalPurchases += Math.abs(value);
+          } else if (description.includes('GST') && description.includes('Sales')) {
+            gstOnSales += Math.abs(value);
+          } else if (description.includes('GST') && description.includes('Purchases')) {
+            gstOnPurchases += Math.abs(value);
+          }
         }
       });
-      
-      console.log(`💰 Calculated totals from ${transactions.length} transactions:`, {
+
+      const netGST = gstOnSales - gstOnPurchases;
+
+      const result: BASCalculationResult = {
         totalSales,
-        totalGST,
         totalPurchases,
-        gstOnPurchases
-      });
-      
-      // Validate we have real data
-      if (totalSales === 0 && totalPurchases === 0) {
-        throw new Error(`No valid transaction amounts found for period ${basPeriod}. Xero may not have transactions with amounts for this quarter.`);
-      }
-      
-      basData = {
-        period: basPeriod,
-        transactions: transactions.length,
-        invoices: transactions.length,
-        contacts: contacts.length,
-        dataSource: 'calculated_from_filtered_transactions',
-        // BAS calculations from REAL invoice data only
-        gstOnSales: Math.round(totalGST),
-        gstOnPurchases: Math.round(gstOnPurchases || totalGST * 0.3), // Use calculated or estimate
-        totalSales: Math.round(totalSales),
-        totalPurchases: Math.round(totalPurchases || totalSales * 0.3), // Use calculated or estimate
-        paygWithholding: Math.round(totalSales * 0.05), // 5% estimate based on real sales
-        fuelTaxCredits: 0, // Not calculated from invoices
-        exportSales: Math.round(totalSales * 0.1), // 10% estimate based on real sales
-        gstFreeSales: Math.round(totalSales * 0.05), // 5% estimate based on real sales
-        capitalPurchases: Math.round((totalPurchases || totalSales * 0.3) * 0.3), // 30% of purchases
-        nonCapitalPurchases: Math.round((totalPurchases || totalSales * 0.3) * 0.7), // 70% of purchases
-        totalWages: Math.round((totalPurchases || totalSales * 0.3) * 0.6), // 60% of expenses
+        gstOnSales,
+        gstOnPurchases,
+        netGST,
+        period: {
+          fromDate,
+          toDate
+        },
+        lastUpdated: new Date().toISOString()
       };
+
+      setCalculationResult(result);
+      onBASComplete?.(result);
       
-      console.log('✅ BAS data extracted successfully:', basData);
-      return basData;
-      
+      console.log('✅ BAS calculation completed successfully');
     } catch (error: any) {
-      console.error('❌ Error extracting Xero data:', error);
-      
-      // Don't use fallback data - throw error to force user to fix Xero connection
-      const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message;
-      
-      // Check for specific error codes
-      if (errorMessage.includes('XERO_TOKEN_EXPIRED') || 
-          errorMessage.includes('Token expired') ||
-          errorMessage.includes('token has expired')) {
-        throw new Error('Xero tokens have expired. Please reconnect to Xero Flow to get fresh tokens, then try BAS processing again.');
-      } else if (errorMessage.includes('Not connected to Xero') || 
-                 errorMessage.includes('NOT_CONNECTED')) {
-        throw new Error('Xero is not connected. Please go to Xero Flow and connect your account, then try BAS processing again.');
-      } else if (errorMessage.includes('No Xero data available')) {
-        throw new Error('Failed to load Xero data. Please ensure Xero is properly connected with valid tokens.');
-      } else {
-        throw new Error(`Failed to extract Xero data: ${errorMessage}`);
-      }
-    }
-  };
-
-  const runAnomalyDetection = async (xeroData: any): Promise<any> => {
-    console.log('🔍 Step 2: Running anomaly detection');
-    
-    try {
-      // Use the anomaly detection hook
-      const anomalyResult = {
-        score: Math.random() * 2, // Simulated anomaly score
-        isAnomaly: Math.random() > 0.8, // 20% chance of anomaly
-        confidence: Math.random() * 0.3 + 0.7, // 70-100% confidence
-        flaggedItems: [] as string[],
-        recommendations: [] as string[]
-      };
-      
-      // Check for potential anomalies
-      if (xeroData.gstOnSales > 100000) {
-        anomalyResult.flaggedItems.push('High GST on sales detected');
-        anomalyResult.recommendations.push('Review sales transactions for accuracy');
-      }
-      
-      if (xeroData.totalSales < 10000) {
-        anomalyResult.flaggedItems.push('Low total sales for period');
-        anomalyResult.recommendations.push('Verify all sales have been recorded');
-      }
-      
-      if (xeroData.gstOnPurchases > xeroData.gstOnSales * 0.8) {
-        anomalyResult.flaggedItems.push('GST on purchases is high relative to sales');
-        anomalyResult.recommendations.push('Review purchase transactions and GST credits');
-      }
-      
-      console.log('✅ Anomaly detection completed:', anomalyResult);
-      return anomalyResult;
-      
-    } catch (error) {
-      console.error('❌ Error in anomaly detection:', error);
-      throw new Error('Failed to run anomaly detection');
-    }
-  };
-
-  const runGPTAnalysis = async (xeroData: any, anomalyData: any): Promise<any> => {
-    console.log('🔍 Step 3: Running GPT analysis');
-    try {
-      const prompt = `Analyze the following BAS data for the period ${basPeriod}:
-
-Xero Data:
-- GST on Sales: $${xeroData.gstOnSales.toLocaleString()}
-- GST on Purchases: $${xeroData.gstOnPurchases.toLocaleString()}
-- Total Sales: $${xeroData.totalSales.toLocaleString()}
-- Total Purchases: $${xeroData.totalPurchases.toLocaleString()}
-- PAYG Withholding: $${xeroData.paygWithholding.toLocaleString()}
-- Fuel Tax Credits: $${xeroData.fuelTaxCredits.toLocaleString()}
-- Export Sales: $${xeroData.exportSales.toLocaleString()}
-- GST-Free Sales: $${xeroData.gstFreeSales.toLocaleString()}
-- Capital Purchases: $${xeroData.capitalPurchases.toLocaleString()}
-- Non-Capital Purchases: $${xeroData.nonCapitalPurchases.toLocaleString()}
-- Total Wages: $${xeroData.totalWages.toLocaleString()}
-
-Anomaly Detection Results:
-- Anomaly Score: ${anomalyData.score.toFixed(4)}
-- Is Anomaly: ${anomalyData.isAnomaly ? 'Yes' : 'No'}
-- Confidence: ${(anomalyData.confidence * 100).toFixed(1)}%
-- Flagged Items: ${anomalyData.flaggedItems.join(', ') || 'None'}
-- Recommendations: ${anomalyData.recommendations.join(', ') || 'None'}
-
-Please provide:
-1. Data validation and accuracy assessment
-2. Compliance risk assessment
-3. Recommendations for BAS lodgement
-4. Any potential issues or missing data
-5. Suggested BAS field mappings
-
-Format your response as a structured analysis.`;
-
-      const response = await openaiService.generateComplianceText({
-        complianceType: 'BAS',
-        companyName: company?.companyName || 'Company',
-        daysLeft: 30,
-        customPrompt: prompt
-      });
-      
-      console.log('✅ GPT analysis completed');
-      return {
-        analysis: response.response,
-        recommendations: response.response.split('\n').filter(line => line.trim().length > 0)
-      };
-      
-    } catch (error: any) {
-      console.error('❌ Error in GPT analysis:', error);
-      const errorMessage = error.response?.data?.message || error.message || 'Failed to run GPT analysis';
-      throw new Error(`GPT Analysis failed: ${errorMessage}`);
-    }
-  };
-
-  const generateBASForm = async (xeroData: any, anomalyData: any, gptAnalysis: any): Promise<BASData> => {
-    console.log('🔍 Step 4: Generating BAS form');
-    
-    try {
-      // Map Xero data to ATO BAS labels
-      const basData: BASData = {
-        BAS_Period: basPeriod,
-        BAS_Fields: {
-          G1: Math.round(xeroData.totalSales), // Total sales
-          G2: Math.round(xeroData.exportSales), // Export sales
-          G3: Math.round(xeroData.gstFreeSales), // Other GST-free sales
-          G10: Math.round(xeroData.capitalPurchases), // Capital purchases
-          G11: Math.round(xeroData.nonCapitalPurchases), // Non-capital purchases
-          '1A': Math.round(xeroData.gstOnSales), // GST on sales
-          '1B': Math.round(xeroData.gstOnPurchases), // GST on purchases
-          W1: Math.round(xeroData.totalWages), // Total salary/wages
-          W2: Math.round(xeroData.paygWithholding), // Amounts withheld (PAYG)
-        }
-      };
-      
-      console.log('✅ BAS form generated:', basData);
-      return basData;
-      
-    } catch (error) {
-      console.error('❌ Error generating BAS form:', error);
-      throw new Error('Failed to generate BAS form');
-    }
-  };
-
-  const processBAS = async () => {
-    if (!basPeriod) {
-      toast.error('Please select a BAS period');
-      return;
-    }
-
-    // Enhanced connection validation
-    if (!xeroData.isConnected) {
-      toast.error('❌ Xero is not connected. Please go to Xero Flow and connect first.', {
-        duration: 6000,
-        icon: '🔗'
-      });
-      return;
-    }
-
-    if (!selectedOrganization) {
-      toast.error('❌ Please select a Xero organization first', {
-        duration: 4000,
-        icon: '🏢'
-      });
-      return;
-    }
-
-    // Validate that we have tenants
-    if (!xeroData.tenants || xeroData.tenants.length === 0) {
-      toast.error('❌ No Xero organizations available. Please reconnect to Xero.', {
-        duration: 6000,
-        icon: '🔄'
-      });
-      return;
-    }
-
-    setIsProcessing(true);
-    setShowResults(false);
-    
-    try {
-      // Step 1: Xero Data Extraction
-      updateStepStatus('step1', 'processing');
-      const xeroData = await extractXeroData();
-      updateStepStatus('step1', 'completed', xeroData);
-      
-      // Step 2: Anomaly Detection
-      updateStepStatus('step2', 'processing');
-      const anomalyData = await runAnomalyDetection(xeroData);
-      updateStepStatus('step2', 'completed', anomalyData);
-      
-      // Step 3: GPT Analysis
-      updateStepStatus('step3', 'processing');
-      const gptAnalysis = await runGPTAnalysis(xeroData, anomalyData);
-      updateStepStatus('step3', 'completed', gptAnalysis);
-      
-      // Step 4: BAS Form Generation
-      updateStepStatus('step4', 'processing');
-      const basData = await generateBASForm(xeroData, anomalyData, gptAnalysis);
-      updateStepStatus('step4', 'completed', basData);
-      
-      setFinalBASData(basData);
-      setShowResults(true);
-      onBASGenerated?.(basData);
-      
-      toast.success('BAS processing completed successfully!');
-      
-    } catch (error: any) {
-      console.error('❌ BAS processing failed:', error);
-      
-      // Find the current processing step and mark it as error
-      const currentStep = processingSteps.find(step => step.status === 'processing');
-      if (currentStep) {
-        updateStepStatus(currentStep.id, 'error', null, error.message);
-      }
-      
-      toast.error(`BAS processing failed: ${error.message}`);
+      console.error('❌ Error calculating BAS:', error);
+      const errorMessage = error.message || 'Failed to calculate BAS';
+      setCalculationError(errorMessage);
+      onBASError?.(errorMessage);
     } finally {
-      setIsProcessing(false);
+      setIsCalculating(false);
+    }
+  }, [basData, fromDate, toDate, onBASComplete, onBASError]);
+
+  // Auto-load data when dependencies change
+  useEffect(() => {
+    if (selectedTenant && fromDate && toDate && isConnected && isTokenValid) {
+      loadBASData();
+    }
+  }, [selectedTenant, fromDate, toDate, isConnected, isTokenValid, loadBASData]);
+
+  // Auto-calculate when data changes
+  useEffect(() => {
+    if (basData && !calculationResult) {
+      calculateBAS();
+    }
+  }, [basData, calculationResult, calculateBAS]);
+
+  // Handle tenant selection
+  const handleTenantChange = (event: any) => {
+    const tenantId = event.target.value;
+    const tenant = availableTenants.find(t => t.tenantId === tenantId || t.id === tenantId);
+    onTenantSelect(tenant || null);
+  };
+
+  // Handle refresh
+  const handleRefresh = async () => {
+    try {
+      await refreshConnection();
+      await loadBASData();
+    } catch (error: any) {
+      console.error('❌ Error refreshing:', error);
     }
   };
 
-  const resetProcessing = () => {
-    setProcessingSteps(prev => prev.map(step => ({ ...step, status: 'pending', data: undefined, error: undefined })));
-    setFinalBASData(null);
-    setShowResults(false);
+  // Handle cache toggle
+  const handleCacheToggle = () => {
+    setUseCache(!useCache);
   };
 
-  const copyBASData = () => {
-    if (finalBASData) {
-      const formattedData = `BAS Period: ${finalBASData.BAS_Period}
-G1: $${finalBASData.BAS_Fields.G1.toLocaleString()}
-G2: $${finalBASData.BAS_Fields.G2.toLocaleString()}
-G3: $${finalBASData.BAS_Fields.G3.toLocaleString()}
-G10: $${finalBASData.BAS_Fields.G10.toLocaleString()}
-G11: $${finalBASData.BAS_Fields.G11.toLocaleString()}
-1A: $${finalBASData.BAS_Fields['1A'].toLocaleString()}
-1B: $${finalBASData.BAS_Fields['1B'].toLocaleString()}
-W1: $${finalBASData.BAS_Fields.W1.toLocaleString()}
-W2: $${finalBASData.BAS_Fields.W2.toLocaleString()}`;
-      
-      navigator.clipboard.writeText(formattedData);
-      toast.success('BAS data copied to clipboard!');
-    }
-  };
+  // Render connection status
+  if (!isConnected) {
+    return (
+      <Card>
+        <CardContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Xero Connection Required
+            </Typography>
+            <Typography>
+              You need to connect to Xero to process BAS data. Click the button below to connect.
+            </Typography>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={connectToXero}
+              disabled={isLoading}
+              sx={{ mt: 2 }}
+            >
+              {isLoading ? <CircularProgress size={24} /> : 'Connect to Xero'}
+            </Button>
+          </Alert>
+        </CardContent>
+      </Card>
+    );
+  }
 
-  const getStepIcon = (status: ProcessingStep['status']) => {
-    switch (status) {
-      case 'pending':
-        return '⏳';
-      case 'processing':
-        return '🔄';
-      case 'completed':
-        return '✅';
-      case 'error':
-        return '❌';
-      default:
-        return '⏳';
-    }
-  };
-
-  const getStepColor = (status: ProcessingStep['status']) => {
-    switch (status) {
-      case 'pending':
-        return 'bg-gray-100 text-gray-600';
-      case 'processing':
-        return 'bg-blue-100 text-blue-600';
-      case 'completed':
-        return 'bg-green-100 text-green-600';
-      case 'error':
-        return 'bg-red-100 text-red-600';
-      default:
-        return 'bg-gray-100 text-gray-600';
-    }
-  };
+  // Render organization selection
+  if (availableTenants.length === 0) {
+    return (
+      <Card>
+        <CardContent>
+          <Alert severity="error">
+            <Typography variant="h6" gutterBottom>
+              No Organizations Found
+            </Typography>
+            <Typography>
+              No Xero organizations were found for your account. Please check your Xero account or reconnect.
+            </Typography>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleRefresh}
+              sx={{ mt: 2 }}
+            >
+              Refresh Connection
+            </Button>
+          </Alert>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900">BAS Processing System</h2>
-        <p className="text-gray-600 mt-2">Automated Business Activity Statement processing with AI analysis</p>
-        
-        {/* Xero Connection Status */}
-        <div className={`mt-4 p-3 rounded-lg ${xeroData.isConnected ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-          <div className="flex items-center justify-center gap-2">
-            <div className={`w-3 h-3 rounded-full ${xeroData.isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-            <span className="font-medium">
-              {xeroData.isConnected ? '✅ Xero Connected' : '❌ Xero Not Connected'}
-            </span>
-          </div>
-          {!xeroData.isConnected && (
-            <p className="text-sm mt-1">
-              Please connect to Xero first to process BAS data
-            </p>
-          )}
-        </div>
-      </div>
+    <Card>
+      <CardContent>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Typography variant="h5" component="h2">
+            BAS Processing
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Tooltip title="Refresh Connection">
+              <IconButton onClick={handleRefresh} disabled={isLoading}>
+                <RefreshIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Clear Cache">
+              <IconButton onClick={clearCache}>
+                <DownloadIcon />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        </Box>
 
-      {/* Xero Organization Selection */}
-      {xeroData.isConnected && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Xero Organization</h3>
-          
-          {xeroData.tenants && xeroData.tenants.length > 0 ? (
-            <>
-              <div className="flex items-center gap-4">
-                <select
-                  value={selectedOrganization}
-                  onChange={(e) => {
-                    setSelectedOrganization(e.target.value);
-                    xeroActions.selectTenant(e.target.value);
-                    // Clear cached data to force reload with new organization
-                    setFinalBASData(null);
-                    setShowResults(false);
-                    console.log('🔄 Organization changed, clearing cached BAS data');
-                  }}
-                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2"
-                  disabled={isProcessing}
-                >
-                  <option value="">Select Xero Organization</option>
-                  {xeroData.tenants.map((tenant: any) => (
-                    <option key={tenant.id} value={tenant.id}>
-                      {tenant.name || tenant.organizationName || tenant.tenantName || tenant.id}
-                    </option>
-                  ))}
-                </select>
-                {xeroData.selectedTenant && (
-                  <div className="text-sm text-green-600 flex items-center gap-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    {xeroData.selectedTenant.name || 'Selected'}
-                  </div>
-                )}
-              </div>
-              <p className="text-sm text-gray-500 mt-2">
-                BAS data will be calculated from transactions in the selected organization
-              </p>
-            </>
-          ) : (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <svg className="w-5 h-5 text-amber-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3l-7.5-13c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <div>
-                  <p className="text-sm font-medium text-amber-800">No Xero Organizations Available</p>
-                  <p className="text-sm text-amber-700 mt-1">
-                    Please complete the Xero OAuth flow to access your organizations.
-                  </p>
-                  <button
-                    onClick={() => window.location.href = '/xero'}
-                    className="mt-3 px-4 py-2 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700 transition-colors"
-                  >
-                    Go to Xero Flow
-                  </button>
-                </div>
-              </div>
-            </div>
+        {/* Connection Status */}
+        <Box sx={{ mb: 3 }}>
+          <Chip
+            icon={isTokenValid ? <CheckCircleIcon /> : <ErrorIcon />}
+            label={`Connected to ${selectedTenant?.name || 'Unknown'}`}
+            color={isTokenValid ? 'success' : 'error'}
+            sx={{ mr: 1 }}
+          />
+          {company && (
+            <Chip
+              label={`Company: ${company.name}`}
+              variant="outlined"
+              size="small"
+            />
           )}
-        </div>
-      )}
+        </Box>
 
-      {/* BAS Period Selection */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">BAS Period</h3>
-        <div className="flex items-center gap-4 flex-wrap">
-          <select
-            value={basPeriod}
-            onChange={(e) => setBasPeriod(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 min-w-[200px]"
-            disabled={isProcessing}
+        {/* Organization Selection */}
+        <FormControl fullWidth sx={{ mb: 3 }}>
+          <InputLabel>Select Organization</InputLabel>
+          <Select
+            value={selectedTenant?.tenantId || selectedTenant?.id || ''}
+            onChange={handleTenantChange}
+            label="Select Organization"
           >
-            <option value="">Select BAS Period</option>
-            <option value="2023-Q3">FY2023 Q3 (Jan-Mar 2024)</option>
-            <option value="2023-Q4">FY2023 Q4 (Apr-Jun 2024)</option>
-            <option value="2024-Q1">FY2024 Q1 (Jul-Sep 2024)</option>
-            <option value="2024-Q2">FY2024 Q2 (Oct-Dec 2024)</option>
-            <option value="2024-Q3">FY2024 Q3 (Jan-Mar 2025)</option>
-            <option value="2024-Q4">FY2024 Q4 (Apr-Jun 2025)</option>
-            <option value="2025-Q1">FY2025 Q1 (Jul-Sep 2025)</option>
-            <option value="2025-Q2">FY2025 Q2 (Oct-Dec 2025)</option>
-          </select>
-          
-          <button
-            onClick={processBAS}
-            disabled={!basPeriod || isProcessing || !xeroData.isConnected || !selectedOrganization}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            {availableTenants.map((tenant) => (
+              <MenuItem key={tenant.tenantId || tenant.id} value={tenant.tenantId || tenant.id}>
+                {tenant.name || tenant.organizationName}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        {/* Date Range Selection */}
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="From Date"
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="To Date"
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+          </Grid>
+        </Grid>
+
+        {/* Options */}
+        <Box sx={{ mb: 3 }}>
+          <Button
+            variant={useCache ? 'contained' : 'outlined'}
+            size="small"
+            onClick={handleCacheToggle}
+            sx={{ mr: 2 }}
           >
-            {isProcessing ? 'Processing...' : 'Start BAS Processing'}
-          </button>
-          
-          {!isProcessing && (
-            <button
-              onClick={resetProcessing}
-              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-            >
-              Reset
-            </button>
-          )}
-        </div>
-        {!selectedOrganization && xeroData.isConnected && (
-          <p className="text-sm text-amber-600 mt-2 flex items-center gap-1">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3l-7.5-13c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            Please select a Xero organization above to continue
-          </p>
-        )}
-      </div>
+            {useCache ? 'Using Cache' : 'Live Data'}
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={loadBASData}
+            disabled={dataLoading || !selectedTenant || !fromDate || !toDate}
+            startIcon={dataLoading ? <CircularProgress size={16} /> : <RefreshIcon />}
+          >
+            {dataLoading ? 'Loading...' : 'Load BAS Data'}
+          </Button>
+        </Box>
 
-      {/* Processing Steps */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="p-6 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Processing Steps</h3>
-        </div>
-        <div className="p-6 space-y-4">
-          {processingSteps.map((step) => (
-            <div key={step.id} className="flex items-start gap-4 p-4 border rounded-lg">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${getStepColor(step.status)}`}>
-                {getStepIcon(step.status)}
-              </div>
-              <div className="flex-1">
-                <h4 className="font-medium text-gray-900">{step.title}</h4>
-                <p className="text-sm text-gray-600">{step.description}</p>
-                
-                {step.status === 'completed' && step.data && (
-                  <div className="mt-2 p-3 bg-green-50 rounded border">
-                    <p className="text-sm text-green-800">
-                      ✅ Completed successfully
-                    </p>
-                  </div>
-                )}
-                
-                {step.status === 'error' && step.error && (
-                  <div className="mt-2 p-3 bg-red-50 rounded border">
-                    <p className="text-sm text-red-800">
-                      ❌ Error: {step.error}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Results */}
-      {showResults && finalBASData && (
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-6 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">BAS Results</h3>
-              <button
-                onClick={copyBASData}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+        {/* Error Display */}
+        {(connectionError || dataError || calculationError) && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              <WarningIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+              Error
+            </Typography>
+            <Typography>
+              {connectionError || dataError || calculationError}
+            </Typography>
+            {connectionError && (
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={connectToXero}
+                sx={{ mt: 1 }}
               >
-                Copy BAS Data
-              </button>
-            </div>
-          </div>
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h4 className="font-medium text-gray-900 mb-3">BAS Period: {finalBASData.BAS_Period}</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">G1 (Total Sales):</span>
-                    <span className="font-medium">${finalBASData.BAS_Fields.G1.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">G2 (Export Sales):</span>
-                    <span className="font-medium">${finalBASData.BAS_Fields.G2.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">G3 (GST-Free Sales):</span>
-                    <span className="font-medium">${finalBASData.BAS_Fields.G3.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">G10 (Capital Purchases):</span>
-                    <span className="font-medium">${finalBASData.BAS_Fields.G10.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">G11 (Non-Capital Purchases):</span>
-                    <span className="font-medium">${finalBASData.BAS_Fields.G11.toLocaleString()}</span>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <h4 className="font-medium text-gray-900 mb-3">GST & PAYG</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">1A (GST on Sales):</span>
-                    <span className="font-medium">${finalBASData.BAS_Fields['1A'].toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">1B (GST on Purchases):</span>
-                    <span className="font-medium">${finalBASData.BAS_Fields['1B'].toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">W1 (Total Wages):</span>
-                    <span className="font-medium">${finalBASData.BAS_Fields.W1.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">W2 (PAYG Withholding):</span>
-                    <span className="font-medium">${finalBASData.BAS_Fields.W2.toLocaleString()}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
+                Reconnect to Xero
+              </Button>
+            )}
+          </Alert>
+        )}
 
-          </div>
-        </div>
-      )}
-    </div>
+        {/* BAS Calculation Results */}
+        {calculationResult && (
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              BAS Calculation Results
+            </Typography>
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell><strong>Item</strong></TableCell>
+                    <TableCell align="right"><strong>Amount</strong></TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  <TableRow>
+                    <TableCell>Total Sales (GST Inclusive)</TableCell>
+                    <TableCell align="right">
+                      ${calculationResult.totalSales.toFixed(2)}
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>Total Purchases (GST Inclusive)</TableCell>
+                    <TableCell align="right">
+                      ${calculationResult.totalPurchases.toFixed(2)}
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>GST on Sales</TableCell>
+                    <TableCell align="right">
+                      ${calculationResult.gstOnSales.toFixed(2)}
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>GST on Purchases</TableCell>
+                    <TableCell align="right">
+                      ${calculationResult.gstOnPurchases.toFixed(2)}
+                    </TableCell>
+                  </TableRow>
+                  <TableRow sx={{ backgroundColor: 'primary.light', color: 'primary.contrastText' }}>
+                    <TableCell><strong>Net GST Payable/Refundable</strong></TableCell>
+                    <TableCell align="right">
+                      <strong>
+                        ${calculationResult.netGST.toFixed(2)}
+                        {calculationResult.netGST >= 0 ? ' (Payable)' : ' (Refundable)'}
+                      </strong>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </TableContainer>
+            
+            <Box sx={{ mt: 2, p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                <strong>Period:</strong> {calculationResult.period.fromDate} to {calculationResult.period.toDate}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                <strong>Last Updated:</strong> {new Date(calculationResult.lastUpdated).toLocaleString()}
+              </Typography>
+            </Box>
+          </Box>
+        )}
+
+        {/* Loading States */}
+        {isCalculating && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 2 }}>
+            <CircularProgress size={24} />
+            <Typography>Calculating BAS...</Typography>
+          </Box>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 
