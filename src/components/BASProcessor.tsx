@@ -194,42 +194,73 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
       setIsCalculating(true);
       setCalculationError(null);
       
-      console.log('🧮 Calculating BAS...');
+      console.log('🧮 Calculating BAS from aggregated Xero data...');
 
-      // Extract relevant data from BAS response
-      const reports = basData.Reports || [];
-      const basReport = reports.find((report: any) => report.ReportType === 'BAS');
-      
-      if (!basReport) {
-        throw new Error('BAS report not found in Xero data');
-      }
+      // The new BAS data structure contains multiple reports
+      const { gstReport, profitLoss, invoices } = basData;
 
-      // Extract values from BAS report rows
-      const rows = basReport.Rows || [];
       let totalSales = 0;
       let totalPurchases = 0;
       let gstOnSales = 0;
       let gstOnPurchases = 0;
 
-      // Process BAS report rows
-      rows.forEach((row: any) => {
-        if (row.Cells && row.Cells.length > 0) {
-          const cells = row.Cells;
-          const description = cells[0]?.Value || '';
-          const value = parseFloat(cells[cells.length - 1]?.Value || '0');
+      // 1. Extract GST information from Tax Summary report
+      if (gstReport?.Reports?.[0]?.Rows) {
+        const taxRows = gstReport.Reports[0].Rows;
+        
+        taxRows.forEach((row: any) => {
+          if (row.Cells && row.Cells.length > 0) {
+            const cells = row.Cells;
+            const description = cells[0]?.Value || '';
+            const value = parseFloat(cells[cells.length - 1]?.Value || '0');
 
-          // Map BAS line items
-          if (description.includes('Sales') && description.includes('GST')) {
-            totalSales += Math.abs(value);
-          } else if (description.includes('Purchases') && description.includes('GST')) {
-            totalPurchases += Math.abs(value);
-          } else if (description.includes('GST') && description.includes('Sales')) {
-            gstOnSales += Math.abs(value);
-          } else if (description.includes('GST') && description.includes('Purchases')) {
-            gstOnPurchases += Math.abs(value);
+            // Map GST line items from Tax Summary
+            if (description.toLowerCase().includes('gst on sales') || 
+                description.toLowerCase().includes('output tax')) {
+              gstOnSales += Math.abs(value);
+            } else if (description.toLowerCase().includes('gst on purchases') || 
+                       description.toLowerCase().includes('input tax')) {
+              gstOnPurchases += Math.abs(value);
+            } else if (description.toLowerCase().includes('total sales')) {
+              totalSales += Math.abs(value);
+            } else if (description.toLowerCase().includes('total purchases')) {
+              totalPurchases += Math.abs(value);
+            }
           }
-        }
-      });
+        });
+      }
+
+      // 2. If GST data not found in Tax Summary, calculate from invoices
+      if (gstOnSales === 0 && invoices?.Invoices) {
+        invoices.Invoices.forEach((invoice: any) => {
+          if (invoice.Type === 'ACCREC') { // Sales invoices
+            const subtotal = parseFloat(invoice.SubTotal || '0');
+            const taxAmount = parseFloat(invoice.TotalTax || '0');
+            totalSales += subtotal;
+            gstOnSales += taxAmount;
+          } else if (invoice.Type === 'ACCPAY') { // Purchase invoices
+            const subtotal = parseFloat(invoice.SubTotal || '0');
+            const taxAmount = parseFloat(invoice.TotalTax || '0');
+            totalPurchases += subtotal;
+            gstOnPurchases += taxAmount;
+          }
+        });
+      }
+
+      // 3. Extract total sales/revenue from Profit & Loss if needed
+      if (totalSales === 0 && profitLoss?.Reports?.[0]?.Rows) {
+        const plRows = profitLoss.Reports[0].Rows;
+        plRows.forEach((row: any) => {
+          if (row.RowType === 'Section' && row.Title?.toLowerCase().includes('revenue')) {
+            row.Rows?.forEach((subRow: any) => {
+              if (subRow.Cells && subRow.Cells.length > 0) {
+                const value = parseFloat(subRow.Cells[subRow.Cells.length - 1]?.Value || '0');
+                totalSales += Math.abs(value);
+              }
+            });
+          }
+        });
+      }
 
       const netGST = gstOnSales - gstOnPurchases;
 
