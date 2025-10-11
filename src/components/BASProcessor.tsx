@@ -83,6 +83,7 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
   const [isCalculating, setIsCalculating] = useState(false);
   const [calculationError, setCalculationError] = useState<string | null>(null);
   const [useCache, setUseCache] = useState(true);
+  const requestSignatureRef = useRef<string | null>(null);
 
   const { company } = useAuth();
   
@@ -111,51 +112,81 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
   }, []);
 
   // Load BAS data when tenant or dates change
-  const loadBASData = useCallback(async () => {
-    if (!selectedTenant || !fromDate || !toDate) {
-      setCalculationError('Please select an organization and date range first.');
-      return;
-    }
-
-    try {
-      setCalculationError(null);
-      console.log(`📊 Loading BAS data for ${selectedTenant.name} from ${fromDate} to ${toDate}`);
-      
-      const data = await loadXeroData('basData', {
-        fromDate,
-        toDate,
-        useCache
-      });
-
-      setBasData(data);
-      console.log('✅ BAS data loaded successfully');
-    } catch (error: any) {
-      console.error('❌ Error loading BAS data:', error);
-      
-      // Provide more helpful error messages
-      let errorMessage = error.message || 'Failed to load BAS data';
-      
-      if (error.response?.status === 404) {
-        errorMessage = 'BAS data endpoint not found. Please ensure you are connected to Xero and try again.';
-      } else if (error.response?.status === 401) {
-        errorMessage = 'Authentication failed. Please reconnect to Xero.';
-      } else if (error.response?.status === 403) {
-        errorMessage = 'Access denied. Please check your Xero permissions.';
-      } else if (error.message?.includes('Not connected')) {
-        errorMessage = 'Not connected to Xero. Please connect first.';
-      } else if (error.message?.includes('No organization selected')) {
-        errorMessage = 'Please select a Xero organization first.';
+  const loadBASData = useCallback(
+    async (options: { force?: boolean } = {}) => {
+      if (!selectedTenant || !fromDate || !toDate) {
+        setCalculationError('Please select an organization and date range first.');
+        return;
       }
-      
-      setCalculationError(errorMessage);
-      onBASErrorRef.current?.(errorMessage);
+
+      const tenantId = selectedTenant.tenantId || selectedTenant.id;
+      const requestSignature = `${tenantId}|${fromDate}|${toDate}|${useCache}`;
+      if (!options.force && requestSignatureRef.current === requestSignature) {
+        console.log('⚠️ Skipping BAS data reload; parameters unchanged');
+        return;
+      }
+
+      requestSignatureRef.current = requestSignature;
+
+      try {
+        setCalculationError(null);
+        console.log(`📊 Loading BAS data for ${selectedTenant.name} from ${fromDate} to ${toDate}`);
+        
+        const data = await loadXeroData('basData', {
+          fromDate,
+          toDate,
+          useCache
+        });
+
+        setBasData(data);
+        console.log('✅ BAS data loaded successfully');
+      } catch (error: any) {
+        console.error('❌ Error loading BAS data:', error);
+        
+        // Provide more helpful error messages
+        let errorMessage = error.message || 'Failed to load BAS data';
+        
+        if (error.response?.status === 404) {
+          errorMessage = 'BAS data endpoint not found. Please ensure you are connected to Xero and try again.';
+        } else if (error.response?.status === 401) {
+          errorMessage = 'Authentication failed. Please reconnect to Xero.';
+        } else if (error.response?.status === 403) {
+          errorMessage = 'Access denied. Please check your Xero permissions.';
+        } else if (error.message?.includes('Not connected')) {
+          errorMessage = 'Not connected to Xero. Please connect first.';
+        } else if (error.message?.includes('No organization selected')) {
+          errorMessage = 'Please select a Xero organization first.';
+        }
+        
+        setCalculationError(errorMessage);
+        onBASErrorRef.current?.(errorMessage);
+      }
+    },
+    [selectedTenant, fromDate, toDate, useCache, loadXeroData],
+  );
+
+  // Auto-load data when dependencies change (with debounce)
+  useEffect(() => {
+    if (selectedTenant && fromDate && toDate && isConnected && isTokenValid) {
+      const timeoutId = setTimeout(() => {
+        loadBASData();
+      }, 300);
+
+      return () => clearTimeout(timeoutId);
     }
-  }, [selectedTenant, fromDate, toDate, useCache, loadXeroData]);
+  }, [selectedTenant, fromDate, toDate, isConnected, isTokenValid, useCache, loadBASData]);
+
+  useEffect(() => {
+    return () => {
+      requestSignatureRef.current = null;
+    };
+  }, []);
 
   // Calculate BAS
   const calculateBAS = useCallback(async () => {
     if (!basData) {
       setCalculationError('No BAS data available. Please load data first.');
+      setCalculationError('Please select an organization and date range first.');
       return;
     }
 
@@ -259,7 +290,7 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
   const handleRefresh = async () => {
     try {
       await refreshConnection();
-      await loadBASData();
+      await loadBASData({ force: true });
     } catch (error: any) {
       console.error('❌ Error refreshing:', error);
     }
@@ -413,7 +444,7 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
           </Button>
           <Button
             variant="outlined"
-            onClick={loadBASData}
+            onClick={() => loadBASData({ force: true })}
             disabled={dataLoading || !selectedTenant || !fromDate || !toDate}
             startIcon={dataLoading ? <CircularProgress size={16} /> : <RefreshIcon />}
           >
