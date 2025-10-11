@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Card,
   CardContent,
@@ -85,6 +85,19 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
   const [useCache, setUseCache] = useState(true);
 
   const { company } = useAuth();
+  
+  // Use refs to avoid infinite loops with callback dependencies
+  const onBASErrorRef = useRef(onBASError);
+  const onBASCompleteRef = useRef(onBASComplete);
+  
+  // Update refs when props change
+  useEffect(() => {
+    onBASErrorRef.current = onBASError;
+  }, [onBASError]);
+  
+  useEffect(() => {
+    onBASCompleteRef.current = onBASComplete;
+  }, [onBASComplete]);
 
   // Initialize date range (current quarter)
   useEffect(() => {
@@ -135,9 +148,9 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
       }
       
       setCalculationError(errorMessage);
-      onBASError?.(errorMessage);
+      onBASErrorRef.current?.(errorMessage);
     }
-  }, [selectedTenant, fromDate, toDate, useCache, loadXeroData, onBASError]);
+  }, [selectedTenant, fromDate, toDate, useCache, loadXeroData]);
 
   // Calculate BAS
   const calculateBAS = useCallback(async () => {
@@ -203,23 +216,28 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
       };
 
       setCalculationResult(result);
-      onBASComplete?.(result);
+      onBASCompleteRef.current?.(result);
       
       console.log('✅ BAS calculation completed successfully');
     } catch (error: any) {
       console.error('❌ Error calculating BAS:', error);
       const errorMessage = error.message || 'Failed to calculate BAS';
       setCalculationError(errorMessage);
-      onBASError?.(errorMessage);
+      onBASErrorRef.current?.(errorMessage);
     } finally {
       setIsCalculating(false);
     }
-  }, [basData, fromDate, toDate, onBASComplete, onBASError]);
+  }, [basData, fromDate, toDate]);
 
-  // Auto-load data when dependencies change
+  // Auto-load data when dependencies change (with debounce)
   useEffect(() => {
     if (selectedTenant && fromDate && toDate && isConnected && isTokenValid) {
-      loadBASData();
+      // Add a small delay to prevent rapid successive calls
+      const timeoutId = setTimeout(() => {
+        loadBASData();
+      }, 300); // 300ms debounce
+      
+      return () => clearTimeout(timeoutId);
     }
   }, [selectedTenant, fromDate, toDate, isConnected, isTokenValid, loadBASData]);
 
