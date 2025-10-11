@@ -37,6 +37,7 @@ import {
 } from '@mui/icons-material';
 import { useXero } from '../contexts/XeroContext';
 import { useAuth } from '../contexts/AuthContext';
+import SidebarLayout from '../components/SidebarLayout';
 
 type SectionId = 'organization' | 'financial-summary' | 'invoices' | 'contacts' | 'accounts';
 
@@ -647,49 +648,52 @@ const EnhancedXeroFlow: React.FC = () => {
 
   if (!status.connected) {
     return (
+      <SidebarLayout>
+        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+          <Typography variant="h4" gutterBottom>
+            Xero Integration
+          </Typography>
+
+          {renderConnectionStatus()}
+
+          <Card>
+            <CardContent sx={{ textAlign: 'center' }}>
+              <Typography variant="h6" gutterBottom>
+                Connect to Xero to Access Your Data
+              </Typography>
+              <Typography color="text.secondary" sx={{ mb: 3 }}>
+                Connect your Xero account to view organization insights and synced financial data.
+              </Typography>
+              <Button
+                variant="contained"
+                size="large"
+                onClick={connect}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <CircularProgress size={20} color="inherit" />
+                    Connecting...
+                  </Box>
+                ) : (
+                  'Connect to Xero'
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        </Container>
+      </SidebarLayout>
+    );
+  }
+
+  return (
+    <SidebarLayout>
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
         <Typography variant="h4" gutterBottom>
           Xero Integration
         </Typography>
 
         {renderConnectionStatus()}
-
-        <Card>
-          <CardContent sx={{ textAlign: 'center' }}>
-            <Typography variant="h6" gutterBottom>
-              Connect to Xero to Access Your Data
-            </Typography>
-            <Typography color="text.secondary" sx={{ mb: 3 }}>
-              Connect your Xero account to view organization insights and synced financial data.
-            </Typography>
-            <Button
-              variant="contained"
-              size="large"
-              onClick={connect}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <CircularProgress size={20} color="inherit" />
-                  Connecting...
-                </Box>
-              ) : (
-                'Connect to Xero'
-              )}
-            </Button>
-          </CardContent>
-        </Card>
-      </Container>
-    );
-  }
-
-  return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Typography variant="h4" gutterBottom>
-        Xero Integration
-      </Typography>
-
-      {renderConnectionStatus()}
 
       {!tenantIdentifier && (
         <Alert severity="info" sx={{ mb: 3 }}>
@@ -751,6 +755,7 @@ const EnhancedXeroFlow: React.FC = () => {
         </DialogActions>
       </Dialog>
     </Container>
+  </SidebarLayout>
   );
 };
 
