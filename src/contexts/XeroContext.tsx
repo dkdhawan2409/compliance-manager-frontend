@@ -468,14 +468,25 @@ export function XeroProvider({ children }: XeroProviderProps) {
     dispatch({ type: 'SET_LOADING', payload: true });
     const endpoints = ['/xero-plug-play/connect', '/xero/connect'];
 
+    const rememberState = (value?: string | null) => {
+      if (!value) return;
+      try {
+        sessionStorage.setItem('xero_oauth_state', value);
+      } catch (storageError) {
+        console.warn('⚠️ Unable to persist Xero OAuth state:', storageError);
+      }
+    };
+
     for (const endpoint of endpoints) {
       try {
         const response = await apiClient.get(endpoint);
         if (response.data.success && response.data.data?.authUrl) {
+          rememberState(response.data.data.state || response.data.state);
           window.location.href = response.data.data.authUrl;
           return;
         }
         if (response.data.success && response.data.authUrl) {
+          rememberState(response.data.state);
           window.location.href = response.data.authUrl;
           return;
         }
