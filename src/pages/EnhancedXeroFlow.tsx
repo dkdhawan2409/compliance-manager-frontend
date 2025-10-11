@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Container,
@@ -14,62 +14,247 @@ import {
   MenuItem,
   Chip,
   Grid,
-  Divider,
-  Tabs,
-  Tab,
-  Paper,
   IconButton,
   Tooltip,
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
   Settings as SettingsIcon,
-  Warning as WarningIcon,
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
-  Info as InfoIcon
+  Info as InfoIcon,
 } from '@mui/icons-material';
 import { useXero } from '../contexts/XeroContext';
 import { useAuth } from '../contexts/AuthContext';
-import BASProcessor from '../components/BASProcessor';
-import FASProcessor from '../components/FASProcessor';
 
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
+type SectionId = 'organization' | 'financial-summary' | 'invoices' | 'contacts' | 'accounts';
+
+interface SectionColumn {
+  key: string;
+  label: string;
+  render?: (row: any) => React.ReactNode;
 }
 
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
+interface SectionConfig {
+  id: SectionId;
+  title: string;
+  resource: string;
+  description?: string;
+  limit?: number;
+  columns?: SectionColumn[];
+}
 
+interface SectionState {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  data: any;
+  error: string | null;
+}
+
+const DATA_SECTIONS: SectionConfig[] = [
+  {
+    id: 'organization',
+    title: 'Organization Overview',
+    resource: 'organization',
+    description: 'Core information about the selected Xero organization.',
+  },
+  {
+    id: 'financial-summary',
+    title: 'Financial Summary',
+    resource: 'financial-summary',
+    description: 'High-level financial metrics calculated from Xero data.',
+  },
+  {
+    id: 'invoices',
+    title: 'Recent Invoices',
+    resource: 'invoices',
+    description: 'Latest invoices created in the selected organization.',
+    limit: 10,
+    columns: [
+      {
+        key: 'InvoiceNumber',
+        label: 'Invoice #',
+        render: (row) => row.InvoiceNumber || row.InvoiceID || '—',
+      },
+      {
+        key: 'Contact',
+        label: 'Contact',
+        render: (row) => row.Contact?.Name || row.ContactName || '—',
+      },
+      {
+        key: 'Date',
+        label: 'Issue Date',
+        render: (row) => formatDate(row.Date || row.IssueDate),
+      },
+      {
+        key: 'DueDate',
+        label: 'Due Date',
+        render: (row) => formatDate(row.DueDate),
+      },
+      {
+        key: 'Total',
+        label: 'Total',
+        render: (row) => formatCurrency(row.Total ?? row.AmountDue),
+      },
+      {
+        key: 'Status',
+        label: 'Status',
+        render: (row) => row.Status || '—',
+      },
+    ],
+  },
+  {
+    id: 'contacts',
+    title: 'Key Contacts',
+    resource: 'contacts',
+    description: 'Contacts and suppliers synced from Xero.',
+    limit: 10,
+    columns: [
+      {
+        key: 'Name',
+        label: 'Name',
+        render: (row) => row.Name || `${row.FirstName || ''} ${row.LastName || ''}`.trim() || '—',
+      },
+      {
+        key: 'EmailAddress',
+        label: 'Email',
+        render: (row) => row.EmailAddress || '—',
+      },
+      {
+        key: 'ContactStatus',
+        label: 'Status',
+        render: (row) => row.ContactStatus || '—',
+      },
+      {
+        key: 'AccountsReceivable',
+        label: 'A/R Outstanding',
+        render: (row) => formatCurrency(row.AccountsReceivable?.Outstanding),
+      },
+    ],
+  },
+  {
+    id: 'accounts',
+    title: 'Chart of Accounts',
+    resource: 'accounts',
+    description: 'Accounts available within the selected organization.',
+    limit: 15,
+    columns: [
+      {
+        key: 'Code',
+        label: 'Code',
+        render: (row) => row.Code || '—',
+      },
+      {
+        key: 'Name',
+        label: 'Name',
+        render: (row) => row.Name || '—',
+      },
+      {
+        key: 'Type',
+        label: 'Type',
+        render: (row) => row.Type || row.Class || '—',
+      },
+      {
+        key: 'Status',
+        label: 'Status',
+        render: (row) => row.Status || '—',
+      },
+    ],
+  },
+] as const;
+
+const buildInitialSectionState = (): Record<SectionId, SectionState> => {
+  const state = {} as Record<SectionId, SectionState>;
+  DATA_SECTIONS.forEach((section) => {
+    state[section.id] = { status: 'idle', data: null, error: null };
+  });
+  return state;
+};
+
+const extractXeroData = (input: any): any => {
+  if (input == null) return input;
+  if (Array.isArray(input)) return input;
+  if (typeof input !== 'object') return input;
+
+  if (Object.prototype.hasOwnProperty.call(input, 'data')) {
+    return extractXeroData(input.data);
+  }
+
+  const keys = [
+    'Organisation',
+    'Organisations',
+    'organization',
+    'Invoices',
+    'Invoice',
+    'Contacts',
+    'Accounts',
+    'BankTransactions',
+    'Transactions',
+    'items',
+    'values',
+    'results',
+  ];
+
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(input, key)) {
+      return extractXeroData((input as Record<string, any>)[key]);
+    }
+  }
+
+  return input;
+};
+
+const formatCurrency = (value: any): string => {
+  if (value == null || value === '') {
+    return '—';
+  }
+
+  const numeric =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string'
+      ? Number.parseFloat(value)
+      : NaN;
+
+  if (Number.isNaN(numeric)) {
+    return String(value);
+  }
+
+  return numeric.toLocaleString(undefined, {
+    style: 'currency',
+    currency: 'AUD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
+const formatDate = (value: any): string => {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleDateString();
+};
+
+const getRowKey = (row: any, index: number): string => {
   return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`xero-tabpanel-${index}`}
-      aria-labelledby={`xero-tab-${index}`}
-      {...other}
-    >
-      {value === index && (
-        <Box sx={{ p: 3 }}>
-          {children}
-        </Box>
-      )}
-    </div>
+    row?.InvoiceID ||
+    row?.ContactID ||
+    row?.AccountID ||
+    row?.id ||
+    row?.Id ||
+    `row-${index}`
   );
-}
-
-function a11yProps(index: number) {
-  return {
-    id: `xero-tab-${index}`,
-    'aria-controls': `xero-tabpanel-${index}`,
-  };
-}
+};
 
 const EnhancedXeroFlow: React.FC = () => {
   const {
@@ -81,70 +266,120 @@ const EnhancedXeroFlow: React.FC = () => {
     selectTenant,
     connect,
     disconnect,
-    checkConnection,
     refreshData,
-    clearCache
+    loadData,
   } = useXero();
 
   const { company } = useAuth();
-  const [activeTab, setActiveTab] = useState(0);
+
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const [connectionRefreshing, setConnectionRefreshing] = useState(false);
+  const [sectionState, setSectionState] = useState<Record<SectionId, SectionState>>(
+    () => buildInitialSectionState(),
+  );
 
-  // Handle tab change
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    setActiveTab(newValue);
-  };
+  const tenantIdentifier = selectedTenant?.tenantId || selectedTenant?.id || null;
 
-  // Handle refresh
-  const handleRefresh = async () => {
-    try {
-      setRefreshing(true);
-      await refreshData();
-      console.log('✅ Data refreshed successfully');
-    } catch (error: any) {
-      console.error('❌ Error refreshing data:', error);
-    } finally {
-      setRefreshing(false);
+  const fetchSectionData = useCallback(
+    async (section: SectionConfig) => {
+      if (!status.connected || !tenantIdentifier) {
+        return;
+      }
+
+      setSectionState((prev) => ({
+        ...prev,
+        [section.id]: { status: 'loading', data: prev[section.id]?.data ?? null, error: null },
+      }));
+
+      try {
+        const response = await loadData(section.resource as any, {
+          tenantId: tenantIdentifier,
+          pageSize: section.limit,
+          page: 1,
+        });
+
+        const normalized = extractXeroData(response);
+
+        setSectionState((prev) => ({
+          ...prev,
+          [section.id]: { status: 'success', data: normalized, error: null },
+        }));
+      } catch (err: any) {
+        const message =
+          err?.response?.data?.message || err?.message || `Failed to load ${section.title}`;
+        setSectionState((prev) => ({
+          ...prev,
+          [section.id]: { status: 'error', data: null, error: message },
+        }));
+      }
+    },
+    [loadData, status.connected, tenantIdentifier],
+  );
+
+  const loadAllSections = useCallback(async () => {
+    if (!status.connected || !tenantIdentifier) {
+      setSectionState(buildInitialSectionState());
+      return;
     }
-  };
 
-  // Handle tenant selection
+    await Promise.all(DATA_SECTIONS.map((section) => fetchSectionData(section)));
+  }, [fetchSectionData, status.connected, tenantIdentifier]);
+
+  useEffect(() => {
+    if (status.connected && tenantIdentifier) {
+      loadAllSections();
+    } else {
+      setSectionState(buildInitialSectionState());
+    }
+  }, [status.connected, tenantIdentifier, loadAllSections]);
+
   const handleTenantChange = (event: any) => {
-    const tenantId = event.target.value;
-    const tenant = availableTenants.find(t => t.tenantId === tenantId || t.id === tenantId);
+    const value = event.target.value;
+    const tenant = availableTenants.find(
+      (t) => t.tenantId === value || t.id === value,
+    );
     selectTenant(tenant || null);
   };
 
-  // Handle settings dialog
-  const handleSettingsOpen = () => setSettingsOpen(true);
-  const handleSettingsClose = () => setSettingsOpen(false);
-
-  // Handle disconnect
-  const handleDisconnect = async () => {
+  const handleConnectionRefresh = async () => {
     try {
-      await disconnect();
-      console.log('✅ Disconnected from Xero successfully');
-    } catch (error: any) {
-      console.error('❌ Error disconnecting:', error);
+      setConnectionRefreshing(true);
+      await refreshData();
+      await loadAllSections();
+    } catch (refreshError) {
+      console.error('❌ Error refreshing Xero connection:', refreshError);
+    } finally {
+      setConnectionRefreshing(false);
     }
   };
 
-  // Render connection status card
+  const handleDisconnect = async () => {
+    try {
+      await disconnect();
+      setSectionState(buildInitialSectionState());
+    } catch (disconnectError) {
+      console.error('❌ Error disconnecting from Xero:', disconnectError);
+    }
+  };
+
+  const handleRefreshSection = async (section: SectionConfig) => {
+    await fetchSectionData(section);
+  };
+
   const renderConnectionStatus = () => (
     <Card sx={{ mb: 3 }}>
       <CardContent>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="h6">Xero Connection Status</Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Tooltip title="Refresh Connection">
-              <IconButton onClick={handleRefresh} disabled={refreshing}>
+            <Tooltip title="Refresh Connection & Data">
+              <IconButton onClick={handleConnectionRefresh} disabled={connectionRefreshing}>
                 <RefreshIcon />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Settings">
-              <IconButton onClick={handleSettingsOpen}>
-                <SettingsIcon />
+            <Tooltip title="Disconnect">
+              <IconButton onClick={handleDisconnect} disabled={isLoading}>
+                <ErrorIcon />
               </IconButton>
             </Tooltip>
           </Box>
@@ -157,24 +392,24 @@ const EnhancedXeroFlow: React.FC = () => {
                 icon={status.connected && status.isTokenValid ? <CheckCircleIcon /> : <ErrorIcon />}
                 label={status.connected && status.isTokenValid ? 'Connected' : 'Not Connected'}
                 color={status.connected && status.isTokenValid ? 'success' : 'error'}
-                size="large"
+                size="medium"
               />
               {company && (
                 <Chip
-                  label={`Company: ${company.name}`}
+                  label={`Company: ${company.companyName || company.name || company.email || '—'}`}
                   variant="outlined"
                   size="small"
                 />
               )}
             </Box>
           </Grid>
-          
+
           <Grid item xs={12} md={6}>
-            {selectedTenant && (
+            {status.connected && availableTenants.length > 0 && (
               <FormControl fullWidth size="small">
                 <InputLabel>Organization</InputLabel>
                 <Select
-                  value={selectedTenant.tenantId || selectedTenant.id || ''}
+                  value={tenantIdentifier || ''}
                   onChange={handleTenantChange}
                   label="Organization"
                 >
@@ -189,10 +424,9 @@ const EnhancedXeroFlow: React.FC = () => {
           </Grid>
         </Grid>
 
-        {/* Status Messages */}
         {status.message && (
-          <Alert 
-            severity={status.connected ? 'info' : 'warning'} 
+          <Alert
+            severity={status.connected ? 'info' : 'warning'}
             sx={{ mt: 2 }}
             icon={<InfoIcon />}
           >
@@ -206,7 +440,6 @@ const EnhancedXeroFlow: React.FC = () => {
           </Alert>
         )}
 
-        {/* Connection Details */}
         {status.connected && (
           <Box sx={{ mt: 2, p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}>
             <Typography variant="body2" color="text.secondary">
@@ -219,7 +452,8 @@ const EnhancedXeroFlow: React.FC = () => {
             )}
             {selectedTenant && (
               <Typography variant="body2" color="text.secondary">
-                <strong>Selected Organization:</strong> {selectedTenant.name || selectedTenant.organizationName}
+                <strong>Selected Organization:</strong>{' '}
+                {selectedTenant.name || selectedTenant.organizationName}
               </Typography>
             )}
           </Box>
@@ -228,135 +462,288 @@ const EnhancedXeroFlow: React.FC = () => {
     </Card>
   );
 
-  // Render connection required state
+  const renderOrganizationSection = (data: any) => {
+    const record = Array.isArray(data) ? data[0] : data;
+    if (!record || typeof record !== 'object') {
+      return (
+        <Typography variant="body2" color="text.secondary">
+          No organization details available.
+        </Typography>
+      );
+    }
+
+    const fields = [
+      { label: 'Legal Name', value: record.LegalName || record.Name },
+      { label: 'Trading Name', value: record.TradingName },
+      { label: 'Country', value: record.CountryCode || record.Country },
+      { label: 'Base Currency', value: record.BaseCurrency },
+      { label: 'Tax Number', value: record.TaxNumber },
+      { label: 'Financial Year End', value: record.FinancialYearEndDay && record.FinancialYearEndMonth
+          ? `${record.FinancialYearEndDay}/${record.FinancialYearEndMonth}`
+          : null },
+      { label: 'Organisation Status', value: record.OrganisationStatus || record.Status },
+      { label: 'Phone Number', value: record.PhoneNumber },
+      { label: 'Email', value: record.Email },
+      { label: 'Time Zone', value: record.Timezone },
+    ];
+
+    const visibleFields = fields.filter((field) => field.value);
+
+    if (!visibleFields.length) {
+      return (
+        <Typography variant="body2" color="text.secondary">
+          Organization profile data is unavailable.
+        </Typography>
+      );
+    }
+
+    return (
+      <Grid container spacing={2}>
+        {visibleFields.map((field) => (
+          <Grid item xs={12} md={6} key={field.label}>
+            <Typography variant="subtitle2">{field.label}</Typography>
+            <Typography variant="body2" color="text.secondary">
+              {String(field.value)}
+            </Typography>
+          </Grid>
+        ))}
+      </Grid>
+    );
+  };
+
+  const renderFinancialSummarySection = (data: any) => {
+    const summary = Array.isArray(data) ? data[0] : data;
+    if (!summary || typeof summary !== 'object') {
+      return (
+        <Typography variant="body2" color="text.secondary">
+          No financial summary available.
+        </Typography>
+      );
+    }
+
+    const metrics = [
+      { label: 'Total Revenue', value: summary.totalRevenue },
+      { label: 'Paid Revenue', value: summary.paidRevenue },
+      { label: 'Outstanding Revenue', value: summary.outstandingRevenue },
+      { label: 'Total Expenses', value: summary.totalExpenses },
+      { label: 'Net Income', value: summary.netIncome },
+      { label: 'Invoice Count', value: summary.invoiceCount },
+      { label: 'Transaction Count', value: summary.transactionCount },
+    ].filter((metric) => metric.value !== undefined && metric.value !== null);
+
+    if (!metrics.length) {
+      return (
+        <Typography variant="body2" color="text.secondary">
+          Financial summary data is unavailable for this organization.
+        </Typography>
+      );
+    }
+
+    return (
+      <Grid container spacing={2}>
+        {metrics.map((metric) => (
+          <Grid item xs={12} sm={6} md={4} key={metric.label}>
+            <Card variant="outlined">
+              <CardContent>
+                <Typography variant="subtitle2" color="text.secondary">
+                  {metric.label}
+                </Typography>
+                <Typography variant="h6">
+                  {typeof metric.value === 'number' || /^[0-9\.\-]+$/.test(String(metric.value))
+                    ? formatCurrency(metric.value)
+                    : String(metric.value)}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+    );
+  };
+
+  const renderTableSection = (section: SectionConfig, data: any) => {
+    const rows = Array.isArray(data) ? data.slice(0, section.limit || 25) : [];
+    if (!rows.length) {
+      return (
+        <Typography variant="body2" color="text.secondary">
+          No {section.title.toLowerCase()} available.
+        </Typography>
+      );
+    }
+
+    const columns = section.columns;
+    if (!columns || !columns.length) {
+      return (
+        <Typography variant="body2" color="text.secondary">
+          No columns configured for this section.
+        </Typography>
+      );
+    }
+
+    return (
+      <TableContainer component={Paper} sx={{ maxHeight: 360 }}>
+        <Table size="small" stickyHeader>
+          <TableHead>
+            <TableRow>
+              {columns.map((column) => (
+                <TableCell key={column.key}>{column.label}</TableCell>
+              ))}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {rows.map((row, index) => (
+              <TableRow hover key={getRowKey(row, index)}>
+                {columns.map((column) => (
+                  <TableCell key={column.key}>
+                    {column.render ? column.render(row) : row[column.key] || '—'}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    );
+  };
+
+  const renderSectionContent = (section: SectionConfig) => {
+    const state = sectionState[section.id];
+
+    if (!state || state.status === 'idle') {
+      return (
+        <Typography variant="body2" color="text.secondary">
+          Select an organization to load {section.title.toLowerCase()}.
+        </Typography>
+      );
+    }
+
+    if (state.status === 'loading') {
+      return (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 2 }}>
+          <CircularProgress size={24} />
+          <Typography variant="body2">Loading {section.title.toLowerCase()}...</Typography>
+        </Box>
+      );
+    }
+
+    if (state.status === 'error') {
+      return (
+        <Alert severity="error">
+          {state.error || `Failed to load ${section.title.toLowerCase()}.`}
+        </Alert>
+      );
+    }
+
+    if (section.id === 'organization') {
+      return renderOrganizationSection(state.data);
+    }
+
+    if (section.id === 'financial-summary') {
+      return renderFinancialSummarySection(state.data);
+    }
+
+    return renderTableSection(section, state.data);
+  };
+
   if (!status.connected) {
     return (
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
         <Typography variant="h4" gutterBottom>
           Xero Integration
         </Typography>
-        
+
         {renderConnectionStatus()}
-        
+
         <Card>
-          <CardContent>
-            <Alert severity="info" sx={{ mb: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Connect to Xero to Access Your Data
-              </Typography>
-              <Typography>
-                Connect your Xero account to process BAS (Business Activity Statements) and FAS (Fringe Benefits Tax) data.
-                You'll be able to select from your available organizations and process compliance data automatically.
-              </Typography>
-            </Alert>
-            
-            <Box sx={{ textAlign: 'center' }}>
-              <Button
-                variant="contained"
-                size="large"
-                onClick={connect}
-                disabled={isLoading}
-                sx={{ minWidth: 200 }}
-              >
-                {isLoading ? (
-                  <>
-                    <CircularProgress size={24} sx={{ mr: 2 }} />
-                    Connecting...
-                  </>
-                ) : (
-                  'Connect to Xero'
-                )}
-              </Button>
-            </Box>
+          <CardContent sx={{ textAlign: 'center' }}>
+            <Typography variant="h6" gutterBottom>
+              Connect to Xero to Access Your Data
+            </Typography>
+            <Typography color="text.secondary" sx={{ mb: 3 }}>
+              Connect your Xero account to view organization insights and synced financial data.
+            </Typography>
+            <Button
+              variant="contained"
+              size="large"
+              onClick={connect}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <CircularProgress size={20} color="inherit" />
+                  Connecting...
+                </Box>
+              ) : (
+                'Connect to Xero'
+              )}
+            </Button>
           </CardContent>
         </Card>
       </Container>
     );
   }
 
-  // Render main interface
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Typography variant="h4" gutterBottom>
         Xero Integration
       </Typography>
-      
-      {renderConnectionStatus()}
-      
-      <Paper sx={{ width: '100%' }}>
-        <Tabs
-          value={activeTab}
-          onChange={handleTabChange}
-          aria-label="Xero integration tabs"
-          sx={{ borderBottom: 1, borderColor: 'divider' }}
-        >
-          <Tab label="BAS Processing" {...a11yProps(0)} />
-          <Tab label="FAS Processing" {...a11yProps(1)} />
-        </Tabs>
-        
-        <TabPanel value={activeTab} index={0}>
-          <BASProcessor />
-        </TabPanel>
-        
-        <TabPanel value={activeTab} index={1}>
-          <FASProcessor />
-        </TabPanel>
-      </Paper>
 
-      {/* Settings Dialog */}
-      <Dialog open={settingsOpen} onClose={handleSettingsClose} maxWidth="sm" fullWidth>
-        <DialogTitle>Xero Settings</DialogTitle>
-        <DialogContent>
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Connection Information
-            </Typography>
-            <Box sx={{ p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}>
-              <Typography variant="body2" color="text.secondary">
-                <strong>Status:</strong> {status.connected ? 'Connected' : 'Not Connected'}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                <strong>Token Valid:</strong> {status.isTokenValid ? 'Yes' : 'No'}
-              </Typography>
-              {status.expiresAt && (
-                <Typography variant="body2" color="text.secondary">
-                  <strong>Token Expires:</strong> {new Date(status.expiresAt).toLocaleString()}
+      {renderConnectionStatus()}
+
+      {!tenantIdentifier && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          Select an organization to load Xero data.
+        </Alert>
+      )}
+
+      {tenantIdentifier &&
+        DATA_SECTIONS.map((section) => (
+          <Card key={section.id} sx={{ mb: 3 }}>
+            <CardContent>
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  mb: section.description ? 1 : 0,
+                }}
+              >
+                <Typography variant="h6">{section.title}</Typography>
+                <Tooltip title={`Refresh ${section.title}`}>
+                  <span>
+                    <IconButton
+                      onClick={() => handleRefreshSection(section)}
+                      disabled={sectionState[section.id]?.status === 'loading'}
+                    >
+                      <RefreshIcon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              </Box>
+
+              {section.description && (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  {section.description}
                 </Typography>
               )}
-              <Typography variant="body2" color="text.secondary">
-                <strong>Available Organizations:</strong> {availableTenants.length}
-              </Typography>
-            </Box>
-          </Box>
 
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Available Organizations
-            </Typography>
-            {availableTenants.length > 0 ? (
-              <Box>
-                {availableTenants.map((tenant, index) => (
-                  <Box key={tenant.tenantId || tenant.id} sx={{ mb: 1 }}>
-                    <Chip
-                      label={tenant.name || tenant.organizationName}
-                      variant={selectedTenant?.tenantId === tenant.tenantId ? 'filled' : 'outlined'}
-                      color={selectedTenant?.tenantId === tenant.tenantId ? 'primary' : 'default'}
-                      size="small"
-                    />
-                  </Box>
-                ))}
-              </Box>
-            ) : (
-              <Typography variant="body2" color="text.secondary">
-                No organizations available
-              </Typography>
-            )}
-          </Box>
+              {renderSectionContent(section)}
+            </CardContent>
+          </Card>
+        ))}
+
+      <Dialog open={settingsOpen} onClose={() => setSettingsOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Xero Settings</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            Tenant management and advanced settings will be available here soon.
+          </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleSettingsClose}>Close</Button>
-          <Button onClick={handleRefresh} disabled={refreshing}>
-            {refreshing ? <CircularProgress size={16} /> : 'Refresh'}
+          <Button onClick={() => setSettingsOpen(false)}>Close</Button>
+          <Button onClick={handleConnectionRefresh} disabled={connectionRefreshing}>
+            {connectionRefreshing ? <CircularProgress size={16} /> : 'Refresh'}
           </Button>
           <Button onClick={handleDisconnect} color="error">
             Disconnect
