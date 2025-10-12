@@ -15,11 +15,45 @@ import {
 export const isPlainObject = (value: any): value is Record<string, any> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
-const flattenArray = (value: any): any => {
+const isPrimitive = (value: any) =>
+  value === null || ['string', 'number', 'boolean'].includes(typeof value);
+
+const mergeKey = (prefix: string, key: string) => (prefix ? `${prefix} › ${key}` : key);
+
+const flattenArray = (value: any): any[] => {
   if (Array.isArray(value)) {
     return value.flatMap((item) => flattenArray(item));
   }
   return [value];
+};
+
+const flattenObject = (obj: any, prefix = ''): Record<string, any> => {
+  if (!isPlainObject(obj)) {
+    return { [prefix || 'Value']: obj };
+  }
+
+  return Object.entries(obj).reduce<Record<string, any>>((acc, [key, value]) => {
+    const nextKey = mergeKey(prefix, key);
+    if (isPlainObject(value)) {
+      Object.assign(acc, flattenObject(value, nextKey));
+    } else if (Array.isArray(value)) {
+      if (value.every(isPrimitive) && value.length <= 8) {
+        acc[nextKey] = value.join(', ');
+      } else {
+        acc[nextKey] = `${value.length} items`;
+      }
+    } else {
+      acc[nextKey] = value;
+    }
+    return acc;
+  }, {});
+};
+
+const normalizeRow = (row: any): Record<string, any> => {
+  if (!isPlainObject(row)) {
+    return { Value: row };
+  }
+  return flattenObject(row);
 };
 
 export const getSectionData = (source: any, key: string) => {
@@ -43,7 +77,7 @@ export const getSectionData = (source: any, key: string) => {
   return null;
 };
 
-const flattenReportRows = (rows: any[], depth = 0): Record<string, any>[] => {
+const flattenReportRows = (rows: any[]): Record<string, any>[] => {
   const items: Record<string, any>[] = [];
 
   if (!Array.isArray(rows)) {
@@ -54,49 +88,29 @@ const flattenReportRows = (rows: any[], depth = 0): Record<string, any>[] => {
     if (!row) return;
 
     if (row.RowType === 'Section' && Array.isArray(row.Rows)) {
-      // Add section header if it has a title
       if (row.Title) {
-        items.push({
-          'Description': `📁 ${row.Title}`,
-          'Value': 'Section Header',
-          'Type': 'Section'
-        });
+        items.push({ Section: row.Title });
       }
-      items.push(...flattenReportRows(row.Rows, depth + 1));
+      items.push(...flattenReportRows(row.Rows));
       return;
     }
 
     if (Array.isArray(row.Cells)) {
       const record: Record<string, any> = {};
-      
-      // Add row type for context
-      if (row.RowType) {
-        record['Type'] = row.RowType;
-      }
-      
       row.Cells.forEach((cell: any, index: number) => {
-        let key;
-        
-        if (index === 0) {
-          key = 'Description';
-        } else if (row.Cells.length === 2 && index === row.Cells.length - 1) {
-          key = 'Value';
-        } else if (index === 1) {
-          key = 'Current Period';
-        } else if (index === 2) {
-          key = 'Previous Period';
+        const columnKey =
+          index === 0
+            ? 'Description'
+            : row.Cells.length === 2 && index === row.Cells.length - 1
+            ? 'Value'
+            : `Column ${index + 1}`;
+
+        if (record[columnKey] !== undefined) {
+          record[`${columnKey} (${index + 1})`] = cell?.Value ?? '';
         } else {
-          key = `Column ${index + 1}`;
-        }
-        
-        // Handle duplicate keys
-        if (record[key] !== undefined) {
-          record[`${key} (${index + 1})`] = cell?.Value ?? '';
-        } else {
-          record[key] = cell?.Value ?? '';
+          record[columnKey] = cell?.Value ?? '';
         }
       });
-      
       if (Object.keys(record).length > 0) {
         items.push(record);
       }
@@ -140,56 +154,57 @@ const normalizeXeroValue = (value: any): any => {
   return value;
 };
 
-const renderKeyValuePairs = (data: Record<string, any>) => (
-  <Grid container spacing={1} sx={{ mt: 1 }}>
-    {Object.entries(data)
-      .slice(0, 12)
-      .map(([label, value]) => (
+const formatCellValue = (value: any, column: string): string => {
+  if (value === null || value === undefined) return '—';
+
+  const strValue = String(value);
+  const lowerColumn = column.toLowerCase();
+
+  if (
+    lowerColumn.includes('value') ||
+    lowerColumn.includes('amount') ||
+    lowerColumn.includes('total') ||
+    lowerColumn.includes('payable')
+  ) {
+    const numValue = Number(value);
+    if (!Number.isNaN(numValue)) {
+      return numValue.toLocaleString('en-AU', {
+        style: 'currency',
+        currency: 'AUD',
+        minimumFractionDigits: 2,
+      });
+    }
+  }
+
+  if (strValue.includes('/Date(') || (strValue.includes('T') && strValue.includes('Z'))) {
+    const date = new Date(strValue);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toLocaleDateString('en-AU');
+    }
+  }
+
+  if (lowerColumn.includes('rate') && typeof value === 'number') {
+    return `${value}%`;
+  }
+
+  return strValue;
+};
+
+const renderPrimitiveGrid = (entries: Array<[string, any]>) => {
+  if (!entries.length) return null;
+
+  return (
+    <Grid container spacing={1} sx={{ mt: 1 }}>
+      {entries.map(([label, value]) => (
         <Grid item xs={12} sm={6} md={4} key={label}>
           <Typography variant="caption" color="text.secondary">
             {label}
           </Typography>
-          <Typography variant="body2">{String(value ?? '—')}</Typography>
+          <Typography variant="body2">{formatCellValue(value, label)}</Typography>
         </Grid>
       ))}
-  </Grid>
-);
-
-const formatCellValue = (value: any, column: string): string => {
-  if (value === null || value === undefined) return '—';
-  
-  const strValue = String(value);
-  
-  // Format currency values
-  if (column.toLowerCase().includes('value') || 
-      column.toLowerCase().includes('amount') || 
-      column.toLowerCase().includes('total') ||
-      column.toLowerCase().includes('payable') ||
-      (typeof value === 'number' && !isNaN(value) && Math.abs(value) > 10)) {
-    const numValue = parseFloat(strValue);
-    if (!isNaN(numValue)) {
-      return `$${numValue.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    }
-  }
-  
-  // Format dates
-  if (strValue.includes('/Date(') || strValue.includes('T') && strValue.includes('Z')) {
-    try {
-      const date = new Date(strValue);
-      if (!isNaN(date.getTime())) {
-        return date.toLocaleDateString('en-AU');
-      }
-    } catch (e) {
-      // Keep original value if parsing fails
-    }
-  }
-  
-  // Format percentages
-  if (column.toLowerCase().includes('rate') && typeof value === 'number') {
-    return `${value}%`;
-  }
-  
-  return strValue;
+    </Grid>
+  );
 };
 
 const renderGenericTable = (rows: any[], prefix: string) => {
@@ -201,9 +216,10 @@ const renderGenericTable = (rows: any[], prefix: string) => {
     );
   }
 
+  const normalizedRows = rows.map((row) => normalizeRow(row));
   const uniqueRows = Array.from(
     new Map(
-      rows.map((row, index) => [JSON.stringify(row) + index, row || {}]),
+      normalizedRows.map((row, index) => [JSON.stringify(row) + index, row]),
     ).values(),
   );
 
@@ -214,7 +230,7 @@ const renderGenericTable = (rows: any[], prefix: string) => {
         return acc.concat(keys);
       }, []),
     ),
-  ).slice(0, 8);
+  ).slice(0, 12);
 
   if (!columns.length) {
     return (
@@ -225,16 +241,16 @@ const renderGenericTable = (rows: any[], prefix: string) => {
   }
 
   return (
-    <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
+    <TableContainer component={Paper} sx={{ maxHeight: 420 }}>
       <Table size="small" stickyHeader>
         <TableHead>
           <TableRow>
             {columns.map((column) => (
-              <TableCell 
+              <TableCell
                 key={column}
-                sx={{ 
+                sx={{
                   fontWeight: 'bold',
-                  backgroundColor: 'grey.100'
+                  backgroundColor: 'grey.100',
                 }}
               >
                 {column}
@@ -244,21 +260,9 @@ const renderGenericTable = (rows: any[], prefix: string) => {
         </TableHead>
         <TableBody>
           {uniqueRows.slice(0, 50).map((row, index) => (
-            <TableRow 
-              hover 
-              key={`${prefix}-${index}`}
-              sx={{
-                backgroundColor: row.Type === 'Section' ? 'grey.50' : 'inherit'
-              }}
-            >
+            <TableRow hover key={`${prefix}-${index}`}>
               {columns.map((column) => (
-                <TableCell 
-                  key={column}
-                  sx={{
-                    fontWeight: row.Type === 'Section' ? 'bold' : 'normal',
-                    fontFamily: column.toLowerCase().includes('value') || column.toLowerCase().includes('amount') ? 'monospace' : 'inherit'
-                  }}
-                >
+                <TableCell key={column}>
                   {formatCellValue(row?.[column], column)}
                 </TableCell>
               ))}
@@ -270,25 +274,7 @@ const renderGenericTable = (rows: any[], prefix: string) => {
   );
 };
 
-const renderJsonPreview = (value: any) => (
-  <Box
-    sx={{
-      mt: 1,
-      maxHeight: 240,
-      overflow: 'auto',
-      backgroundColor: 'grey.100',
-      borderRadius: 1,
-      p: 2,
-      fontFamily: 'monospace',
-      fontSize: '0.75rem',
-      whiteSpace: 'pre',
-    }}
-  >
-    {JSON.stringify(value, null, 2)}
-  </Box>
-);
-
-const renderSection = (label: string, value: any) => {
+const renderSection = (label: string, value: any): React.ReactNode => {
   if (value === undefined || value === null) {
     return null;
   }
@@ -308,49 +294,19 @@ const renderSection = (label: string, value: any) => {
   }
 
   if (isPlainObject(normalized)) {
-    // Check if this is a complex nested object that should be displayed as a table
-    const hasNestedArrays = Object.values(normalized).some(val => Array.isArray(val));
-    const hasComplexNestedObjects = Object.values(normalized).some(val => 
-      val && typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length > 5
-    );
-
-    if (hasNestedArrays || hasComplexNestedObjects) {
-      // For complex objects, try to extract tabular data
-      const tableData = [];
-      Object.entries(normalized).forEach(([key, value]) => {
-        if (Array.isArray(value)) {
-          value.forEach((item, index) => {
-            if (typeof item === 'object' && item !== null) {
-              tableData.push({ 'Type': key, 'Index': index, ...item });
-            } else {
-              tableData.push({ 'Type': key, 'Index': index, 'Value': item });
-            }
-          });
-        } else if (value && typeof value === 'object' && !Array.isArray(value)) {
-          tableData.push({ 'Type': key, ...value });
-        } else {
-          tableData.push({ 'Type': key, 'Value': value });
-        }
-      });
-
-      if (tableData.length > 0) {
-        return (
-          <Box key={label} sx={{ mb: 3 }}>
-            <Typography variant="subtitle1" sx={{ mb: 1 }}>
-              {label}
-            </Typography>
-            {renderGenericTable(tableData, label)}
-          </Box>
-        );
-      }
-    }
+    const entries = Object.entries(normalized);
+    const primitives = entries.filter(([, v]) => isPrimitive(v));
+    const complex = entries.filter(([, v]) => !isPrimitive(v));
 
     return (
       <Box key={label} sx={{ mb: 3 }}>
         <Typography variant="subtitle1" sx={{ mb: 1 }}>
           {label}
         </Typography>
-        {renderKeyValuePairs(normalized)}
+        {renderPrimitiveGrid(primitives)}
+        {complex.map(([childLabel, childValue]) =>
+          renderSection(`${label} › ${childLabel}`, childValue),
+        )}
       </Box>
     );
   }
@@ -360,7 +316,7 @@ const renderSection = (label: string, value: any) => {
       <Typography variant="subtitle1" sx={{ mb: 1 }}>
         {label}
       </Typography>
-      <Typography variant="body2">{String(normalized)}</Typography>
+      <Typography variant="body2">{formatCellValue(normalized, label)}</Typography>
     </Box>
   );
 };
