@@ -15,6 +15,13 @@ import {
 export const isPlainObject = (value: any): value is Record<string, any> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
+const flattenArray = (value: any): any => {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => flattenArray(item));
+  }
+  return [value];
+};
+
 export const getSectionData = (source: any, key: string) => {
   if (!source) return null;
   const variants = [key, key.toLowerCase(), key.toUpperCase()];
@@ -133,9 +140,15 @@ const renderGenericTable = (rows: any[], prefix: string) => {
     );
   }
 
+  const uniqueRows = Array.from(
+    new Map(
+      rows.map((row, index) => [JSON.stringify(row) + index, row || {}]),
+    ).values(),
+  );
+
   const columns = Array.from(
     new Set(
-      rows.reduce<string[]>((acc, row) => {
+      uniqueRows.reduce<string[]>((acc, row) => {
         const keys = Object.keys(row || {});
         return acc.concat(keys);
       }, []),
@@ -161,7 +174,7 @@ const renderGenericTable = (rows: any[], prefix: string) => {
           </TableRow>
         </TableHead>
         <TableBody>
-          {rows.slice(0, 25).map((row, index) => (
+          {uniqueRows.slice(0, 25).map((row, index) => (
             <TableRow hover key={`${prefix}-${index}`}>
               {columns.map((column) => (
                 <TableCell key={column}>{String(row?.[column] ?? '—')}</TableCell>
@@ -197,7 +210,8 @@ const renderSection = (label: string, value: any) => {
     return null;
   }
 
-  const normalized = normalizeXeroValue(value);
+  const flattened = flattenArray(normalizeXeroValue(value));
+  const normalized = flattened.length === 1 ? flattened[0] : flattened;
 
   if (Array.isArray(normalized)) {
     return (
