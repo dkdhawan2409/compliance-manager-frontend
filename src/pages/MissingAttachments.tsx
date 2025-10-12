@@ -33,10 +33,24 @@ import {
 } from '../api/missingAttachmentService';
 import { useXero } from '../contexts/XeroContext';
 
+const CONFIG_COMPARISON_FIELDS: (keyof MissingAttachmentConfig)[] = [
+  'gstThreshold',
+  'linkExpiryDays',
+  'smsEnabled',
+  'phoneNumber',
+  'emailEnabled',
+  'emailAddress',
+  'enabled',
+  'notificationFrequency',
+  'maxDailyNotifications',
+];
+
 const MissingAttachments: React.FC = () => {
   const { state: xeroState, refreshToken, selectTenant } = useXero();
   const [activeTab, setActiveTab] = useState<'overview' | 'config' | 'transactions' | 'links'>('overview');
   const [config, setConfig] = useState<MissingAttachmentConfig | null>(null);
+  const [configDraft, setConfigDraft] = useState<MissingAttachmentConfig | null>(null);
+  const [savingConfig, setSavingConfig] = useState(false);
   const [statistics, setStatistics] = useState<Statistics | null>(null);
   const [missingTransactions, setMissingTransactions] = useState<MissingTransaction[]>([]);
   const [uploadLinks, setUploadLinks] = useState<UploadLink[]>([]);
@@ -70,6 +84,7 @@ const MissingAttachments: React.FC = () => {
       ]);
       
       setConfig(configData);
+      setConfigDraft(configData);
       setStatistics(statsData);
       setTokenStatus(tokenStatusData);
       
@@ -103,18 +118,140 @@ const MissingAttachments: React.FC = () => {
     loadData();
   }, [loadData]);
 
-  const handleConfigUpdate = useCallback(async (updates: Partial<MissingAttachmentConfig>) => {
-    if (!config) return;
-    
+  useEffect(() => {
+    if (!config) {
+      setConfigDraft(null);
+      return;
+    }
+
+    setConfigDraft((prev) => {
+      if (!prev) {
+        return { ...config };
+      }
+
+      const hasUnsavedChanges = CONFIG_COMPARISON_FIELDS.some(
+        (field) => (prev?.[field] ?? null) !== (config?.[field] ?? null),
+      );
+      return hasUnsavedChanges ? prev : { ...config };
+    });
+  }, [config]);
+
+  const updateConfigDraft = useCallback((field: keyof MissingAttachmentConfig, value: any) => {
+    setConfigDraft((prev) => (prev ? { ...prev, [field]: value } : prev));
+  }, []);
+
+  const configValidation = useMemo(() => {
+    const errors: {
+      gstThreshold?: string;
+      linkExpiryDays?: string;
+      phoneNumber?: string;
+      emailAddress?: string;
+    } = {};
+
+    if (!configDraft) {
+      return errors;
+    }
+
+    const gstThreshold = Number(configDraft.gstThreshold ?? 0);
+    if (!Number.isFinite(gstThreshold) || gstThreshold < 0 || gstThreshold > 999999.99) {
+      errors.gstThreshold = 'GST threshold must be between 0 and 999,999.99';
+    }
+
+    const linkExpiryDays = Number(configDraft.linkExpiryDays ?? 0);
+    if (!Number.isInteger(linkExpiryDays) || linkExpiryDays < 1 || linkExpiryDays > 30) {
+      errors.linkExpiryDays = 'Link expiry must be between 1 and 30 days';
+    }
+
+    if (configDraft.smsEnabled) {
+      const phone = (configDraft.phoneNumber || '').trim();
+      if (!phone) {
+        errors.phoneNumber = 'Phone number is required when SMS notifications are enabled.';
+      } else {
+        const cleaned = phone.replace(/[^\d+]/g, '');
+        if (cleaned.startsWith('+')) {
+          const digits = cleaned.substring(1);
+          if (!/^\d{7,15}$/.test(digits)) {
+            errors.phoneNumber = 'Enter a valid international phone number (+ followed by 7-15 digits).';
+          }
+        } else if (!/^\d{7,15}$/.test(cleaned)) {
+          errors.phoneNumber = 'Enter a valid phone number with 7-15 digits.';
+        }
+      }
+    }
+
+    if (configDraft.emailEnabled) {
+      const email = (configDraft.emailAddress || '').trim();
+      if (!email) {
+        errors.emailAddress = 'Email address is required when email notifications are enabled.';
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        errors.emailAddress = 'Enter a valid email address.';
+      }
+    }
+
+    return errors;
+  }, [configDraft]);
+
+  const hasValidationErrors = useMemo(
+    () => Object.values(configValidation).some((message) => Boolean(message)),
+    [configValidation],
+  );
+
+  const isConfigDirty = useMemo(() => {
+    if (!configDraft || !config) {
+      return false;
+    }
+    return CONFIG_COMPARISON_FIELDS.some(
+      (field) => (configDraft?.[field] ?? null) !== (config?.[field] ?? null),
+    );
+  }, [configDraft, config]);
+
+  const handleResetConfig = useCallback(() => {
+    if (config) {
+      setConfigDraft({ ...config });
+    }
+  }, [config]);
+
+  const handleSaveConfig = useCallback(async () => {
+    if (!configDraft) {
+      return;
+    }
+
+    if (hasValidationErrors) {
+      toast.error('Please fix the highlighted fields before saving.');
+      return;
+    }
+
+    const updates: Partial<MissingAttachmentConfig> = {};
+    CONFIG_COMPARISON_FIELDS.forEach((field) => {
+      const draftValue = configDraft[field];
+      const originalValue = config?.[field];
+      const normalizedDraft =
+        typeof draftValue === 'string'
+          ? draftValue.trim()
+          : draftValue;
+
+      if (normalizedDraft !== originalValue) {
+        (updates as any)[field] = normalizedDraft;
+      }
+    });
+
+    if (Object.keys(updates).length === 0) {
+      toast('No changes to save.');
+      return;
+    }
+
     try {
+      setSavingConfig(true);
       const updatedConfig = await updateMissingAttachmentConfig(updates);
       setConfig(updatedConfig);
       toast.success('Configuration updated successfully');
     } catch (error: any) {
       console.error('Error updating config:', error);
       toast.error('Failed to update configuration');
+    } finally {
+      setSavingConfig(false);
     }
-  }, [config]);
+  }, [configDraft, config, hasValidationErrors]);
 
   const handleDetectMissing = useCallback(async () => {
     try {
@@ -831,10 +968,35 @@ const MissingAttachments: React.FC = () => {
         </div>
       )}
 
-      {activeTab === 'config' && config && (
+      {activeTab === 'config' && config && configDraft && (
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-6">Configuration Settings</h2>
-          
+          <div className="flex flex-col gap-4 mb-6 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Configuration Settings</h2>
+              <p className="text-sm text-gray-500">
+                Update your notification preferences, then click Save to apply changes.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleResetConfig}
+                disabled={!isConfigDirty || savingConfig}
+                className="px-4 py-2 text-sm border border-gray-300 rounded-md text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Reset
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveConfig}
+                disabled={!isConfigDirty || hasValidationErrors || savingConfig}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed"
+              >
+                {savingConfig ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+
           <div className="space-y-6">
             {/* General Settings */}
             <div>
@@ -847,15 +1009,24 @@ const MissingAttachments: React.FC = () => {
                   <input
                     type="number"
                     step="0.01"
-                    value={config.gstThreshold}
-                    onChange={(e) => handleConfigUpdate({ gstThreshold: parseFloat(e.target.value) })}
+                    value={configDraft.gstThreshold}
+                    onChange={(e) => {
+                      const next = Number.parseFloat(e.target.value);
+                      updateConfigDraft(
+                        'gstThreshold',
+                        Number.isNaN(next) ? configDraft.gstThreshold : next,
+                      );
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     Transactions above this amount are flagged as high risk
                   </p>
+                  {configValidation.gstThreshold && (
+                    <p className="text-xs text-red-600 mt-1">{configValidation.gstThreshold}</p>
+                  )}
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Link Expiry (Days)
@@ -864,10 +1035,19 @@ const MissingAttachments: React.FC = () => {
                     type="number"
                     min="1"
                     max="30"
-                    value={config.linkExpiryDays}
-                    onChange={(e) => handleConfigUpdate({ linkExpiryDays: parseInt(e.target.value) })}
+                    value={configDraft.linkExpiryDays}
+                    onChange={(e) => {
+                      const next = Number.parseInt(e.target.value, 10);
+                      updateConfigDraft(
+                        'linkExpiryDays',
+                        Number.isNaN(next) ? configDraft.linkExpiryDays : next,
+                      );
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                  {configValidation.linkExpiryDays && (
+                    <p className="text-xs text-red-600 mt-1">{configValidation.linkExpiryDays}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -880,58 +1060,75 @@ const MissingAttachments: React.FC = () => {
                   <input
                     type="checkbox"
                     id="smsEnabled"
-                    checked={config.smsEnabled}
-                    onChange={(e) => handleConfigUpdate({ smsEnabled: e.target.checked })}
+                    checked={configDraft.smsEnabled}
+                    onChange={(e) => updateConfigDraft('smsEnabled', e.target.checked)}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                   />
                   <label htmlFor="smsEnabled" className="text-sm font-medium text-gray-700">
                     Enable SMS Notifications
                   </label>
                 </div>
-                
-                {config.smsEnabled && (
+
+                {configDraft.smsEnabled && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Phone Number
                     </label>
                     <input
                       type="tel"
-                      value={config.phoneNumber || ''}
-                      onChange={(e) => handleConfigUpdate({ phoneNumber: e.target.value })}
+                      inputMode="tel"
+                      pattern="^[+0-9\s-]{7,20}$"
+                      maxLength={20}
+                      value={configDraft.phoneNumber || ''}
+                      onChange={(e) => updateConfigDraft('phoneNumber', e.target.value)}
                       placeholder="+61412345678 or 0412345678"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+                        configValidation.phoneNumber
+                          ? 'border-red-300 focus:ring-red-500'
+                          : 'border-gray-300 focus:ring-blue-500'
+                      }`}
                     />
                     <p className="text-xs text-gray-500 mt-1">
                       Enter phone number in international format (+61412345678) or national format (0412345678)
                     </p>
+                    {configValidation.phoneNumber && (
+                      <p className="text-xs text-red-600 mt-1">{configValidation.phoneNumber}</p>
+                    )}
                   </div>
                 )}
-                
+
                 <div className="flex items-center space-x-3">
                   <input
                     type="checkbox"
                     id="emailEnabled"
-                    checked={config.emailEnabled}
-                    onChange={(e) => handleConfigUpdate({ emailEnabled: e.target.checked })}
+                    checked={configDraft.emailEnabled}
+                    onChange={(e) => updateConfigDraft('emailEnabled', e.target.checked)}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                   />
                   <label htmlFor="emailEnabled" className="text-sm font-medium text-gray-700">
                     Enable Email Notifications
                   </label>
                 </div>
-                
-                {config.emailEnabled && (
+
+                {configDraft.emailEnabled && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Email Address
                     </label>
                     <input
                       type="email"
-                      value={config.emailAddress || ''}
-                      onChange={(e) => handleConfigUpdate({ emailAddress: e.target.value })}
+                      value={configDraft.emailAddress || ''}
+                      onChange={(e) => updateConfigDraft('emailAddress', e.target.value)}
                       placeholder="notifications@company.com"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+                        configValidation.emailAddress
+                          ? 'border-red-300 focus:ring-red-500'
+                          : 'border-gray-300 focus:ring-blue-500'
+                      }`}
                     />
+                    {configValidation.emailAddress && (
+                      <p className="text-xs text-red-600 mt-1">{configValidation.emailAddress}</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -944,14 +1141,17 @@ const MissingAttachments: React.FC = () => {
                 <input
                   type="checkbox"
                   id="enabled"
-                  checked={config.enabled}
-                  onChange={(e) => handleConfigUpdate({ enabled: e.target.checked })}
+                  checked={configDraft.enabled}
+                  onChange={(e) => updateConfigDraft('enabled', e.target.checked)}
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
                 <label htmlFor="enabled" className="text-sm font-medium text-gray-700">
                   Enable Missing Attachment Detection
                 </label>
               </div>
+              <p className="text-xs text-gray-500 mt-1">
+                When disabled, missing attachment detection and notifications will be paused.
+              </p>
             </div>
           </div>
         </div>
