@@ -54,6 +54,144 @@ interface BASCalculationResult {
   lastUpdated: string;
 }
 
+const isPlainObject = (value: any): value is Record<string, any> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+const getSectionData = (source: any, key: string) => {
+  if (!source) return null;
+
+  const variants = [key, key.toLowerCase(), key.toUpperCase()];
+
+  for (const variant of variants) {
+    if (source[variant] !== undefined) {
+      return source[variant];
+    }
+  }
+
+  if (isPlainObject(source.data)) {
+    for (const variant of variants) {
+      if (source.data[variant] !== undefined) {
+        return source.data[variant];
+      }
+    }
+  }
+
+  return null;
+};
+
+const renderKeyValuePairs = (data: Record<string, any>) => (
+  <Grid container spacing={1} sx={{ mt: 1 }}>
+    {Object.entries(data)
+      .slice(0, 12)
+      .map(([label, value]) => (
+        <Grid item xs={12} sm={6} md={4} key={label}>
+          <Typography variant="caption" color="text.secondary">
+            {label}
+          </Typography>
+          <Typography variant="body2">{String(value ?? '—')}</Typography>
+        </Grid>
+      ))}
+  </Grid>
+);
+
+const renderGenericTable = (rows: any[]) => {
+  if (!rows.length) {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        No records available.
+      </Typography>
+    );
+  }
+
+  const columns = Array.from(
+    new Set(
+      rows.reduce<string[]>((acc, row) => {
+        const keys = Object.keys(row || {});
+        return acc.concat(keys);
+      }, []),
+    ),
+  ).slice(0, 8);
+
+  if (!columns.length) {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        Unable to determine columns for this dataset.
+      </Typography>
+    );
+  }
+
+  return (
+    <TableContainer component={Paper} sx={{ maxHeight: 360 }}>
+      <Table size="small" stickyHeader>
+        <TableHead>
+          <TableRow>
+            {columns.map((column) => (
+              <TableCell key={column}>{column}</TableCell>
+            ))}
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {rows.slice(0, 15).map((row, index) => (
+            <TableRow hover key={getRowKey(row, index)}>
+              {columns.map((column) => (
+                <TableCell key={column}>{String(row?.[column] ?? '—')}</TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+};
+
+const renderJsonPreview = (value: any) => (
+  <Box
+    sx={{
+      mt: 1,
+      maxHeight: 240,
+      overflow: 'auto',
+      backgroundColor: 'grey.100',
+      borderRadius: 1,
+      p: 2,
+      fontFamily: 'monospace',
+      fontSize: '0.75rem',
+      whiteSpace: 'pre',
+    }}
+  >
+    {JSON.stringify(value, null, 2)}
+  </Box>
+);
+
+const renderDataPreview = (label: string, value: any) => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  let content: React.ReactNode;
+
+  if (Array.isArray(value)) {
+    content = renderGenericTable(value);
+  } else if (isPlainObject(value)) {
+    content = (
+      <Box>
+        {renderKeyValuePairs(value)}
+        {renderJsonPreview(value)}
+      </Box>
+    );
+  } else {
+    content = <Typography variant="body2">{String(value)}</Typography>;
+  }
+
+  return (
+    <Box key={label} sx={{ mb: 3 }}>
+      <Typography variant="subtitle1" sx={{ mb: 1 }}>
+        {label}
+      </Typography>
+      {content}
+    </Box>
+  );
+};
+
 const BASProcessor: React.FC<BASProcessorProps> = ({
   // Xero data props
   isConnected,
@@ -132,17 +270,17 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
         setCalculationError(null);
         console.log(`📊 Loading BAS data for ${selectedTenant.name} from ${fromDate} to ${toDate}`);
         
-        const data = await loadXeroData('basData', {
+        const response = await loadXeroData('basData', {
           fromDate,
           toDate,
           useCache
         });
-
-        setBasData(data);
+        const normalized = response?.data?.data ?? response?.data ?? response;
+        setBasData(isPlainObject(normalized) ? normalized : response);
         console.log('✅ BAS data loaded successfully');
       } catch (error: any) {
         console.error('❌ Error loading BAS data:', error);
-        
+
         // Provide more helpful error messages
         let errorMessage = error.message || 'Failed to load BAS data';
         
@@ -157,9 +295,10 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
         } else if (error.message?.includes('No organization selected')) {
           errorMessage = 'Please select a Xero organization first.';
         }
-        
+
         setCalculationError(errorMessage);
         onBASErrorRef.current?.(errorMessage);
+        requestSignatureRef.current = null;
       }
     },
     [selectedTenant, fromDate, toDate, useCache, loadXeroData],
@@ -186,7 +325,6 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
   const calculateBAS = useCallback(async () => {
     if (!basData) {
       setCalculationError('No BAS data available. Please load data first.');
-      setCalculationError('Please select an organization and date range first.');
       return;
     }
 
@@ -196,8 +334,15 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
       
       console.log('🧮 Calculating BAS from aggregated Xero data...');
 
-      // The new BAS data structure contains multiple reports
-      const { gstReport, profitLoss, invoices } = basData;
+      const dataRoot = isPlainObject(basData.data) ? basData.data : basData;
+      const gstReport = getSectionData(basData, 'gstReport') || getSectionData(dataRoot, 'gstReport');
+      const profitLoss = getSectionData(basData, 'profitLoss') || getSectionData(dataRoot, 'profitLoss');
+      const invoicesWrapper = getSectionData(basData, 'invoices') || getSectionData(dataRoot, 'invoices');
+      const invoices = Array.isArray(invoicesWrapper?.Invoices)
+        ? invoicesWrapper.Invoices
+        : Array.isArray(invoicesWrapper)
+        ? invoicesWrapper
+        : [];
 
       let totalSales = 0;
       let totalPurchases = 0;
@@ -614,6 +759,30 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 2 }}>
             <CircularProgress size={24} />
             <Typography>Calculating BAS...</Typography>
+          </Box>
+        )}
+
+        {basData && (
+          <Box sx={{ mt: 4 }}>
+            <Typography variant="h6" gutterBottom>
+              Detailed BAS Data
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Raw data returned from Xero for the selected period.
+            </Typography>
+            {[
+              ['Reporting Period', getSectionData(basData, 'period')],
+              ['Metadata', getSectionData(basData, 'metadata')],
+              ['GST Report', getSectionData(basData, 'gstReport')],
+              ['BAS Reports', getSectionData(basData, 'Reports')],
+              ['Invoices', getSectionData(basData, 'invoices')?.Invoices ?? getSectionData(basData, 'invoices')],
+              ['Profit & Loss', getSectionData(basData, 'profitLoss')],
+              ['Balance Sheet', getSectionData(basData, 'balanceSheet')],
+              ['Accounts', getSectionData(basData, 'accounts')],
+              ['Bank Transactions', getSectionData(basData, 'bankTransactions')],
+              ['Payroll Summary', getSectionData(basData, 'payrollSummary')],
+            ]
+              .map(([label, value]) => renderDataPreview(label as string, value))}
           </Box>
         )}
       </CardContent>

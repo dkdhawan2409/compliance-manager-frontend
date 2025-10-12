@@ -55,6 +55,140 @@ interface FASCalculationResult {
   lastUpdated: string;
 }
 
+const isPlainObject = (value: any): value is Record<string, any> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+const getSectionData = (source: any, key: string) => {
+  if (!source) return null;
+  const variants = [key, key.toLowerCase(), key.toUpperCase()];
+  for (const variant of variants) {
+    if (source[variant] !== undefined) {
+      return source[variant];
+    }
+  }
+  if (isPlainObject(source.data)) {
+    for (const variant of variants) {
+      if (source.data[variant] !== undefined) {
+        return source.data[variant];
+      }
+    }
+  }
+  return null;
+};
+
+const renderKeyValuePairs = (data: Record<string, any>) => (
+  <Grid container spacing={1} sx={{ mt: 1 }}>
+    {Object.entries(data)
+      .slice(0, 12)
+      .map(([label, value]) => (
+        <Grid item xs={12} sm={6} md={4} key={label}>
+          <Typography variant="caption" color="text.secondary">
+            {label}
+          </Typography>
+          <Typography variant="body2">{String(value ?? '—')}</Typography>
+        </Grid>
+      ))}
+  </Grid>
+);
+
+const renderGenericTable = (rows: any[]) => {
+  if (!rows.length) {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        No records available.
+      </Typography>
+    );
+  }
+
+  const columns = Array.from(
+    new Set(
+      rows.reduce<string[]>((acc, row) => {
+        const keys = Object.keys(row || {});
+        return acc.concat(keys);
+      }, []),
+    ),
+  ).slice(0, 8);
+
+  if (!columns.length) {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        Unable to determine columns for this dataset.
+      </Typography>
+    );
+  }
+
+  return (
+    <TableContainer component={Paper} sx={{ maxHeight: 360 }}>
+      <Table size="small" stickyHeader>
+        <TableHead>
+          <TableRow>
+            {columns.map((column) => (
+              <TableCell key={column}>{column}</TableCell>
+            ))}
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {rows.slice(0, 15).map((row, index) => (
+            <TableRow hover key={`fas-${index}`}>
+              {columns.map((column) => (
+                <TableCell key={column}>{String(row?.[column] ?? '—')}</TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+};
+
+const renderJsonPreview = (value: any) => (
+  <Box
+    sx={{
+      mt: 1,
+      maxHeight: 240,
+      overflow: 'auto',
+      backgroundColor: 'grey.100',
+      borderRadius: 1,
+      p: 2,
+      fontFamily: 'monospace',
+      fontSize: '0.75rem',
+      whiteSpace: 'pre',
+    }}
+  >
+    {JSON.stringify(value, null, 2)}
+  </Box>
+);
+
+const renderDataPreview = (label: string, value: any) => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  let content: React.ReactNode;
+
+  if (Array.isArray(value)) {
+    content = renderGenericTable(value);
+  } else if (isPlainObject(value)) {
+    content = (
+      <Box>
+        {renderKeyValuePairs(value)}
+        {renderJsonPreview(value)}
+      </Box>
+    );
+  } else {
+    content = <Typography variant="body2">{String(value)}</Typography>;
+  }
+
+  return (
+    <Box key={label} sx={{ mb: 3 }}>
+      <Typography variant="subtitle1" sx={{ mb: 1 }}>
+        {label}
+      </Typography>
+      {content}
+    </Box>
+  );
+};
+
 const FASProcessor: React.FC<FASProcessorProps> = ({
   // Xero data props
   isConnected,
@@ -121,19 +255,20 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
         setCalculationError(null);
         console.log(`📊 Loading FAS data for ${selectedTenant.name} from ${fromDate} to ${toDate}`);
 
-        const data = await loadXeroData('fasData', {
+        const response = await loadXeroData('fasData', {
           fromDate,
           toDate,
           useCache
         });
-
-        setFasData(data);
+        const normalized = response?.data?.data ?? response?.data ?? response;
+        setFasData(isPlainObject(normalized) ? normalized : response);
         console.log('✅ FAS data loaded successfully');
       } catch (error: any) {
         console.error('❌ Error loading FAS data:', error);
         const message = error.message || 'Failed to load FAS data';
         setCalculationError(message);
         onFASError?.(message);
+        requestSignatureRef.current = null;
       }
     },
     [selectedTenant, fromDate, toDate, useCache, loadXeroData, onFASError]
@@ -152,41 +287,47 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
       
       console.log('🧮 Calculating FAS...');
 
-      // Extract relevant data from FAS response
-      const reports = fasData.Reports || [];
-      const fasReport = reports.find((report: any) => report.ReportType === 'FAS');
-      
-      if (!fasReport) {
-        throw new Error('FAS report not found in Xero data');
-      }
+      const dataRoot = isPlainObject(fasData.data) ? fasData.data : fasData;
+      const fasReport =
+        getSectionData(fasData, 'fasReport') ||
+        getSectionData(dataRoot, 'fasReport') ||
+        getSectionData(dataRoot, 'reports');
 
-      // Extract values from FAS report rows
-      const rows = fasReport.Rows || [];
+      const rows = Array.isArray(fasReport?.Rows)
+        ? fasReport.Rows
+        : Array.isArray(fasReport)
+        ? fasReport
+        : fasReport?.Reports?.[0]?.Rows || [];
       let totalFBT = 0;
       let fbtOnCars = 0;
       let fbtOnEntertainment = 0;
       let fbtOnOther = 0;
       let grossTaxableValue = 0;
 
-      // Process FAS report rows
-      rows.forEach((row: any) => {
-        if (row.Cells && row.Cells.length > 0) {
-          const cells = row.Cells;
-          const description = cells[0]?.Value || '';
-          const value = parseFloat(cells[cells.length - 1]?.Value || '0');
+      if (Array.isArray(rows) && rows.length > 0) {
+        rows.forEach((row: any) => {
+          if (row.Cells && row.Cells.length > 0) {
+            const cells = row.Cells;
+            const description = (cells[0]?.Value || '').toLowerCase();
+            const value = parseFloat(cells[cells.length - 1]?.Value || '0');
 
-          // Map FAS line items
-          if (description.includes('FBT') && description.includes('Car')) {
-            fbtOnCars += Math.abs(value);
-          } else if (description.includes('FBT') && description.includes('Entertainment')) {
-            fbtOnEntertainment += Math.abs(value);
-          } else if (description.includes('FBT') && !description.includes('Total')) {
-            fbtOnOther += Math.abs(value);
-          } else if (description.includes('Gross Taxable Value')) {
-            grossTaxableValue += Math.abs(value);
+            if (description.includes('car')) {
+              fbtOnCars += Math.abs(value);
+            } else if (description.includes('entertainment')) {
+              fbtOnEntertainment += Math.abs(value);
+            } else if (description.includes('gross taxable value')) {
+              grossTaxableValue += Math.abs(value);
+            } else if (description.includes('fbt')) {
+              fbtOnOther += Math.abs(value);
+            }
           }
-        }
-      });
+        });
+      } else {
+        console.warn('⚠️ FAS report rows not available; raw dataset will be displayed.');
+        setCalculationError('FAS summary report not available for this period. Showing raw dataset below.');
+        setCalculationResult(null);
+        return;
+      }
 
       totalFBT = fbtOnCars + fbtOnEntertainment + fbtOnOther;
       const fbtPayable = totalFBT * 0.47; // FBT rate is 47%
@@ -510,6 +651,28 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 2 }}>
             <CircularProgress size={24} />
             <Typography>Calculating FAS...</Typography>
+          </Box>
+        )}
+
+        {fasData && (
+          <Box sx={{ mt: 4 }}>
+            <Typography variant="h6" gutterBottom>
+              Detailed FAS Data
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Raw data returned from Xero for the selected period.
+            </Typography>
+            {[
+              ['Reporting Period', getSectionData(fasData, 'period')],
+              ['Metadata', getSectionData(fasData, 'metadata')],
+              ['FBT Summary', getSectionData(fasData, 'fbtSummary')],
+              ['FAS Reports', getSectionData(fasData, 'fasReport') || getSectionData(fasData, 'Reports')],
+              ['Accounts', getSectionData(fasData, 'accounts')],
+              ['Balance Sheet', getSectionData(fasData, 'balanceSheet')],
+              ['Profit & Loss', getSectionData(fasData, 'profitLoss')],
+              ['Transactions', getSectionData(fasData, 'transactions')],
+              ['Bank Transactions', getSectionData(fasData, 'bankTransactions')],
+            ].map(([label, value]) => renderDataPreview(label as string, value))}
           </Box>
         )}
       </CardContent>
