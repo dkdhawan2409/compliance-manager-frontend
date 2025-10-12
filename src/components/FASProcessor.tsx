@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Card,
   CardContent,
@@ -84,6 +84,7 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
   const [isCalculating, setIsCalculating] = useState(false);
   const [calculationError, setCalculationError] = useState<string | null>(null);
   const [useCache, setUseCache] = useState(true);
+  const requestSignatureRef = useRef<string | null>(null);
 
   const { company } = useAuth();
 
@@ -100,29 +101,43 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
   }, []);
 
   // Load FAS data when tenant or dates change
-  const loadFASData = useCallback(async () => {
-    if (!selectedTenant || !fromDate || !toDate) {
-      return;
-    }
+  const loadFASData = useCallback(
+    async (options: { force?: boolean } = {}) => {
+      if (!selectedTenant || !fromDate || !toDate) {
+        setCalculationError('Please select an organization and date range first.');
+        return;
+      }
 
-    try {
-      setCalculationError(null);
-      console.log(`📊 Loading FAS data for ${selectedTenant.name} from ${fromDate} to ${toDate}`);
-      
-      const data = await loadXeroData('fasData', {
-        fromDate,
-        toDate,
-        useCache
-      });
+      const tenantId = selectedTenant.tenantId || selectedTenant.id;
+      const signature = `${tenantId}|${fromDate}|${toDate}|${useCache}`;
+      if (!options.force && requestSignatureRef.current === signature) {
+        console.log('⚠️ Skipping FAS data reload; parameters unchanged');
+        return;
+      }
 
-      setFasData(data);
-      console.log('✅ FAS data loaded successfully');
-    } catch (error: any) {
-      console.error('❌ Error loading FAS data:', error);
-      setCalculationError(error.message || 'Failed to load FAS data');
-      onFASError?.(error.message || 'Failed to load FAS data');
-    }
-  }, [selectedTenant, fromDate, toDate, useCache, loadXeroData, onFASError]);
+      requestSignatureRef.current = signature;
+
+      try {
+        setCalculationError(null);
+        console.log(`📊 Loading FAS data for ${selectedTenant.name} from ${fromDate} to ${toDate}`);
+
+        const data = await loadXeroData('fasData', {
+          fromDate,
+          toDate,
+          useCache
+        });
+
+        setFasData(data);
+        console.log('✅ FAS data loaded successfully');
+      } catch (error: any) {
+        console.error('❌ Error loading FAS data:', error);
+        const message = error.message || 'Failed to load FAS data';
+        setCalculationError(message);
+        onFASError?.(message);
+      }
+    },
+    [selectedTenant, fromDate, toDate, useCache, loadXeroData, onFASError]
+  );
 
   // Calculate FAS
   const calculateFAS = useCallback(async () => {
@@ -207,9 +222,19 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
   // Auto-load data when dependencies change
   useEffect(() => {
     if (selectedTenant && fromDate && toDate && isConnected && isTokenValid) {
-      loadFASData();
+      const timeoutId = setTimeout(() => {
+        loadFASData();
+      }, 300);
+
+      return () => clearTimeout(timeoutId);
     }
-  }, [selectedTenant, fromDate, toDate, isConnected, isTokenValid, loadFASData]);
+  }, [selectedTenant, fromDate, toDate, isConnected, isTokenValid, useCache, loadFASData]);
+
+  useEffect(() => {
+    return () => {
+      requestSignatureRef.current = null;
+    };
+  }, []);
 
   // Auto-calculate when data changes
   useEffect(() => {
@@ -229,7 +254,7 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
   const handleRefresh = async () => {
     try {
       await refreshConnection();
-      await loadFASData();
+      await loadFASData({ force: true });
     } catch (error: any) {
       console.error('❌ Error refreshing:', error);
     }
@@ -383,7 +408,7 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
           </Button>
           <Button
             variant="outlined"
-            onClick={loadFASData}
+            onClick={() => loadFASData({ force: true })}
             disabled={dataLoading || !selectedTenant || !fromDate || !toDate}
             startIcon={dataLoading ? <CircularProgress size={16} /> : <RefreshIcon />}
           >
