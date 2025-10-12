@@ -45,6 +45,11 @@ const MissingAttachments: React.FC = () => {
   const [processing, setProcessing] = useState(false);
   const lastRefreshRef = useRef<number>(0);
 
+  const activeTenantId = useMemo(
+    () => xeroState.selectedTenant?.tenantId || xeroState.selectedTenant?.id || null,
+    [xeroState.selectedTenant]
+  );
+
   const loadData = useCallback(async (forceRefresh = false) => {
     const now = Date.now();
     const timeSinceLastRefresh = now - lastRefreshRef.current;
@@ -126,8 +131,13 @@ const MissingAttachments: React.FC = () => {
         });
         return;
       }
+
+      if (!activeTenantId) {
+        toast.error('Select a Xero organization before detecting missing attachments.');
+        return;
+      }
       
-      const result = await detectMissingAttachments();
+      const result = await detectMissingAttachments(activeTenantId);
       setMissingTransactions(result.transactions);
       toast.success(`Found ${result.totalTransactions} transactions without attachments`);
     } catch (error: any) {
@@ -258,7 +268,7 @@ const MissingAttachments: React.FC = () => {
           
           // If refresh was successful, retry the operation
           console.log('✅ Token refresh successful, retrying detection...');
-          const result = await detectMissingAttachments();
+          const result = await detectMissingAttachments(activeTenantId);
           setMissingTransactions(result.transactions);
           toast.success(`Found ${result.totalTransactions} transactions without attachments`);
           return; // Exit early on success
@@ -305,7 +315,7 @@ const MissingAttachments: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [refreshToken]);
+  }, [refreshToken, xeroState.isConnected, activeTenantId]);
 
   const handleProcessMissing = useCallback(async () => {
     try {
@@ -670,11 +680,14 @@ const MissingAttachments: React.FC = () => {
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">Xero Organization</h3>
                 <div className="flex items-center gap-4">
                   <select
-                    value={xeroState.selectedTenant?.id || ''}
+                    value={activeTenantId || ''}
                     onChange={(e) => {
-                      const tenant = xeroState.tenants.find(t => t.id === e.target.value);
+                      const value = e.target.value;
+                      const tenant = xeroState.tenants.find(
+                        (t: any) => t.tenantId === value || t.id === value
+                      );
                       if (tenant) {
-                        selectTenant(tenant.id);
+                        selectTenant(tenant);
                         console.log('🎯 Selected organization for Missing Attachments:', tenant);
                       }
                     }}
@@ -682,7 +695,10 @@ const MissingAttachments: React.FC = () => {
                   >
                     <option value="">Select Xero Organization</option>
                     {xeroState.tenants.map((tenant: any) => (
-                      <option key={tenant.id} value={tenant.id}>
+                      <option
+                        key={tenant.tenantId || tenant.id}
+                        value={tenant.tenantId || tenant.id}
+                      >
                         {tenant.name || tenant.organizationName || tenant.tenantName || tenant.id}
                       </option>
                     ))}
