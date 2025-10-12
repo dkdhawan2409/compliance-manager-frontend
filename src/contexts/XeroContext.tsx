@@ -350,6 +350,113 @@ function sanitizeParams(params: Record<string, any>): Record<string, any> {
   }, {});
 }
 
+function normalizeTenant(input: any): XeroTenant | null {
+  if (!input || typeof input !== 'object') {
+    return null;
+  }
+
+  const rawTenantId =
+    input.tenantId ||
+    input.tenant_id ||
+    input.id ||
+    input.ID ||
+    input.TenantID ||
+    input.connectionId ||
+    input.tenant;
+
+  if (rawTenantId === undefined || rawTenantId === null) {
+    return null;
+  }
+
+  const tenantId = typeof rawTenantId === 'string' ? rawTenantId : String(rawTenantId);
+
+  return {
+    id:
+      input.id ||
+      input.tenant_id ||
+      input.tenantId ||
+      tenantId,
+    tenantId,
+    name:
+      input.name ||
+      input.organizationName ||
+      input.organisationName ||
+      input.tenantName ||
+      tenantId,
+    tenantName:
+      input.tenantName ||
+      input.name ||
+      input.organizationName ||
+      input.organisationName ||
+      tenantId,
+    organizationName:
+      input.organizationName ||
+      input.organisationName ||
+      input.name ||
+      input.tenantName ||
+      tenantId,
+    organizationCountry: input.organizationCountry || input.country || input.CountryCode,
+    organizationTaxNumber: input.organizationTaxNumber || input.taxNumber || input.TaxNumber,
+    organizationLegalName: input.organizationLegalName || input.legalName || input.LegalName,
+    organizationShortCode: input.organizationShortCode || input.shortCode || input.ShortCode,
+  };
+}
+
+function coerceTenants(source: any): any[] {
+  if (!source) return [];
+
+  if (Array.isArray(source)) {
+    return source;
+  }
+
+  if (typeof source === 'string') {
+    try {
+      const parsed = JSON.parse(source);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+      if (parsed && typeof parsed === 'object' && Array.isArray((parsed as any).tenants)) {
+        return (parsed as any).tenants;
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  }
+
+  if (typeof source === 'object') {
+    if (Array.isArray((source as any).tenants)) {
+      return (source as any).tenants;
+    }
+    return [source];
+  }
+
+  return [];
+}
+
+function mergeTenants(...sources: Array<any>): XeroTenant[] {
+  const seen = new Set<string>();
+  const merged: XeroTenant[] = [];
+
+  sources
+    .filter(Boolean)
+    .forEach((source) => {
+      const items = coerceTenants(source);
+      items.forEach((item) => {
+        const normalized = normalizeTenant(item);
+        if (!normalized) {
+          return;
+        }
+        if (!seen.has(normalized.tenantId)) {
+          seen.add(normalized.tenantId);
+          merged.push(normalized);
+        }
+      });
+    });
+
+  return merged;
+}
+
 export function XeroProvider({ children }: XeroProviderProps) {
   const [state, dispatch] = useReducer(xeroReducer, initialState);
 
@@ -399,7 +506,18 @@ export function XeroProvider({ children }: XeroProviderProps) {
     try {
       const response = await apiClient.get('/xero-plug-play/settings');
       if (response.data.success) {
-        dispatch({ type: 'SET_SETTINGS', payload: response.data.data });
+        const settingsData = response.data.data;
+        dispatch({ type: 'SET_SETTINGS', payload: settingsData });
+        const mergedTenants = mergeTenants(
+          settingsData?.tenants,
+          settingsData?.authorizedTenants,
+          settingsData?.authorized_tenants,
+          settingsData?.tenant_data,
+          settingsData?.status?.tenants
+        );
+        if (mergedTenants.length > 0) {
+          dispatch({ type: 'SET_TENANTS', payload: mergedTenants });
+        }
         dispatch({ type: 'SET_ERROR', payload: null });
       }
     } catch (error: any) {
@@ -438,22 +556,28 @@ export function XeroProvider({ children }: XeroProviderProps) {
         throw new Error('Unable to retrieve Xero connection status');
       }
 
-      let tenants: XeroTenant[] = Array.isArray(statusData.tenants) ? statusData.tenants : [];
-
-      if (tenants.length === 0) {
-        try {
-          const tenantsResponse = await apiClient.get('/xero/tenants');
-          if (tenantsResponse.data.success && Array.isArray(tenantsResponse.data.data?.tenants)) {
-            tenants = tenantsResponse.data.data.tenants;
-          }
-        } catch (tenantError) {
-          console.warn('⚠️ Failed to load tenants:', tenantError);
+      let tenantsFromStatus: any[] = Array.isArray(statusData.tenants) ? statusData.tenants : [];
+      let tenantsFromEndpoint: any[] = [];
+      try {
+        const tenantsResponse = await apiClient.get('/xero/tenants');
+        if (tenantsResponse.data.success && Array.isArray(tenantsResponse.data.data?.tenants)) {
+          tenantsFromEndpoint = tenantsResponse.data.data.tenants;
         }
+      } catch (tenantError) {
+        console.warn('⚠️ Failed to load tenants:', tenantError);
       }
+
+      const mergedTenants = mergeTenants(
+        tenantsFromStatus,
+        tenantsFromEndpoint,
+        state.settings?.tenants,
+        state.settings?.authorizedTenants,
+        state.availableTenants
+      );
 
       dispatch({
         type: 'SET_STATUS',
-        payload: { ...statusData, tenants },
+        payload: { ...statusData, tenants: mergedTenants },
       });
       dispatch({ type: 'SET_ERROR', payload: null });
     } catch (error: any) {
@@ -462,7 +586,7 @@ export function XeroProvider({ children }: XeroProviderProps) {
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
-  }, []);
+  }, [state.availableTenants, state.settings]);
 
   const connect = useCallback(async () => {
     dispatch({ type: 'SET_LOADING', payload: true });
