@@ -23,6 +23,8 @@ import {
   detectMissingAttachments,
   processMissingAttachments,
   getUploadLinks,
+  createUploadLink,
+  uploadReceipt,
   getMissingAttachmentStatistics,
   checkTokenStatus,
   MissingAttachmentConfig,
@@ -58,6 +60,14 @@ const MissingAttachments: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const lastRefreshRef = useRef<number>(0);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [uploadTarget, setUploadTarget] = useState<MissingTransaction | null>(null);
+  const [uploadLinkInfo, setUploadLinkInfo] = useState<UploadLink | null>(null);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
+  const [creatingUploadLink, setCreatingUploadLink] = useState(false);
 
   const activeTenantId = useMemo(
     () => xeroState.selectedTenant?.tenantId || xeroState.selectedTenant?.id || null,
@@ -117,6 +127,24 @@ const MissingAttachments: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const getTransactionId = (transaction: MissingTransaction): string | null => {
+    return (
+      transaction.InvoiceID ||
+      transaction.BankTransactionID ||
+      transaction.ReceiptID ||
+      transaction.PurchaseOrderID ||
+      (transaction as any).TransactionID ||
+      (transaction as any).transactionId ||
+      null
+    );
+  };
+
+  const getTransactionLabel = (transaction: MissingTransaction): string => {
+    const id = getTransactionId(transaction);
+    const label = transaction.type || 'Transaction';
+    return id ? `${label} #${id}` : label;
+  };
 
   useEffect(() => {
     if (!config) {
@@ -622,6 +650,100 @@ const MissingAttachments: React.FC = () => {
       toast.error('Failed to load upload links');
     }
   }, []);
+
+  const handleCloseUploadModal = useCallback(() => {
+    setUploadModalOpen(false);
+    setUploadTarget(null);
+    setUploadLinkInfo(null);
+    setUploadFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, []);
+
+  const handleUploadFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] || null;
+    setUploadFile(file);
+  }, []);
+
+  const handleOpenUploadModal = useCallback(
+    async (transaction: MissingTransaction) => {
+      const tenantId = activeTenantId;
+      if (!tenantId) {
+        toast.error('Select a Xero organization before uploading receipts.');
+        return;
+      }
+
+      const transactionId = getTransactionId(transaction);
+      if (!transactionId) {
+        toast.error('Unable to determine the transaction identifier.');
+        return;
+      }
+
+      try {
+        setCreatingUploadLink(true);
+        setUploadTarget(transaction);
+        setUploadLinkInfo(null);
+        setUploadFile(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+
+        const link = await createUploadLink({
+          transactionId,
+          tenantId,
+          transactionType: transaction.type || 'Invoice',
+        });
+
+        setUploadLinkInfo(link);
+        setUploadModalOpen(true);
+        toast.success('Upload link ready. Select a file to attach.');
+      } catch (error: any) {
+        console.error('Error creating upload link:', error);
+        const message = error.response?.data?.message || error.message || 'Failed to create upload link';
+        toast.error(message);
+        setUploadTarget(null);
+      } finally {
+        setCreatingUploadLink(false);
+      }
+    },
+    [activeTenantId],
+  );
+
+  const handleUploadReceipt = useCallback(async () => {
+    if (!uploadLinkInfo || !uploadTarget) {
+      toast.error('Upload link not ready. Please try again.');
+      return;
+    }
+
+    if (!uploadFile) {
+      toast.error('Select a file to upload.');
+      return;
+    }
+
+    const transactionId = getTransactionId(uploadTarget);
+
+    try {
+      setUploadingReceipt(true);
+      await uploadReceipt(uploadLinkInfo.linkId, uploadLinkInfo.token, uploadFile);
+      toast.success('Receipt uploaded successfully.');
+
+      if (transactionId) {
+        setMissingTransactions((prev) =>
+          prev.filter((transaction) => getTransactionId(transaction) !== transactionId),
+        );
+      }
+
+      await loadUploadLinks();
+      handleCloseUploadModal();
+    } catch (error: any) {
+      console.error('Error uploading receipt:', error);
+      const message = error.response?.data?.message || error.message || 'Failed to upload receipt';
+      toast.error(message);
+    } finally {
+      setUploadingReceipt(false);
+    }
+  }, [handleCloseUploadModal, loadUploadLinks, uploadFile, uploadLinkInfo, uploadTarget]);
 
   const handleTabChange = useCallback((tab: 'overview' | 'config' | 'transactions' | 'links') => {
     setActiveTab(tab);
@@ -1191,40 +1313,68 @@ const MissingAttachments: React.FC = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Potential Penalty
                     </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {missingTransactions.map((transaction, index) => (
-                    <tr key={index}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {transaction.type} #{transaction.InvoiceID || transaction.BankTransactionID || transaction.ReceiptID || transaction.PurchaseOrderID}
+                  {missingTransactions.map((transaction, index) => {
+                    const transactionId = getTransactionId(transaction);
+                    const isTarget =
+                      transactionId &&
+                      uploadTarget &&
+                      getTransactionId(uploadTarget) === transactionId;
+                    const isBusy = isTarget && (creatingUploadLink || uploadingReceipt);
+
+                    return (
+                      <tr key={index}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {getTransactionLabel(transaction)}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {transaction.Date && formatDate(transaction.Date)}
+                            </div>
                           </div>
-                          <div className="text-sm text-gray-500">
-                            {transaction.Date && formatDate(transaction.Date)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {formatCurrency(transaction.moneyAtRisk.total, transaction.moneyAtRisk.currency)}
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {formatCurrency(transaction.moneyAtRisk.total, transaction.moneyAtRisk.currency)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          transaction.moneyAtRisk.riskLevel === 'HIGH'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {transaction.moneyAtRisk.riskLevel}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatCurrency(transaction.moneyAtRisk.potentialPenalty, transaction.moneyAtRisk.currency)}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              transaction.moneyAtRisk.riskLevel === 'HIGH'
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-yellow-100 text-yellow-800'
+                            }`}
+                          >
+                            {transaction.moneyAtRisk.riskLevel}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {formatCurrency(transaction.moneyAtRisk.potentialPenalty, transaction.moneyAtRisk.currency)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenUploadModal(transaction)}
+                            disabled={isBusy || creatingUploadLink || uploadingReceipt || !activeTenantId}
+                            className="px-3 py-1 text-xs font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isTarget && uploadingReceipt
+                              ? 'Uploading…'
+                              : isTarget && creatingUploadLink
+                              ? 'Preparing…'
+                              : 'Upload Receipt'}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1318,6 +1468,58 @@ const MissingAttachments: React.FC = () => {
               </table>
             </div>
           )}
+        </div>
+      )}
+      {uploadModalOpen && uploadTarget && uploadLinkInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold text-gray-900">Upload Receipt</h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Attach a document for {getTransactionLabel(uploadTarget)}.
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              Files are automatically linked to the Xero transaction and stored securely.
+            </p>
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select File
+              </label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={handleUploadFileChange}
+                className="w-full"
+              />
+              <p className="text-xs text-gray-500 mt-2">Accepted formats: PDF, JPG, PNG. Max size 10MB.</p>
+            </div>
+
+            {uploadFile && (
+              <p className="text-xs text-gray-600 mt-3">
+                Selected file: <span className="font-medium">{uploadFile.name}</span>
+              </p>
+            )}
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={handleCloseUploadModal}
+                disabled={uploadingReceipt}
+                className="px-4 py-2 text-sm border border-gray-300 rounded-md text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleUploadReceipt}
+                disabled={!uploadFile || uploadingReceipt}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed"
+              >
+                {uploadingReceipt ? 'Uploading…' : 'Upload to Xero'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
       </div>

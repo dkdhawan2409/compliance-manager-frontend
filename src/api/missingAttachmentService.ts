@@ -155,6 +155,15 @@ export const getUploadLinks = async (
   return response.data.data;
 };
 
+export const createUploadLink = async (params: {
+  transactionId: string;
+  tenantId: string;
+  transactionType: string;
+}): Promise<UploadLink> => {
+  const response = await apiClient.post('/missing-attachments/upload-links', params);
+  return response.data.data;
+};
+
 // Statistics
 export const getMissingAttachmentStatistics = async (
   days = 30
