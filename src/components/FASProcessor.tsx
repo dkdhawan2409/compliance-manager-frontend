@@ -34,12 +34,18 @@ import {
 } from '@mui/icons-material';
 import { withXeroData, XeroDataProps } from '../hocs/withXeroData';
 import { useAuth } from '../contexts/AuthContext';
+import {
+  isPlainObject,
+  getSectionData,
+  renderXeroDataPreview,
+} from './XeroDataPreview';
 
 interface FASProcessorProps extends XeroDataProps {
   // Additional props specific to FAS processing
   onFASComplete?: (data: any) => void;
   onFASError?: (error: string) => void;
 }
+
 
 interface FASCalculationResult {
   totalFBT: number;
@@ -54,140 +60,6 @@ interface FASCalculationResult {
   };
   lastUpdated: string;
 }
-
-const isPlainObject = (value: any): value is Record<string, any> =>
-  value !== null && typeof value === 'object' && !Array.isArray(value);
-
-const getSectionData = (source: any, key: string) => {
-  if (!source) return null;
-  const variants = [key, key.toLowerCase(), key.toUpperCase()];
-  for (const variant of variants) {
-    if (source[variant] !== undefined) {
-      return source[variant];
-    }
-  }
-  if (isPlainObject(source.data)) {
-    for (const variant of variants) {
-      if (source.data[variant] !== undefined) {
-        return source.data[variant];
-      }
-    }
-  }
-  return null;
-};
-
-const renderKeyValuePairs = (data: Record<string, any>) => (
-  <Grid container spacing={1} sx={{ mt: 1 }}>
-    {Object.entries(data)
-      .slice(0, 12)
-      .map(([label, value]) => (
-        <Grid item xs={12} sm={6} md={4} key={label}>
-          <Typography variant="caption" color="text.secondary">
-            {label}
-          </Typography>
-          <Typography variant="body2">{String(value ?? '—')}</Typography>
-        </Grid>
-      ))}
-  </Grid>
-);
-
-const renderGenericTable = (rows: any[]) => {
-  if (!rows.length) {
-    return (
-      <Typography variant="body2" color="text.secondary">
-        No records available.
-      </Typography>
-    );
-  }
-
-  const columns = Array.from(
-    new Set(
-      rows.reduce<string[]>((acc, row) => {
-        const keys = Object.keys(row || {});
-        return acc.concat(keys);
-      }, []),
-    ),
-  ).slice(0, 8);
-
-  if (!columns.length) {
-    return (
-      <Typography variant="body2" color="text.secondary">
-        Unable to determine columns for this dataset.
-      </Typography>
-    );
-  }
-
-  return (
-    <TableContainer component={Paper} sx={{ maxHeight: 360 }}>
-      <Table size="small" stickyHeader>
-        <TableHead>
-          <TableRow>
-            {columns.map((column) => (
-              <TableCell key={column}>{column}</TableCell>
-            ))}
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.slice(0, 15).map((row, index) => (
-            <TableRow hover key={`fas-${index}`}>
-              {columns.map((column) => (
-                <TableCell key={column}>{String(row?.[column] ?? '—')}</TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
-  );
-};
-
-const renderJsonPreview = (value: any) => (
-  <Box
-    sx={{
-      mt: 1,
-      maxHeight: 240,
-      overflow: 'auto',
-      backgroundColor: 'grey.100',
-      borderRadius: 1,
-      p: 2,
-      fontFamily: 'monospace',
-      fontSize: '0.75rem',
-      whiteSpace: 'pre',
-    }}
-  >
-    {JSON.stringify(value, null, 2)}
-  </Box>
-);
-
-const renderDataPreview = (label: string, value: any) => {
-  if (value === undefined || value === null) {
-    return null;
-  }
-
-  let content: React.ReactNode;
-
-  if (Array.isArray(value)) {
-    content = renderGenericTable(value);
-  } else if (isPlainObject(value)) {
-    content = (
-      <Box>
-        {renderKeyValuePairs(value)}
-        {renderJsonPreview(value)}
-      </Box>
-    );
-  } else {
-    content = <Typography variant="body2">{String(value)}</Typography>;
-  }
-
-  return (
-    <Box key={label} sx={{ mb: 3 }}>
-      <Typography variant="subtitle1" sx={{ mb: 1 }}>
-        {label}
-      </Typography>
-      {content}
-    </Box>
-  );
-};
 
 const FASProcessor: React.FC<FASProcessorProps> = ({
   // Xero data props
@@ -662,17 +534,20 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               Raw data returned from Xero for the selected period.
             </Typography>
-            {[
-              ['Reporting Period', getSectionData(fasData, 'period')],
-              ['Metadata', getSectionData(fasData, 'metadata')],
-              ['FBT Summary', getSectionData(fasData, 'fbtSummary')],
-              ['FAS Reports', getSectionData(fasData, 'fasReport') || getSectionData(fasData, 'Reports')],
-              ['Accounts', getSectionData(fasData, 'accounts')],
-              ['Balance Sheet', getSectionData(fasData, 'balanceSheet')],
-              ['Profit & Loss', getSectionData(fasData, 'profitLoss')],
-              ['Transactions', getSectionData(fasData, 'transactions')],
-              ['Bank Transactions', getSectionData(fasData, 'bankTransactions')],
-            ].map(([label, value]) => renderDataPreview(label as string, value))}
+            {renderXeroDataPreview([
+              { label: 'Reporting Period', value: getSectionData(fasData, 'period') },
+              { label: 'Metadata', value: getSectionData(fasData, 'metadata') },
+              { label: 'FBT Summary', value: getSectionData(fasData, 'fbtSummary') },
+              {
+                label: 'FAS Reports',
+                value: getSectionData(fasData, 'fasReport') || getSectionData(fasData, 'Reports'),
+              },
+              { label: 'Accounts', value: getSectionData(fasData, 'accounts') },
+              { label: 'Balance Sheet', value: getSectionData(fasData, 'balanceSheet') },
+              { label: 'Profit & Loss', value: getSectionData(fasData, 'profitLoss') },
+              { label: 'Transactions', value: getSectionData(fasData, 'transactions') },
+              { label: 'Bank Transactions', value: getSectionData(fasData, 'bankTransactions') },
+            ])}
           </Box>
         )}
       </CardContent>

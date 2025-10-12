@@ -23,7 +23,7 @@ import {
   TableRow,
   Paper,
   IconButton,
-  Tooltip
+  Tooltip,
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
@@ -34,6 +34,11 @@ import {
 } from '@mui/icons-material';
 import { withXeroData, XeroDataProps } from '../hocs/withXeroData';
 import { useAuth } from '../contexts/AuthContext';
+import {
+  isPlainObject,
+  getSectionData,
+  renderXeroDataPreview,
+} from './XeroDataPreview';
 
 interface BASProcessorProps extends XeroDataProps {
   // Additional props specific to BAS processing
@@ -53,144 +58,6 @@ interface BASCalculationResult {
   };
   lastUpdated: string;
 }
-
-const isPlainObject = (value: any): value is Record<string, any> =>
-  value !== null && typeof value === 'object' && !Array.isArray(value);
-
-const getSectionData = (source: any, key: string) => {
-  if (!source) return null;
-
-  const variants = [key, key.toLowerCase(), key.toUpperCase()];
-
-  for (const variant of variants) {
-    if (source[variant] !== undefined) {
-      return source[variant];
-    }
-  }
-
-  if (isPlainObject(source.data)) {
-    for (const variant of variants) {
-      if (source.data[variant] !== undefined) {
-        return source.data[variant];
-      }
-    }
-  }
-
-  return null;
-};
-
-const renderKeyValuePairs = (data: Record<string, any>) => (
-  <Grid container spacing={1} sx={{ mt: 1 }}>
-    {Object.entries(data)
-      .slice(0, 12)
-      .map(([label, value]) => (
-        <Grid item xs={12} sm={6} md={4} key={label}>
-          <Typography variant="caption" color="text.secondary">
-            {label}
-          </Typography>
-          <Typography variant="body2">{String(value ?? '—')}</Typography>
-        </Grid>
-      ))}
-  </Grid>
-);
-
-const renderGenericTable = (rows: any[]) => {
-  if (!rows.length) {
-    return (
-      <Typography variant="body2" color="text.secondary">
-        No records available.
-      </Typography>
-    );
-  }
-
-  const columns = Array.from(
-    new Set(
-      rows.reduce<string[]>((acc, row) => {
-        const keys = Object.keys(row || {});
-        return acc.concat(keys);
-      }, []),
-    ),
-  ).slice(0, 8);
-
-  if (!columns.length) {
-    return (
-      <Typography variant="body2" color="text.secondary">
-        Unable to determine columns for this dataset.
-      </Typography>
-    );
-  }
-
-  return (
-    <TableContainer component={Paper} sx={{ maxHeight: 360 }}>
-      <Table size="small" stickyHeader>
-        <TableHead>
-          <TableRow>
-            {columns.map((column) => (
-              <TableCell key={column}>{column}</TableCell>
-            ))}
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.slice(0, 15).map((row, index) => (
-            <TableRow hover key={getRowKey(row, index)}>
-              {columns.map((column) => (
-                <TableCell key={column}>{String(row?.[column] ?? '—')}</TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
-  );
-};
-
-const renderJsonPreview = (value: any) => (
-  <Box
-    sx={{
-      mt: 1,
-      maxHeight: 240,
-      overflow: 'auto',
-      backgroundColor: 'grey.100',
-      borderRadius: 1,
-      p: 2,
-      fontFamily: 'monospace',
-      fontSize: '0.75rem',
-      whiteSpace: 'pre',
-    }}
-  >
-    {JSON.stringify(value, null, 2)}
-  </Box>
-);
-
-const renderDataPreview = (label: string, value: any) => {
-  if (value === undefined || value === null) {
-    return null;
-  }
-
-  let content: React.ReactNode;
-
-  if (Array.isArray(value)) {
-    content = renderGenericTable(value);
-  } else if (isPlainObject(value)) {
-    content = (
-      <Box>
-        {renderKeyValuePairs(value)}
-        {renderJsonPreview(value)}
-      </Box>
-    );
-  } else {
-    content = <Typography variant="body2">{String(value)}</Typography>;
-  }
-
-  return (
-    <Box key={label} sx={{ mb: 3 }}>
-      <Typography variant="subtitle1" sx={{ mb: 1 }}>
-        {label}
-      </Typography>
-      {content}
-    </Box>
-  );
-};
 
 const BASProcessor: React.FC<BASProcessorProps> = ({
   // Xero data props
@@ -770,19 +637,23 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               Raw data returned from Xero for the selected period.
             </Typography>
-            {[
-              ['Reporting Period', getSectionData(basData, 'period')],
-              ['Metadata', getSectionData(basData, 'metadata')],
-              ['GST Report', getSectionData(basData, 'gstReport')],
-              ['BAS Reports', getSectionData(basData, 'Reports')],
-              ['Invoices', getSectionData(basData, 'invoices')?.Invoices ?? getSectionData(basData, 'invoices')],
-              ['Profit & Loss', getSectionData(basData, 'profitLoss')],
-              ['Balance Sheet', getSectionData(basData, 'balanceSheet')],
-              ['Accounts', getSectionData(basData, 'accounts')],
-              ['Bank Transactions', getSectionData(basData, 'bankTransactions')],
-              ['Payroll Summary', getSectionData(basData, 'payrollSummary')],
-            ]
-              .map(([label, value]) => renderDataPreview(label as string, value))}
+            {renderXeroDataPreview([
+              { label: 'Reporting Period', value: getSectionData(basData, 'period') },
+              { label: 'Metadata', value: getSectionData(basData, 'metadata') },
+              { label: 'GST Report', value: getSectionData(basData, 'gstReport') },
+              { label: 'BAS Reports', value: getSectionData(basData, 'Reports') },
+              {
+                label: 'Invoices',
+                value:
+                  getSectionData(basData, 'invoices')?.Invoices ??
+                  getSectionData(basData, 'invoices'),
+              },
+              { label: 'Profit & Loss', value: getSectionData(basData, 'profitLoss') },
+              { label: 'Balance Sheet', value: getSectionData(basData, 'balanceSheet') },
+              { label: 'Accounts', value: getSectionData(basData, 'accounts') },
+              { label: 'Bank Transactions', value: getSectionData(basData, 'bankTransactions') },
+              { label: 'Payroll Summary', value: getSectionData(basData, 'payrollSummary') },
+            ])}
           </Box>
         )}
       </CardContent>
