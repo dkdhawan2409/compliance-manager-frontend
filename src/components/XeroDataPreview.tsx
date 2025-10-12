@@ -54,25 +54,49 @@ const flattenReportRows = (rows: any[], depth = 0): Record<string, any>[] => {
     if (!row) return;
 
     if (row.RowType === 'Section' && Array.isArray(row.Rows)) {
+      // Add section header if it has a title
+      if (row.Title) {
+        items.push({
+          'Description': `📁 ${row.Title}`,
+          'Value': 'Section Header',
+          'Type': 'Section'
+        });
+      }
       items.push(...flattenReportRows(row.Rows, depth + 1));
       return;
     }
 
     if (Array.isArray(row.Cells)) {
       const record: Record<string, any> = {};
+      
+      // Add row type for context
+      if (row.RowType) {
+        record['Type'] = row.RowType;
+      }
+      
       row.Cells.forEach((cell: any, index: number) => {
-        const key =
-          index === 0
-            ? 'Description'
-            : row.Cells.length === 2 && index === row.Cells.length - 1
-            ? 'Value'
-            : `Column ${index + 1}`;
+        let key;
+        
+        if (index === 0) {
+          key = 'Description';
+        } else if (row.Cells.length === 2 && index === row.Cells.length - 1) {
+          key = 'Value';
+        } else if (index === 1) {
+          key = 'Current Period';
+        } else if (index === 2) {
+          key = 'Previous Period';
+        } else {
+          key = `Column ${index + 1}`;
+        }
+        
+        // Handle duplicate keys
         if (record[key] !== undefined) {
           record[`${key} (${index + 1})`] = cell?.Value ?? '';
         } else {
           record[key] = cell?.Value ?? '';
         }
       });
+      
       if (Object.keys(record).length > 0) {
         items.push(record);
       }
@@ -131,6 +155,43 @@ const renderKeyValuePairs = (data: Record<string, any>) => (
   </Grid>
 );
 
+const formatCellValue = (value: any, column: string): string => {
+  if (value === null || value === undefined) return '—';
+  
+  const strValue = String(value);
+  
+  // Format currency values
+  if (column.toLowerCase().includes('value') || 
+      column.toLowerCase().includes('amount') || 
+      column.toLowerCase().includes('total') ||
+      column.toLowerCase().includes('payable') ||
+      (typeof value === 'number' && !isNaN(value) && Math.abs(value) > 10)) {
+    const numValue = parseFloat(strValue);
+    if (!isNaN(numValue)) {
+      return `$${numValue.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+  }
+  
+  // Format dates
+  if (strValue.includes('/Date(') || strValue.includes('T') && strValue.includes('Z')) {
+    try {
+      const date = new Date(strValue);
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleDateString('en-AU');
+      }
+    } catch (e) {
+      // Keep original value if parsing fails
+    }
+  }
+  
+  // Format percentages
+  if (column.toLowerCase().includes('rate') && typeof value === 'number') {
+    return `${value}%`;
+  }
+  
+  return strValue;
+};
+
 const renderGenericTable = (rows: any[], prefix: string) => {
   if (!rows.length) {
     return (
@@ -164,20 +225,42 @@ const renderGenericTable = (rows: any[], prefix: string) => {
   }
 
   return (
-    <TableContainer component={Paper} sx={{ maxHeight: 360 }}>
+    <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
       <Table size="small" stickyHeader>
         <TableHead>
           <TableRow>
             {columns.map((column) => (
-              <TableCell key={column}>{column}</TableCell>
+              <TableCell 
+                key={column}
+                sx={{ 
+                  fontWeight: 'bold',
+                  backgroundColor: 'grey.100'
+                }}
+              >
+                {column}
+              </TableCell>
             ))}
           </TableRow>
         </TableHead>
         <TableBody>
-          {uniqueRows.slice(0, 25).map((row, index) => (
-            <TableRow hover key={`${prefix}-${index}`}>
+          {uniqueRows.slice(0, 50).map((row, index) => (
+            <TableRow 
+              hover 
+              key={`${prefix}-${index}`}
+              sx={{
+                backgroundColor: row.Type === 'Section' ? 'grey.50' : 'inherit'
+              }}
+            >
               {columns.map((column) => (
-                <TableCell key={column}>{String(row?.[column] ?? '—')}</TableCell>
+                <TableCell 
+                  key={column}
+                  sx={{
+                    fontWeight: row.Type === 'Section' ? 'bold' : 'normal',
+                    fontFamily: column.toLowerCase().includes('value') || column.toLowerCase().includes('amount') ? 'monospace' : 'inherit'
+                  }}
+                >
+                  {formatCellValue(row?.[column], column)}
+                </TableCell>
               ))}
             </TableRow>
           ))}
@@ -225,13 +308,49 @@ const renderSection = (label: string, value: any) => {
   }
 
   if (isPlainObject(normalized)) {
+    // Check if this is a complex nested object that should be displayed as a table
+    const hasNestedArrays = Object.values(normalized).some(val => Array.isArray(val));
+    const hasComplexNestedObjects = Object.values(normalized).some(val => 
+      val && typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length > 5
+    );
+
+    if (hasNestedArrays || hasComplexNestedObjects) {
+      // For complex objects, try to extract tabular data
+      const tableData = [];
+      Object.entries(normalized).forEach(([key, value]) => {
+        if (Array.isArray(value)) {
+          value.forEach((item, index) => {
+            if (typeof item === 'object' && item !== null) {
+              tableData.push({ 'Type': key, 'Index': index, ...item });
+            } else {
+              tableData.push({ 'Type': key, 'Index': index, 'Value': item });
+            }
+          });
+        } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+          tableData.push({ 'Type': key, ...value });
+        } else {
+          tableData.push({ 'Type': key, 'Value': value });
+        }
+      });
+
+      if (tableData.length > 0) {
+        return (
+          <Box key={label} sx={{ mb: 3 }}>
+            <Typography variant="subtitle1" sx={{ mb: 1 }}>
+              {label}
+            </Typography>
+            {renderGenericTable(tableData, label)}
+          </Box>
+        );
+      }
+    }
+
     return (
       <Box key={label} sx={{ mb: 3 }}>
         <Typography variant="subtitle1" sx={{ mb: 1 }}>
           {label}
         </Typography>
         {renderKeyValuePairs(normalized)}
-        {renderJsonPreview(normalized)}
       </Box>
     );
   }
