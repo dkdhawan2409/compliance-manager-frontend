@@ -94,6 +94,13 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
 
   const { company } = useAuth();
 
+  const formatDateForInput = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Initialize date range (current FBT year)
   useEffect(() => {
     const now = new Date();
@@ -102,8 +109,8 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
     const fbtYearStart = new Date(currentYear, 3, 1); // April 1
     const fbtYearEnd = new Date(currentYear + 1, 2, 31); // March 31
 
-    setFromDate(fbtYearStart.toISOString().split('T')[0]);
-    setToDate(fbtYearEnd.toISOString().split('T')[0]);
+    setFromDate(formatDateForInput(fbtYearStart));
+    setToDate(formatDateForInput(fbtYearEnd));
   }, []);
 
   // Load FAS data when tenant or dates change
