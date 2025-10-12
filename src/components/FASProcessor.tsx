@@ -201,11 +201,36 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
             }
           }
         });
-      } else {
-        console.warn('⚠️ FAS report rows not available; raw dataset will be displayed.');
-        setCalculationError('FAS summary report not available for this period. Showing raw dataset below.');
-        setCalculationResult(null);
-        return;
+      }
+
+      if (fbtOnCars === 0 && fbtOnEntertainment === 0 && fbtOnOther === 0) {
+        const transactions = getSectionData(fasData, 'transactions');
+        if (Array.isArray(transactions)) {
+          transactions.forEach((tx: any) => {
+            const category = (tx?.Category || tx?.Type || '').toLowerCase();
+            const value = Math.abs(parseFloat(tx?.Amount || tx?.Value || '0'));
+            if (category.includes('car')) {
+              fbtOnCars += value;
+            } else if (category.includes('entertainment')) {
+              fbtOnEntertainment += value;
+            } else if (category.includes('fbt')) {
+              fbtOnOther += value;
+            }
+          });
+        }
+      }
+
+      if (grossTaxableValue === 0) {
+        const balanceSheet = getSectionData(fasData, 'balanceSheet');
+        if (Array.isArray(balanceSheet)) {
+          balanceSheet.forEach((row: any) => {
+            const description = String(row?.Description || row?.LineDescription || '').toLowerCase();
+            const value = Math.abs(parseFloat(row?.Value || row?.Column2 || '0'));
+            if (description.includes('net assets') || description.includes('gross taxable')) {
+              grossTaxableValue += value;
+            }
+          });
+        }
       }
 
       totalFBT = fbtOnCars + fbtOnEntertainment + fbtOnOther;
