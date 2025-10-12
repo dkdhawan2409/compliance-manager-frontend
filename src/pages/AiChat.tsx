@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useXero } from '../contexts/XeroContext';
 import SidebarLayout from '../components/SidebarLayout';
 import toast from 'react-hot-toast';
 import openaiService from '../api/openaiService';
@@ -8,7 +9,6 @@ import { companyService } from '../api/companyService';
 import { AI_CONFIG } from '../config/aiConfig';
 import FinancialAnalysisDisplay from '../components/FinancialAnalysisDisplay';
 import TemplateSelector from '../components/TemplateSelector';
-import { withXeroData, WithXeroDataProps } from '../hocs/withXeroData';
 import { NotificationTemplate } from '../api/templateService';
 
 interface Message {
@@ -30,27 +30,27 @@ interface FinancialAnalysis {
   Recommended_Actions: string[];
 }
 
-interface AiChatProps extends WithXeroDataProps {}
-
-const AiChat: React.FC<AiChatProps> = ({ 
-  xeroData, 
-  xeroActions, 
-  loadXeroDataForAnalysis: loadXeroDataForAnalysisFromHOC 
-}) => {
+const AiChat: React.FC = () => {
   console.log('AiChat component rendered');
   
   const { company } = useAuth();
   const navigate = useNavigate();
-  
-  // Destructure from HOC props
   const {
-    isConnected: xeroConnected,
+    status,
     isLoading: xeroLoading,
     error,
     selectedTenant,
-    tenants,
-    hasSettings,
-  } = xeroData;
+    availableTenants: tenants = [],
+    loadSettings,
+    selectTenant,
+    loadData,
+    data: xeroContextData,
+    dataLoading: xeroDataLoading,
+    dataError: xeroDataError,
+  } = useXero();
+
+  const xeroConnected = status.connected;
+  const xeroData = xeroContextData || {};
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -67,6 +67,68 @@ const AiChat: React.FC<AiChatProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const loadXeroDataForAnalysis = useCallback(async () => {
+    if (!xeroConnected) {
+      toast.error('Connect to Xero before running analysis.');
+      return null;
+    }
+
+    if (!selectedTenant) {
+      toast.error('Select a Xero organization first.');
+      return null;
+    }
+
+    const tenantId = selectedTenant.tenantId || selectedTenant.id;
+
+    setIsLoadingXeroData(true);
+    try {
+      const normalize = (response: any) => response?.data?.data ?? response?.data ?? response;
+
+      const [basResponse, invoicesResponse, contactsResponse, dashboardResponse] = await Promise.all([
+        loadData('basData', { tenantId, useCache: false }).catch((err: any) => {
+          console.warn('⚠️ BAS data unavailable:', err?.message || err);
+          return null;
+        }),
+        loadData('invoices', { tenantId, useCache: false, pageSize: 100 }).catch((err: any) => {
+          console.warn('⚠️ Invoice data unavailable:', err?.message || err);
+          return null;
+        }),
+        loadData('contacts', { tenantId, useCache: false }).catch((err: any) => {
+          console.warn('⚠️ Contact data unavailable:', err?.message || err);
+          return null;
+        }),
+        loadData('dashboard-data', { tenantId, useCache: false }).catch((err: any) => {
+          console.warn('⚠️ Dashboard data unavailable:', err?.message || err);
+          return null;
+        }),
+      ]);
+
+      const basData = basResponse ? normalize(basResponse) : null;
+      const invoiceData = invoicesResponse ? normalize(invoicesResponse) : null;
+      const contactsData = contactsResponse ? normalize(contactsResponse) : null;
+      const dashboardData = dashboardResponse ? normalize(dashboardResponse) : null;
+
+      const transactions = invoiceData?.Invoices || invoiceData?.items || invoiceData?.data || invoiceData || [];
+      const contacts = contactsData?.Contacts || contactsData?.items || contactsData?.data || contactsData || [];
+
+      return {
+        tenantId,
+        tenantName: selectedTenant.name || selectedTenant.organizationName || selectedTenant.tenantName,
+        basData,
+        transactions,
+        contacts,
+        dashboardData,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error: any) {
+      console.error('❌ Failed to load Xero data for analysis:', error);
+      toast.error(error?.message || 'Failed to load Xero data for analysis.');
+      return null;
+    } finally {
+      setIsLoadingXeroData(false);
+    }
+  }, [xeroConnected, selectedTenant, loadData]);
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
@@ -74,8 +136,8 @@ const AiChat: React.FC<AiChatProps> = ({
   // Load Xero settings and check connection status on component mount
   useEffect(() => {
     console.log('🔄 AiChat: Loading Xero settings and checking connection status...');
-    xeroActions.loadSettings();
-  }, []); // Remove loadSettings from dependencies to prevent infinite loop
+    loadSettings();
+  }, [loadSettings]);
 
   // Automatically select the best tenant when available (prioritize Demo Company Global)
   useEffect(() => {
@@ -89,13 +151,13 @@ const AiChat: React.FC<AiChatProps> = ({
       
       if (demoCompany) {
         console.log('🔧 Auto-selecting Demo Company (Global):', demoCompany);
-        xeroActions.selectTenant(demoCompany.id);
+        selectTenant(demoCompany);
       } else {
         console.log('🔧 Auto-selecting first tenant:', tenants[0]);
-        xeroActions.selectTenant(tenants[0].id);
+        selectTenant(tenants[0]);
       }
     }
-  }, [tenants, selectedTenant, xeroActions]);
+  }, [tenants, selectedTenant, selectTenant]);
 
   // Check if AI is configured
   useEffect(() => {
@@ -1106,7 +1168,7 @@ Return this exact JSON structure with calculated values:
                 <div className="flex items-center gap-2">
                   <button
                     onClick={async () => {
-                      const data = await loadXeroDataForAnalysisFromHOC();
+                      const data = await loadXeroDataForAnalysis();
                       if (data) {
                         await generateFinancialAnalysis(data);
                       }
@@ -1254,13 +1316,18 @@ Return this exact JSON structure with calculated values:
                           Select Organization:
                         </label>
                         <select
-                          value={selectedTenant?.id || ''}
-                          onChange={(e) => xeroActions.selectTenant(e.target.value)}
+                          value={selectedTenant?.tenantId || selectedTenant?.id || ''}
+                          onChange={(e) => {
+                            const tenant = tenants.find((t: any) => t.tenantId === e.target.value || t.id === e.target.value);
+                            if (tenant) {
+                              selectTenant(tenant);
+                            }
+                          }}
                           className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent backdrop-blur-sm"
                         >
                           <option value="">Select an organization...</option>
                           {tenants.map((tenant) => (
-                            <option key={tenant.id} value={tenant.id} className="bg-gray-800 text-white">
+                            <option key={tenant.tenantId || tenant.id} value={tenant.tenantId || tenant.id} className="bg-gray-800 text-white">
                               {tenant.name || tenant.organizationName || tenant.tenantName}
                             </option>
                           ))}
@@ -1414,4 +1481,4 @@ Return this exact JSON structure with calculated values:
   );
 };
 
-export default withXeroData(AiChat); 
+export default AiChat; 
