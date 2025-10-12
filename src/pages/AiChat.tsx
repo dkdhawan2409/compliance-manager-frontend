@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useXero } from '../contexts/XeroContext';
 import SidebarLayout from '../components/SidebarLayout';
@@ -27,6 +26,21 @@ interface FinancialAnalysis {
     Month_3: number;
   };
   GST_Estimate_Next_Period: number;
+  BAS_Summary?: {
+    totalSales: number;
+    totalPurchases: number;
+    gstOnSales: number;
+    gstOnPurchases: number;
+    netGST: number;
+    hasData?: boolean;
+  } | null;
+  FBT_Exposure?: {
+    totalFringeBenefits: number;
+    totalFBT: number;
+    categories?: Record<string, number>;
+    keyRisks?: string[];
+    hasData?: boolean;
+  } | null;
   Insights: string[];
   Recommended_Actions: string[];
 }
@@ -35,7 +49,6 @@ const AiChat: React.FC = () => {
   console.log('AiChat component rendered');
   
   const { company } = useAuth();
-  const navigate = useNavigate();
   const {
     status,
     isLoading: xeroLoading,
@@ -922,7 +935,7 @@ Please help me with the following:
   };
 
   // Generate financial analysis using AI
-  const generateFinancialAnalysis = async (xeroDataFromAnalysis: any) => {
+  const generateFinancialAnalysis = useCallback(async (xeroDataFromAnalysis: any, focus: 'overall' | 'bas' | 'fas' = 'overall') => {
           if (!xeroDataFromAnalysis) {
         toast.error('No Xero data available for analysis');
         return;
@@ -966,6 +979,21 @@ Please help me with the following:
         : null
     };
 
+    const focusInstruction = focus === 'bas'
+      ? 'Focus primarily on BAS obligations. Analyse GST trends, upcoming BAS liabilities or refunds, and highlight any compliance actions needed.'
+      : focus === 'fas'
+      ? 'Focus primarily on FBT exposure. Analyse fringe benefits totals, estimated FBT payable, and highlight key risk areas and recommendations.'
+      : 'Provide a balanced overview covering cashflow, GST, FBT, and operational insights.';
+
+    const requiredJsonStructure = `{
+  "Cashflow_Projection": {"Month_1": 25000, "Month_2": 28000, "Month_3": 30000},
+  "BAS_Summary": {"totalSales": 0, "totalPurchases": 0, "gstOnSales": 0, "gstOnPurchases": 0, "netGST": 0},
+  "FBT_Exposure": {"totalFringeBenefits": 0, "totalFBT": 0, "keyRisks": ["risk1", "risk2"]},
+  "GST_Estimate_Next_Period": 5000,
+  "Insights": ["insight1", "insight2", "insight3"],
+  "Recommended_Actions": ["action1", "action2", "action3"]
+}`;
+
     // Debug: Check if values are actually numbers
     console.log('🔍 Raw values before sending to AI:');
     console.log('  - rev (totalAmount):', financialSummary.invoices.summary.totalAmount, 'type:', typeof financialSummary.invoices.summary.totalAmount);
@@ -974,17 +1002,17 @@ Please help me with the following:
     console.log('  - netIncome:', financialSummary.financialMetrics.netIncome, 'type:', typeof financialSummary.financialMetrics.netIncome);
     console.log('  - expenses:', financialSummary.financialMetrics.totalExpenses, 'type:', typeof financialSummary.financialMetrics.totalExpenses);
 
-    const analysisPrompt = `Analyze financial data and return ONLY valid JSON with no additional text:
+    const analysisPrompt = `Analyze the following financial data and respond with ONLY valid JSON. ${focusInstruction}
 
 DATA: ${JSON.stringify(conciseData)}
 
-Return this exact JSON structure with calculated values:
-{"Cashflow_Projection": {"Month_1": 25000, "Month_2": 28000, "Month_3": 30000}, "GST_Estimate_Next_Period": 5000, "Insights": ["insight1", "insight2", "insight3"], "Recommended_Actions": ["action1", "action2", "action3"]}`;
+Return exactly this JSON structure (update values accordingly; use 0 or empty arrays when data is unavailable):
+${requiredJsonStructure}`;
 
     console.log('📝 Optimized prompt size:', analysisPrompt.length, 'characters');
     console.log('📊 Concise data sent to AI:', conciseData);
     console.log('🔍 Financial data validation:');
-    console.log('  - Total Revenue:', conciseData.rev);
+    console.log('  - Total Revenue:', conciseData.revenue);
     console.log('  - Paid Amount:', conciseData.paid);
     console.log('  - Outstanding:', conciseData.outstanding);
     console.log('  - Net Income:', conciseData.netIncome);
@@ -1117,15 +1145,68 @@ Return this exact JSON structure with calculated values:
           analysis = {
             Cashflow_Projection: { Month_1: 0, Month_2: 0, Month_3: 0 },
             GST_Estimate_Next_Period: 0,
+            BAS_Summary: conciseData.gst
+              ? {
+                  totalSales: conciseData.gst.totalSales || 0,
+                  totalPurchases: conciseData.gst.totalPurchases || 0,
+                  gstOnSales: conciseData.gst.gstOnSales || 0,
+                  gstOnPurchases: conciseData.gst.gstOnPurchases || 0,
+                  netGST: conciseData.gst.netGST || 0,
+                  hasData: !!conciseData.gst
+                }
+              : null,
+            FBT_Exposure: conciseData.fbt
+              ? {
+                  totalFringeBenefits: conciseData.fbt.totalFringeBenefits || 0,
+                  totalFBT: conciseData.fbt.totalFBT || 0,
+                  categories: conciseData.fbt.categories || {},
+                  keyRisks: ['Review FBT accounts for detailed analysis'],
+                  hasData: !!conciseData.fbt
+                }
+              : null,
             Insights: [content],
             Recommended_Actions: ['Review the analysis above for detailed insights']
           };
         }
 
+        const basResult = analysis.BAS_Summary || analysis.bas_summary || analysis.basSummary || analysis.Bas_Summary || null;
+        const fbtResult = analysis.FBT_Exposure || analysis.fbt_exposure || analysis.fbtExposure || analysis.Fbt_Exposure || null;
+
+        analysis.BAS_Summary = basResult || conciseData.gst
+          ? {
+              totalSales: Number(basResult?.totalSales ?? basResult?.TotalSales ?? conciseData.gst?.totalSales ?? 0),
+              totalPurchases: Number(basResult?.totalPurchases ?? basResult?.TotalPurchases ?? conciseData.gst?.totalPurchases ?? 0),
+              gstOnSales: Number(basResult?.gstOnSales ?? basResult?.GSTOnSales ?? conciseData.gst?.gstOnSales ?? 0),
+              gstOnPurchases: Number(basResult?.gstOnPurchases ?? basResult?.GSTOnPurchases ?? conciseData.gst?.gstOnPurchases ?? 0),
+              netGST: Number(basResult?.netGST ?? basResult?.NetGST ?? conciseData.gst?.netGST ?? 0),
+              hasData: !!(basResult || conciseData.gst)
+            }
+          : null;
+
+        analysis.FBT_Exposure = fbtResult || conciseData.fbt
+          ? {
+              totalFringeBenefits: Number(fbtResult?.totalFringeBenefits ?? fbtResult?.TotalFringeBenefits ?? conciseData.fbt?.totalFringeBenefits ?? 0),
+              totalFBT: Number(fbtResult?.totalFBT ?? fbtResult?.TotalFBT ?? conciseData.fbt?.totalFBT ?? 0),
+              categories: fbtResult?.categories ?? fbtResult?.Categories ?? conciseData.fbt?.categories ?? {},
+              keyRisks: fbtResult?.keyRisks ?? fbtResult?.KeyRisks ?? [
+                'Review FBT categories for potential exposure',
+                'Validate employee benefit postings against FBT rules'
+              ],
+              hasData: !!(fbtResult || conciseData.fbt)
+            }
+          : null;
+
+        const resultLabel =
+          focus === 'bas'
+            ? 'BAS Analysis Complete'
+            : focus === 'fas'
+            ? 'FBT Analysis Complete'
+            : 'Financial Analysis Complete';
+
         const assistantMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          content: 'Financial Analysis Complete',
+          content: resultLabel,
           timestamp: new Date(),
           data: analysis
         };
@@ -1197,6 +1278,25 @@ Return this exact JSON structure with calculated values:
               Month_3: extractedNumbers[2] || 30000 
             },
             GST_Estimate_Next_Period: extractedNumbers[3] || 5000,
+            BAS_Summary: conciseData.gst
+              ? {
+                  totalSales: conciseData.gst.totalSales || 0,
+                  totalPurchases: conciseData.gst.totalPurchases || 0,
+                  gstOnSales: conciseData.gst.gstOnSales || 0,
+                  gstOnPurchases: conciseData.gst.gstOnPurchases || 0,
+                  netGST: conciseData.gst.netGST || 0,
+                  hasData: true
+                }
+              : null,
+            FBT_Exposure: conciseData.fbt
+              ? {
+                  totalFringeBenefits: conciseData.fbt.totalFringeBenefits || 0,
+                  totalFBT: conciseData.fbt.totalFBT || 0,
+                  categories: conciseData.fbt.categories || {},
+                  keyRisks: ['Validate FBT calculations against employee benefit accounts'],
+                  hasData: true
+                }
+              : null,
             Insights: [responseText.substring(0, 200) + '...'],
             Recommended_Actions: ['Review the analysis above for detailed insights']
           };
@@ -1205,6 +1305,25 @@ Return this exact JSON structure with calculated values:
           analysis = {
             Cashflow_Projection: { Month_1: 25000, Month_2: 28000, Month_3: 30000 },
             GST_Estimate_Next_Period: 5000,
+            BAS_Summary: conciseData.gst
+              ? {
+                  totalSales: conciseData.gst.totalSales || 0,
+                  totalPurchases: conciseData.gst.totalPurchases || 0,
+                  gstOnSales: conciseData.gst.gstOnSales || 0,
+                  gstOnPurchases: conciseData.gst.gstOnPurchases || 0,
+                  netGST: conciseData.gst.netGST || 0,
+                  hasData: true
+                }
+              : null,
+            FBT_Exposure: conciseData.fbt
+              ? {
+                  totalFringeBenefits: conciseData.fbt.totalFringeBenefits || 0,
+                  totalFBT: conciseData.fbt.totalFBT || 0,
+                  categories: conciseData.fbt.categories || {},
+                  keyRisks: ['Review FBT categories for potential exposure'],
+                  hasData: true
+                }
+              : null,
             Insights: [responseText || 'Analysis completed successfully'],
             Recommended_Actions: ['Review the analysis above for detailed insights']
           };
@@ -1236,7 +1355,7 @@ Return this exact JSON structure with calculated values:
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [openAiKey]);
 
   return (
     <SidebarLayout>
