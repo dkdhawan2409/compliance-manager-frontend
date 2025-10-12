@@ -10,6 +10,7 @@ import { AI_CONFIG } from '../config/aiConfig';
 import FinancialAnalysisDisplay from '../components/FinancialAnalysisDisplay';
 import TemplateSelector from '../components/TemplateSelector';
 import { NotificationTemplate } from '../api/templateService';
+import { isPlainObject, getSectionData } from '../components/XeroDataPreview';
 
 interface Message {
   id: string;
@@ -45,8 +46,6 @@ const AiChat: React.FC = () => {
     selectTenant,
     loadData,
     data: xeroContextData,
-    dataLoading: xeroDataLoading,
-    dataError: xeroDataError,
   } = useXero();
 
   const xeroConnected = status.connected;
@@ -84,9 +83,13 @@ const AiChat: React.FC = () => {
     try {
       const normalize = (response: any) => response?.data?.data ?? response?.data ?? response;
 
-      const [basResponse, invoicesResponse, contactsResponse, dashboardResponse] = await Promise.all([
+      const [basResponse, fasResponse, invoicesResponse, contactsResponse, dashboardResponse] = await Promise.all([
         loadData('basData', { tenantId, useCache: false }).catch((err: any) => {
           console.warn('⚠️ BAS data unavailable:', err?.message || err);
+          return null;
+        }),
+        loadData('fasData', { tenantId, useCache: false }).catch((err: any) => {
+          console.warn('⚠️ FAS data unavailable:', err?.message || err);
           return null;
         }),
         loadData('invoices', { tenantId, useCache: false, pageSize: 100 }).catch((err: any) => {
@@ -104,6 +107,7 @@ const AiChat: React.FC = () => {
       ]);
 
       const basData = basResponse ? normalize(basResponse) : null;
+      const fasData = fasResponse ? normalize(fasResponse) : null;
       const invoiceData = invoicesResponse ? normalize(invoicesResponse) : null;
       const contactsData = contactsResponse ? normalize(contactsResponse) : null;
       const dashboardData = dashboardResponse ? normalize(dashboardResponse) : null;
@@ -115,6 +119,7 @@ const AiChat: React.FC = () => {
         tenantId,
         tenantName: selectedTenant.name || selectedTenant.organizationName || selectedTenant.tenantName,
         basData,
+        fasData,
         transactions,
         contacts,
         dashboardData,
@@ -649,6 +654,123 @@ Please help me with the following:
 
 
 
+  const computeBasSummary = (basData: any, transactions: any[]) => {
+    if (!basData) {
+      return null;
+    }
+
+    try {
+      const dataRoot = isPlainObject(basData?.data) ? basData.data : basData;
+      const gstReport = getSectionData(basData, 'gstReport') || getSectionData(dataRoot, 'gstReport');
+      const profitLoss = getSectionData(basData, 'profitLoss') || getSectionData(dataRoot, 'profitLoss');
+      const invoicesWrapper = getSectionData(basData, 'invoices') || getSectionData(dataRoot, 'invoices');
+
+      const invoicesList = Array.isArray(invoicesWrapper?.Invoices)
+        ? invoicesWrapper.Invoices
+        : Array.isArray(invoicesWrapper)
+        ? invoicesWrapper
+        : Array.isArray(transactions)
+        ? transactions
+        : [];
+
+      let totalSales = 0;
+      let totalPurchases = 0;
+      let gstOnSales = 0;
+      let gstOnPurchases = 0;
+
+      if (gstReport?.Reports?.[0]?.Rows) {
+        const taxRows = gstReport.Reports[0].Rows;
+        taxRows.forEach((row: any) => {
+          if (!row.Cells || row.Cells.length === 0) return;
+          const cells = row.Cells;
+          const description = (cells[0]?.Value || '').toLowerCase();
+          const value = parseFloat(cells[cells.length - 1]?.Value || '0');
+
+          if (description.includes('gst on sales') || description.includes('output tax')) {
+            gstOnSales += Math.abs(value);
+          } else if (description.includes('gst on purchases') || description.includes('input tax')) {
+            gstOnPurchases += Math.abs(value);
+          } else if (description.includes('total sales')) {
+            totalSales += Math.abs(value);
+          } else if (description.includes('total purchases')) {
+            totalPurchases += Math.abs(value);
+          }
+        });
+      }
+
+      if (gstOnSales === 0 && Array.isArray(invoicesList)) {
+        invoicesList.forEach((invoice: any) => {
+          const type = invoice.Type || invoice.type || '';
+          const subTotal = parseFloat(invoice.SubTotal || invoice.subTotal || invoice.amount || '0');
+          const taxAmount = parseFloat(invoice.TotalTax || invoice.totalTax || invoice.tax || '0');
+
+          if (type === 'ACCREC') {
+            totalSales += subTotal;
+            gstOnSales += taxAmount;
+          } else if (type === 'ACCPAY') {
+            totalPurchases += subTotal;
+            gstOnPurchases += taxAmount;
+          }
+        });
+      }
+
+      if (totalSales === 0 && profitLoss?.Reports?.[0]?.Rows) {
+        profitLoss.Reports[0].Rows.forEach((row: any) => {
+          if (row.RowType === 'Section' && row.Title?.toLowerCase().includes('revenue')) {
+            row.Rows?.forEach((subRow: any) => {
+              if (!subRow.Cells || subRow.Cells.length === 0) return;
+              const value = parseFloat(subRow.Cells[subRow.Cells.length - 1]?.Value || '0');
+              totalSales += Math.abs(value);
+            });
+          }
+        });
+      }
+
+      const netGST = gstOnSales - gstOnPurchases;
+
+      return {
+        totalSales,
+        totalPurchases,
+        gstOnSales,
+        gstOnPurchases,
+        netGST,
+        hasData: totalSales !== 0 || gstOnSales !== 0 || gstReport != null
+      };
+    } catch (error) {
+      console.warn('⚠️ Failed to compute BAS summary for AI analysis:', error);
+      return null;
+    }
+  };
+
+  const computeFasSummary = (fasData: any) => {
+    if (!fasData) {
+      return null;
+    }
+
+    try {
+      const report = Array.isArray(fasData) ? fasData[0] : Array.isArray(fasData?.data) ? fasData.data[0] : fasData;
+      if (!report) {
+        return null;
+      }
+
+      const totalFringeBenefits = parseFloat(report.TotalFringeBenefits || report.totalFringeBenefits || '0');
+      const totalFBT = parseFloat(report.TotalFBT || report.totalFBT || '0');
+      const categories = report.Categories || report.categories || {};
+
+      return {
+        totalFringeBenefits,
+        totalFBT,
+        categories,
+        reportName: report.ReportName || report.reportName || 'Fringe Benefits Summary',
+        reportDate: report.ReportDate || report.reportDate || new Date().toISOString().split('T')[0],
+        hasData: totalFringeBenefits !== 0 || totalFBT !== 0
+      };
+    } catch (error) {
+      console.warn('⚠️ Failed to compute FAS summary for AI analysis:', error);
+      return null;
+    }
+  };
+
   // Extract essential financial data for analysis
   const extractFinancialData = (xeroData: any) => {
     console.log('🔍 Extracting financial data from:', xeroData);
@@ -681,12 +803,17 @@ Please help me with the following:
         netIncome: parseFloat(financialSummary?.netIncome?.toString() || '0') || 0,
         totalExpenses: parseFloat(financialSummary?.totalExpenses?.toString() || '0') || 0,
         transactionCount: financialSummary?.transactionCount || 0,
-        dataQuality: financialSummary?.dataQuality || {}
+        dataQuality: financialSummary?.dataQuality || {},
+        gstOnSales: 0,
+        gstOnPurchases: 0,
+        netGST: 0
       },
       reports: {
         available: !!xeroData.basData,
         type: xeroData.basData?.type || 'None',
-        financialSummary: financialSummary
+        financialSummary: financialSummary,
+        bas: null as any,
+        fas: null as any
       },
       dashboard: {
         available: !!xeroData.dashboardData,
@@ -768,6 +895,19 @@ Please help me with the following:
     } else {
       console.warn('⚠️ No contacts data found or not an array');
     }
+    const basSummary = computeBasSummary(xeroData.basData, xeroData.transactions);
+    if (basSummary) {
+      summary.reports.bas = basSummary;
+      summary.financialMetrics.netGST = basSummary.netGST;
+      summary.financialMetrics.gstOnSales = basSummary.gstOnSales;
+      summary.financialMetrics.gstOnPurchases = basSummary.gstOnPurchases;
+    }
+
+    const fasSummary = computeFasSummary(xeroData.fasData);
+    if (fasSummary) {
+      summary.reports.fas = fasSummary;
+    }
+
 
     console.log('📊 Final Financial Summary:', summary);
     console.log('🔍 Key values for AI:');
@@ -801,13 +941,29 @@ Please help me with the following:
     
     // Create a minimal financial summary for the AI
     const conciseData = {
-      rev: financialSummary.invoices.summary.totalAmount,
+      revenue: financialSummary.invoices.summary.totalAmount,
       paid: financialSummary.invoices.summary.paidAmount,
       outstanding: financialSummary.invoices.summary.outstandingAmount,
       netIncome: financialSummary.financialMetrics.netIncome,
       expenses: financialSummary.financialMetrics.totalExpenses,
       invoices: financialSummary.invoices.total,
-      customers: financialSummary.contacts.types.customer || 0
+      customers: financialSummary.contacts.types.customer || 0,
+      gst: financialSummary.reports.bas
+        ? {
+            totalSales: financialSummary.reports.bas.totalSales,
+            totalPurchases: financialSummary.reports.bas.totalPurchases,
+            gstOnSales: financialSummary.reports.bas.gstOnSales,
+            gstOnPurchases: financialSummary.reports.bas.gstOnPurchases,
+            netGST: financialSummary.reports.bas.netGST
+          }
+        : null,
+      fbt: financialSummary.reports.fas
+        ? {
+            totalFringeBenefits: financialSummary.reports.fas.totalFringeBenefits,
+            totalFBT: financialSummary.reports.fas.totalFBT,
+            categories: financialSummary.reports.fas.categories || {}
+          }
+        : null
     };
 
     // Debug: Check if values are actually numbers
