@@ -5,6 +5,7 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   ReactNode,
 } from 'react';
 import apiClient from '../api/client';
@@ -457,8 +458,22 @@ function mergeTenants(...sources: Array<any>): XeroTenant[] {
   return merged;
 }
 
+function tenantsEqual(a: XeroTenant[], b: XeroTenant[]): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (a.length !== b.length) return false;
+  const idsA = a.map((tenant) => tenant.tenantId).sort();
+  const idsB = b.map((tenant) => tenant.tenantId).sort();
+  return idsA.every((id, index) => id === idsB[index]);
+}
+
 export function XeroProvider({ children }: XeroProviderProps) {
   const [state, dispatch] = useReducer(xeroReducer, initialState);
+  const stateRef = useRef(state);
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   const derivedState = useMemo<DerivedXeroState>(() => {
     const isConnected = state.status.connected && state.status.isTokenValid;
@@ -515,7 +530,10 @@ export function XeroProvider({ children }: XeroProviderProps) {
           settingsData?.tenant_data,
           settingsData?.status?.tenants
         );
-        if (mergedTenants.length > 0) {
+        if (
+          mergedTenants.length > 0 &&
+          !tenantsEqual(mergedTenants, stateRef.current?.availableTenants || [])
+        ) {
           dispatch({ type: 'SET_TENANTS', payload: mergedTenants });
         }
         dispatch({ type: 'SET_ERROR', payload: null });
@@ -556,7 +574,7 @@ export function XeroProvider({ children }: XeroProviderProps) {
         throw new Error('Unable to retrieve Xero connection status');
       }
 
-      let tenantsFromStatus: any[] = Array.isArray(statusData.tenants) ? statusData.tenants : [];
+      const tenantsFromStatus: any[] = Array.isArray(statusData.tenants) ? statusData.tenants : [];
       let tenantsFromEndpoint: any[] = [];
       try {
         const tenantsResponse = await apiClient.get('/xero/tenants');
@@ -567,18 +585,22 @@ export function XeroProvider({ children }: XeroProviderProps) {
         console.warn('⚠️ Failed to load tenants:', tenantError);
       }
 
+      const currentSettings = stateRef.current?.settings;
       const mergedTenants = mergeTenants(
         tenantsFromStatus,
         tenantsFromEndpoint,
-        state.settings?.tenants,
-        state.settings?.authorizedTenants,
-        state.availableTenants
+        currentSettings?.tenants,
+        currentSettings?.authorizedTenants,
+        currentSettings?.authorized_tenants,
+        currentSettings?.tenant_data,
+        stateRef.current?.availableTenants
       );
 
       dispatch({
         type: 'SET_STATUS',
         payload: { ...statusData, tenants: mergedTenants },
       });
+
       dispatch({ type: 'SET_ERROR', payload: null });
     } catch (error: any) {
       const message = error.response?.data?.message || error.message || 'Failed to check Xero connection';
@@ -586,7 +608,7 @@ export function XeroProvider({ children }: XeroProviderProps) {
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
-  }, [state.availableTenants, state.settings]);
+  }, []);
 
   const connect = useCallback(async () => {
     dispatch({ type: 'SET_LOADING', payload: true });
