@@ -88,6 +88,8 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
   const [isCalculating, setIsCalculating] = useState(false);
   const [calculationError, setCalculationError] = useState<string | null>(null);
   const [useCache, setUseCache] = useState(true);
+  const [selectedQuarter, setSelectedQuarter] = useState<string>('');
+  const [dateSelectionMode, setDateSelectionMode] = useState<'manual' | 'quarter'>('quarter');
   const requestSignatureRef = useRef<string | null>(null);
 
   const { company } = useAuth();
@@ -112,15 +114,44 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
     return `${year}-${month}-${day}`;
   };
 
-  // Initialize date range (current quarter)
-  useEffect(() => {
-    const now = new Date();
-    const currentQuarter = Math.floor(now.getMonth() / 3);
-    const quarterStart = new Date(now.getFullYear(), currentQuarter * 3, 1);
-    const quarterEnd = new Date(now.getFullYear(), (currentQuarter + 1) * 3, 0);
+  // Quarter calculation functions
+  const getQuarterDates = (quarter: string, year: number) => {
+    const quarters = {
+      'Q1': { start: new Date(year, 6, 1), end: new Date(year, 8, 30) }, // Jul-Sep
+      'Q2': { start: new Date(year, 9, 1), end: new Date(year, 11, 31) }, // Oct-Dec
+      'Q3': { start: new Date(year, 0, 1), end: new Date(year, 2, 31) }, // Jan-Mar
+      'Q4': { start: new Date(year, 3, 1), end: new Date(year, 5, 30) }  // Apr-Jun
+    };
+    return quarters[quarter as keyof typeof quarters];
+  };
 
-    setFromDate(formatDateForInput(quarterStart));
-    setToDate(formatDateForInput(quarterEnd));
+  const getCurrentBASQuarter = () => {
+    const now = new Date();
+    const month = now.getMonth() + 1; // 1-12
+    const year = now.getFullYear();
+    
+    if (month >= 7 && month <= 9) return { quarter: 'Q1', year };
+    if (month >= 10 && month <= 12) return { quarter: 'Q2', year };
+    if (month >= 1 && month <= 3) return { quarter: 'Q3', year };
+    if (month >= 4 && month <= 6) return { quarter: 'Q4', year };
+    
+    return { quarter: 'Q1', year }; // Default fallback
+  };
+
+  const handleQuarterChange = (quarter: string, year: number) => {
+    const dates = getQuarterDates(quarter, year);
+    if (dates) {
+      setFromDate(formatDateForInput(dates.start));
+      setToDate(formatDateForInput(dates.end));
+      setSelectedQuarter(quarter);
+    }
+  };
+
+  // Initialize with current BAS quarter
+  useEffect(() => {
+    const { quarter, year } = getCurrentBASQuarter();
+    setSelectedQuarter(quarter);
+    handleQuarterChange(quarter, year);
   }, []);
 
   // Load BAS data when tenant or dates change
@@ -458,29 +489,93 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
           </Select>
         </FormControl>
 
-        {/* Date Range Selection */}
-        <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="From Date"
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-            />
+        {/* Date Selection Mode Toggle */}
+        <Box sx={{ mb: 2 }}>
+          <Button
+            variant={dateSelectionMode === 'quarter' ? 'contained' : 'outlined'}
+            onClick={() => setDateSelectionMode('quarter')}
+            sx={{ mr: 1 }}
+            size="small"
+          >
+            📅 Quarter Selection
+          </Button>
+          <Button
+            variant={dateSelectionMode === 'manual' ? 'contained' : 'outlined'}
+            onClick={() => setDateSelectionMode('manual')}
+            size="small"
+          >
+            📆 Manual Dates
+          </Button>
+        </Box>
+
+        {/* Quarter Selection */}
+        {dateSelectionMode === 'quarter' && (
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <InputLabel>BAS Quarter</InputLabel>
+                <Select
+                  value={selectedQuarter}
+                  onChange={(e) => {
+                    const quarter = e.target.value;
+                    const currentYear = new Date().getFullYear();
+                    handleQuarterChange(quarter, currentYear);
+                  }}
+                  label="BAS Quarter"
+                >
+                  <MenuItem value="Q1">Q1 (Jul-Sep)</MenuItem>
+                  <MenuItem value="Q2">Q2 (Oct-Dec)</MenuItem>
+                  <MenuItem value="Q3">Q3 (Jan-Mar)</MenuItem>
+                  <MenuItem value="Q4">Q4 (Apr-Jun)</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Financial Year"
+                type="number"
+                value={new Date().getFullYear()}
+                disabled
+                helperText="BAS Year (April to March)"
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  <strong>Selected Period:</strong> {fromDate} to {toDate}
+                  {selectedQuarter && ` (${selectedQuarter} ${new Date().getFullYear()})`}
+                </Typography>
+              </Box>
+            </Grid>
           </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="To Date"
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-            />
+        )}
+
+        {/* Manual Date Range Selection */}
+        {dateSelectionMode === 'manual' && (
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="From Date"
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="To Date"
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
           </Grid>
-        </Grid>
+        )}
 
         {/* Options */}
         <Box sx={{ mb: 3 }}>
