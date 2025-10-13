@@ -1,5 +1,22 @@
 import React from 'react';
 
+interface BasSummary {
+  totalSales: number;
+  totalPurchases: number;
+  gstOnSales: number;
+  gstOnPurchases: number;
+  netGST: number;
+  hasData?: boolean;
+}
+
+interface FbtExposure {
+  totalFringeBenefits: number;
+  totalFBT: number;
+  categories?: Record<string, number>;
+  keyRisks?: string[];
+  hasData?: boolean;
+}
+
 interface FinancialAnalysis {
   Cashflow_Projection: {
     Month_1: number;
@@ -7,6 +24,8 @@ interface FinancialAnalysis {
     Month_3: number;
   };
   GST_Estimate_Next_Period: number;
+  BAS_Summary?: BasSummary | null;
+  FBT_Exposure?: FbtExposure | null;
   Insights: string[];
   Recommended_Actions: string[];
 }

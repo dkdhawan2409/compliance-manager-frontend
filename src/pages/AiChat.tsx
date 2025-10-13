@@ -1357,6 +1357,16 @@ ${requiredJsonStructure}`;
     }
   }, [openAiKey]);
 
+  const runFinancialAnalysis = useCallback(
+    async (focus: 'overall' | 'bas' | 'fas' = 'overall') => {
+      const data = await loadXeroDataForAnalysis();
+      if (data) {
+        await generateFinancialAnalysis(data, focus);
+      }
+    },
+    [loadXeroDataForAnalysis, generateFinancialAnalysis]
+  );
+
   return (
     <SidebarLayout>
       <div className="h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 flex flex-col relative overflow-hidden">
@@ -1424,7 +1434,7 @@ ${requiredJsonStructure}`;
               
               {/* BAS Processing Button - Show in both modes */}
               <button
-                onClick={() => navigate('/bas-processing')}
+                onClick={() => runFinancialAnalysis('bas')}
                 className="px-3 sm:px-4 py-2 text-xs sm:text-sm bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-lg hover:from-orange-600 hover:to-red-700 transition-all duration-300 whitespace-nowrap shadow-lg"
               >
                 📊 BAS Processing
@@ -1432,7 +1442,7 @@ ${requiredJsonStructure}`;
               
               {/* FAS Processing Button - Show in both modes */}
               <button
-                onClick={() => navigate('/fas-processing')}
+                onClick={() => runFinancialAnalysis('fas')}
                 className="px-3 sm:px-4 py-2 text-xs sm:text-sm bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg hover:from-purple-600 hover:to-pink-700 transition-all duration-300 whitespace-nowrap shadow-lg"
               >
                 📊 FAS Processing
