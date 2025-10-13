@@ -498,8 +498,9 @@ const MissingAttachments: React.FC = () => {
         return;
       }
       
-      const result = await processMissingAttachments();
-      toast.success(`Processed ${result.totalTransactions} transactions, sent ${result.smssSent} notifications`);
+      const result = await processMissingAttachments(activeTenantId || undefined);
+      const notificationCount = result.notifications?.totalNotifications ?? result.smssSent;
+      toast.success(`Processed ${result.totalTransactions} transactions, sent ${notificationCount} notifications`);
       
       // Refresh data
       await loadData();
@@ -564,8 +565,9 @@ const MissingAttachments: React.FC = () => {
           
           // If refresh was successful, retry the operation
           console.log('✅ Token refresh successful, retrying process...');
-          const result = await processMissingAttachments();
-          toast.success(`Processed ${result.totalTransactions} transactions, sent ${result.smssSent} notifications`);
+          const result = await processMissingAttachments(activeTenantId || undefined);
+          const notificationCount = result.notifications?.totalNotifications ?? result.smssSent;
+          toast.success(`Processed ${result.totalTransactions} transactions, sent ${notificationCount} notifications`);
           
           // Refresh data
           await loadData();
@@ -598,8 +600,9 @@ const MissingAttachments: React.FC = () => {
           
           // If refresh was successful, retry the operation
           console.log('✅ Token refresh successful, retrying process...');
-          const result = await processMissingAttachments();
-          toast.success(`Processed ${result.totalTransactions} transactions, sent ${result.smssSent} notifications`);
+          const result = await processMissingAttachments(activeTenantId || undefined);
+          const notificationCount = result.notifications?.totalNotifications ?? result.smssSent;
+          toast.success(`Processed ${result.totalTransactions} transactions, sent ${notificationCount} notifications`);
           
           // Refresh data
           await loadData();

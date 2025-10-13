@@ -79,6 +79,22 @@ export interface ProcessingResult {
   highRiskCount: number;
   lowRiskCount: number;
   smssSent: number;
+  notifications?: {
+    totalNotifications: number;
+    success?: boolean;
+    message?: string;
+    sms?: {
+      success: boolean;
+      message?: string;
+      [key: string]: any;
+    };
+    email?: {
+      success: boolean;
+      message?: string;
+      [key: string]: any;
+    };
+    [key: string]: any;
+  };
   errors: Array<{
     transactionId: string;
     error: string;
@@ -138,8 +154,9 @@ export const detectMissingAttachments = async (
   return response.data.data;
 };
 
-export const processMissingAttachments = async (): Promise<ProcessingResult> => {
-  const response = await apiClient.post('/missing-attachments/process');
+export const processMissingAttachments = async (tenantId?: string): Promise<ProcessingResult> => {
+  const payload = tenantId ? { tenantId } : {};
+  const response = await apiClient.post('/missing-attachments/process', payload);
   return response.data.data;
 };
 
