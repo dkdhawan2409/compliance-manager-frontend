@@ -23,6 +23,9 @@ const validationSchema = Yup.object({
   mobileNumber: Yup.string()
     .matches(/^[1-9][\d\s\-\(\)]{8,20}$/, 'Invalid mobile number')
     .required('Mobile number is required'),
+  accountantEmail: Yup.string()
+    .email('Invalid email address')
+    .notRequired(),
 });
 
 const Profile: React.FC = () => {
@@ -36,6 +39,7 @@ const Profile: React.FC = () => {
       email: company?.email || '',
       countryCode: company?.countryCode || '+61',
       mobileNumber: company?.mobileNumber || '',
+      accountantEmail: company?.accountantEmail || '',
     },
     validationSchema,
     enableReinitialize: true,
@@ -47,6 +51,7 @@ const Profile: React.FC = () => {
           email: values.email,
           mobileNumber: values.mobileNumber,
           countryCode: values.countryCode,
+          accountantEmail: values.accountantEmail || undefined,
         };
 
         const response = await companyService.updateProfile(profileData);
@@ -113,6 +118,27 @@ const Profile: React.FC = () => {
                       onChange={formik.handleChange}
                       error={formik.touched.email && Boolean(formik.errors.email)}
                       helperText={formik.touched.email && formik.errors.email}
+                      margin="normal"
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <Email />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      id="accountantEmail"
+                      name="accountantEmail"
+                      label="Accountant Email (Optional)"
+                      type="email"
+                      value={formik.values.accountantEmail}
+                      onChange={formik.handleChange}
+                      error={formik.touched.accountantEmail && Boolean(formik.errors.accountantEmail)}
+                      helperText={formik.touched.accountantEmail && formik.errors.accountantEmail || 'Email address of your accountant or accounting firm'}
                       margin="normal"
                       InputProps={{
                         startAdornment: (

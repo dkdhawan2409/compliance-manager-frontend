@@ -29,12 +29,14 @@ export interface ProfileData {
   email: string;
   mobileNumber: string;
   countryCode: string;
+  accountantEmail?: string;
 }
 
 export interface Company {
   id: number;
   companyName: string;
   email: string;
+  accountantEmail?: string;
   mobileNumber: string;
   countryCode?: string;
   basFrequency?: 'Monthly' | 'Quarterly' | 'Annually';
