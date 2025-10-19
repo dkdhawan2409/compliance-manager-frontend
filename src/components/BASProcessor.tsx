@@ -382,6 +382,55 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
     setUseCache(!useCache);
   };
 
+  // Handle PDF download
+  const handleDownloadPDF = async () => {
+    if (!selectedTenant || !fromDate || !toDate) {
+      setCalculationError('Please load BAS data first before downloading PDF.');
+      return;
+    }
+
+    try {
+      const tenantId = selectedTenant.tenantId || selectedTenant.id;
+      const token = localStorage.getItem('token');
+      
+      const params = new URLSearchParams({
+        tenantId,
+        fromDate,
+        toDate,
+        quarter: selectedQuarter || ''
+      });
+
+      const url = `https://compliance-manager-backend.onrender.com/api/xero/bas-data/pdf?${params.toString()}`;
+      
+      console.log('📄 Downloading BAS PDF from:', url);
+
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF');
+      }
+
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = `BAS_Report_${selectedQuarter || fromDate}_${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(downloadUrl);
+
+      console.log('✅ BAS PDF downloaded successfully');
+    } catch (error: any) {
+      console.error('❌ Error downloading BAS PDF:', error);
+      setCalculationError('Failed to download PDF: ' + error.message);
+    }
+  };
+
   // Render connection status
   if (!isConnected) {
     return (
@@ -578,12 +627,11 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
         )}
 
         {/* Options */}
-        <Box sx={{ mb: 3 }}>
+        <Box sx={{ mb: 3, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           <Button
             variant={useCache ? 'contained' : 'outlined'}
             size="small"
             onClick={handleCacheToggle}
-            sx={{ mr: 2 }}
           >
             {useCache ? 'Using Cache' : 'Live Data'}
           </Button>
@@ -594,6 +642,15 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
             startIcon={dataLoading ? <CircularProgress size={16} /> : <RefreshIcon />}
           >
             {dataLoading ? 'Loading...' : 'Load BAS Data'}
+          </Button>
+          <Button
+            variant="contained"
+            color="success"
+            onClick={handleDownloadPDF}
+            disabled={!basData || dataLoading}
+            startIcon={<DownloadIcon />}
+          >
+            📄 Download PDF
           </Button>
         </Box>
 

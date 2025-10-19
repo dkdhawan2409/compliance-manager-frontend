@@ -340,6 +340,55 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
     setUseCache(!useCache);
   };
 
+  // Handle PDF download
+  const handleDownloadPDF = async () => {
+    if (!selectedTenant || !fromDate || !toDate) {
+      setCalculationError('Please load FAS data first before downloading PDF.');
+      return;
+    }
+
+    try {
+      const tenantId = selectedTenant.tenantId || selectedTenant.id;
+      const token = localStorage.getItem('token');
+      
+      const params = new URLSearchParams({
+        tenantId,
+        fromDate,
+        toDate,
+        quarter: selectedQuarter || ''
+      });
+
+      const url = `https://compliance-manager-backend.onrender.com/api/xero/fas-data/pdf?${params.toString()}`;
+      
+      console.log('📄 Downloading FAS PDF from:', url);
+
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF');
+      }
+
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = `FAS_Report_${selectedQuarter || fromDate}_${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(downloadUrl);
+
+      console.log('✅ FAS PDF downloaded successfully');
+    } catch (error: any) {
+      console.error('❌ Error downloading FAS PDF:', error);
+      setCalculationError('Failed to download PDF: ' + error.message);
+    }
+  };
+
   // Render connection status
   if (!isConnected) {
     return (
@@ -536,12 +585,11 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
         )}
 
         {/* Options */}
-        <Box sx={{ mb: 3 }}>
+        <Box sx={{ mb: 3, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           <Button
             variant={useCache ? 'contained' : 'outlined'}
             size="small"
             onClick={handleCacheToggle}
-            sx={{ mr: 2 }}
           >
             {useCache ? 'Using Cache' : 'Live Data'}
           </Button>
@@ -552,6 +600,15 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
             startIcon={dataLoading ? <CircularProgress size={16} /> : <RefreshIcon />}
           >
             {dataLoading ? 'Loading...' : 'Load FAS Data'}
+          </Button>
+          <Button
+            variant="contained"
+            color="success"
+            onClick={handleDownloadPDF}
+            disabled={!fasData || dataLoading}
+            startIcon={<DownloadIcon />}
+          >
+            📄 Download PDF
           </Button>
         </Box>
 
