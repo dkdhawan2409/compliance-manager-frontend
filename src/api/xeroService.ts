@@ -594,6 +594,28 @@ export const syncFASData = async (options?: {
   return response.data;
 };
 
+export const downloadBASReportPdf = async (payload: {
+  basData: Record<string, unknown>;
+  summary?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+}): Promise<Blob> => {
+  const response = await apiClient.post('/reports/bas/pdf', payload, {
+    responseType: 'blob'
+  });
+  return response.data;
+};
+
+export const downloadFASReportPdf = async (payload: {
+  fasData: Record<string, unknown>;
+  summary?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+}): Promise<Blob> => {
+  const response = await apiClient.post('/reports/fas/pdf', payload, {
+    responseType: 'blob'
+  });
+  return response.data;
+};
+
 // Available resource types
 export const XERO_RESOURCE_TYPES = [
   'invoices',
@@ -614,4 +636,4 @@ export const XERO_RESOURCE_TYPES = [
   'reports',
 ] as const;
 
-export type XeroResourceType = typeof XERO_RESOURCE_TYPES[number]; 
+export type XeroResourceType = typeof XERO_RESOURCE_TYPES[number];

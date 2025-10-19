@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useUserRole, requireAIToolsAccess } from '../utils/roleUtils';
 import { Navigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { downloadBASReportPdf } from '../api/xeroService';
 
 interface BASData {
   BAS_Period: string;
@@ -30,39 +31,57 @@ const BASProcessing: React.FC = () => {
 
   const [processedBASData, setProcessedBASData] = useState<BASData | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [isDownloadingReport, setIsDownloadingReport] = useState(false);
 
   const handleBASGenerated = (basData: BASData) => {
     setProcessedBASData(basData);
     toast.success(`BAS data for ${basData.BAS_Period} has been processed successfully!`);
   };
 
-  const downloadBASReport = () => {
-    if (!processedBASData) return;
+  const downloadBASReport = async () => {
+    if (!processedBASData || isDownloadingReport) return;
 
-    const reportData = {
-      generatedAt: new Date().toISOString(),
-      company: company?.name || 'Unknown Company',
-      basData: processedBASData,
-      summary: {
-        totalSales: processedBASData.BAS_Fields.G1,
-        totalGST: processedBASData.BAS_Fields['1A'] - processedBASData.BAS_Fields['1B'],
-        netGST: processedBASData.BAS_Fields['1A'] - processedBASData.BAS_Fields['1B'],
-        totalWages: processedBASData.BAS_Fields.W1,
-        paygWithholding: processedBASData.BAS_Fields.W2
-      }
-    };
+    try {
+      setIsDownloadingReport(true);
+      const gstOnSales = processedBASData.BAS_Fields['1A'];
+      const gstOnPurchases = processedBASData.BAS_Fields['1B'];
 
-    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `BAS_Report_${processedBASData.BAS_Period}_${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    toast.success('BAS report downloaded successfully!');
+      const payload = {
+        basData: processedBASData,
+        summary: {
+          totalSales: processedBASData.BAS_Fields.G1,
+          totalGST: gstOnSales,
+          gstOnPurchases,
+          netGST: gstOnSales - gstOnPurchases,
+          totalWages: processedBASData.BAS_Fields.W1,
+          paygWithholding: processedBASData.BAS_Fields.W2
+        },
+        metadata: {
+          companyName: company?.name,
+          generatedAt: new Date().toISOString(),
+          notes: 'BAS PDF generated from processed BAS data.'
+        }
+      };
+
+      const pdfBlob = await downloadBASReportPdf(payload);
+      const downloadUrl = window.URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      const safePeriod = processedBASData.BAS_Period.replace(/[^a-z0-9]+/gi, '_');
+      link.download = `BAS_Report_${safePeriod}_${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+
+      toast.success('BAS PDF downloaded successfully!');
+    } catch (error: any) {
+      console.error('Failed to download BAS PDF:', error);
+      const message = error?.response?.data?.message || 'Failed to download BAS PDF. Please try again.';
+      toast.error(message);
+    } finally {
+      setIsDownloadingReport(false);
+    }
   };
 
   return (
@@ -82,9 +101,10 @@ const BASProcessing: React.FC = () => {
                 {processedBASData && (
                   <button
                     onClick={downloadBASReport}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    disabled={isDownloadingReport}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    📥 Download Report
+                    {isDownloadingReport ? '⏳ Preparing PDF...' : '📥 Download PDF'}
                   </button>
                 )}
                 <button

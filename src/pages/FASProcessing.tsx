@@ -4,6 +4,7 @@ import FASProcessor from '../components/FASProcessor';
 import { useAuth } from '../contexts/AuthContext';
 import { useUserRole } from '../utils/roleUtils';
 import toast from 'react-hot-toast';
+import { downloadFASReportPdf } from '../api/xeroService';
 
 interface FASData {
   FAS_Period: string;
@@ -26,38 +27,53 @@ const FASProcessing: React.FC = () => {
 
   const [processedFASData, setProcessedFASData] = useState<FASData | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [isDownloadingReport, setIsDownloadingReport] = useState(false);
 
   const handleFASGenerated = (fasData: FASData) => {
     setProcessedFASData(fasData);
     toast.success(`FAS data for ${fasData.FAS_Period} has been processed successfully!`);
   };
 
-  const downloadFASReport = () => {
-    if (!processedFASData) return;
+  const downloadFASReport = async () => {
+    if (!processedFASData || isDownloadingReport) return;
 
-    const reportData = {
-      generatedAt: new Date().toISOString(),
-      company: company?.name || 'Unknown Company',
-      fasData: processedFASData,
-      summary: {
-        totalFringeBenefits: processedFASData.FAS_Fields.A1,
-        fbtPayable: processedFASData.FAS_Fields.A5,
-        fbtRate: processedFASData.FAS_Fields.A6,
-        reportableBenefits: processedFASData.FAS_Fields.A3
-      }
-    };
+    try {
+      setIsDownloadingReport(true);
 
-    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `FAS_Report_${processedFASData.FAS_Period}_${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    toast.success('FAS report downloaded successfully!');
+      const payload = {
+        fasData: processedFASData,
+        summary: {
+          totalFringeBenefits: processedFASData.FAS_Fields.A1,
+          fbtPayable: processedFASData.FAS_Fields.A5,
+          fbtRate: processedFASData.FAS_Fields.A6,
+          reportableBenefits: processedFASData.FAS_Fields.A3
+        },
+        metadata: {
+          companyName: company?.name,
+          generatedAt: new Date().toISOString(),
+          notes: 'FAS PDF generated from processed FAS data.'
+        }
+      };
+
+      const pdfBlob = await downloadFASReportPdf(payload);
+      const downloadUrl = window.URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      const safePeriod = processedFASData.FAS_Period.replace(/[^a-z0-9]+/gi, '_');
+      link.download = `FAS_Report_${safePeriod}_${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+
+      toast.success('FAS PDF downloaded successfully!');
+    } catch (error: any) {
+      console.error('Failed to download FAS PDF:', error);
+      const message = error?.response?.data?.message || 'Failed to download FAS PDF. Please try again.';
+      toast.error(message);
+    } finally {
+      setIsDownloadingReport(false);
+    }
   };
 
   return (
@@ -77,9 +93,10 @@ const FASProcessing: React.FC = () => {
                 {processedFASData && (
                   <button
                     onClick={downloadFASReport}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                    disabled={isDownloadingReport}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    📥 Download Report
+                    {isDownloadingReport ? '⏳ Preparing PDF...' : '📥 Download PDF'}
                   </button>
                 )}
                 <button
