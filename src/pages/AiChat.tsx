@@ -127,12 +127,39 @@ const getValue = (source: any, ...keys: string[]): unknown => {
   return undefined;
 };
 
+const LABEL_DETAILS: Record<string, string> = {
+  G1: 'Total sales for the period (includes GST-free and input-taxed sales)',
+  G2: 'Export sales that are GST-free',
+  G3: 'Domestic GST-free sales (excluding exports)',
+  G10: 'Capital acquisitions and asset purchases',
+  G11: 'Non-capital/business operating purchases',
+  G21: 'GST on taxable sales before adjustments',
+  G22: 'Increasing adjustments to GST on sales',
+  G23: 'GST credits from purchases',
+  G24: 'Increasing adjustments to GST credits',
+  '1A': 'Total GST payable (G21 + G22)',
+  '1B': 'Total GST credits (G23 + G24)',
+  W1: 'Gross wages and payments subject to PAYG withholding',
+  W2: 'Amounts withheld from W1 payments',
+  W3: 'Other PAYG withholdings (e.g. investment distributions)',
+  W4: 'Withholding for payments where no ABN was quoted',
+  W5: 'Total PAYG amounts withheld',
+  T1: 'PAYG instalment income for the period',
+  T2: 'Standard PAYG instalment rate applied',
+  T3: 'Varied PAYG instalment rate (if applicable)',
+  T11: 'Calculated PAYG instalment for the period',
+  '5A': 'PAYG instalment payable this period'
+};
+
+const describeLabel = (code: string): string =>
+  LABEL_DETAILS[code] ? `${code} — ${LABEL_DETAILS[code]}` : code;
+
 const pushMoneyLine = (lines: string[], label: string, rawValue: unknown) => {
   const floored = floorCurrencyValue(rawValue);
   if (floored === null) {
     return;
   }
-  lines.push(`${label}: ${formatCurrencyValue(floored)}`);
+  lines.push(`${describeLabel(label)}: ${formatCurrencyValue(floored)}`);
 };
 
 const pushRateLine = (lines: string[], label: string, rawValue: unknown) => {
@@ -140,7 +167,7 @@ const pushRateLine = (lines: string[], label: string, rawValue: unknown) => {
   if (numeric === null || numeric < 0) {
     return;
   }
-  lines.push(`${label}: ${formatRateValue(numeric)}`);
+  lines.push(`${describeLabel(label)}: ${formatRateValue(numeric)}`);
 };
 
 const findBasDataCandidate = (input: any, visited = new WeakSet<object>()): Record<string, unknown> | null => {
@@ -270,6 +297,9 @@ const formatBasPlainText = (input: Record<string, unknown>): string | null => {
   outputLines.push(`BAS Period: ${period || 'Unknown'}`, '');
 
   const gstLines: string[] = [];
+  let summaryG1: number | null = null;
+  let summary1A: number | null = null;
+  let summary1B: number | null = null;
   if (gstBlock && typeof gstBlock === 'object') {
     const sales = getValue(gstBlock, 'sales', 'Sales') as Record<string, unknown> | undefined;
     const purchases = getValue(gstBlock, 'purchases', 'Purchases') as Record<string, unknown> | undefined;
@@ -289,6 +319,7 @@ const formatBasPlainText = (input: Record<string, unknown>): string | null => {
       (rawInputTaxed ?? 0);
 
     if (rawG1 !== null && rawG1 >= compareSum) {
+      summaryG1 = rawG1;
       pushMoneyLine(gstLines, 'G1', rawG1);
     }
     pushMoneyLine(gstLines, 'G2', rawG2);
@@ -331,11 +362,19 @@ const formatBasPlainText = (input: Record<string, unknown>): string | null => {
       }
     }
 
+    if (raw1A !== null) {
+      summary1A = raw1A;
+    }
+    if (raw1B !== null) {
+      summary1B = raw1B;
+    }
+
     pushMoneyLine(gstLines, '1A', raw1A);
     pushMoneyLine(gstLines, '1B', raw1B);
   }
 
   const paygWithholdingLines: string[] = [];
+  let summaryW2: number | null = null;
   if (paygWithholdingBlock && typeof paygWithholdingBlock === 'object') {
     const stpPrefill = getValue(paygWithholdingBlock, 'stp_prefill', 'stpPrefill') as
       | Record<string, unknown>
@@ -356,6 +395,9 @@ const formatBasPlainText = (input: Record<string, unknown>): string | null => {
     }
 
     pushMoneyLine(paygWithholdingLines, 'W1', rawW1);
+    if (rawW2 !== null) {
+      summaryW2 = rawW2;
+    }
     pushMoneyLine(paygWithholdingLines, 'W2', rawW2);
     pushMoneyLine(paygWithholdingLines, 'W3', rawW3);
     pushMoneyLine(paygWithholdingLines, 'W4', rawW4);
@@ -363,6 +405,7 @@ const formatBasPlainText = (input: Record<string, unknown>): string | null => {
   }
 
   const paygInstalmentLines: string[] = [];
+  let summary5A: number | null = null;
   if (paygInstalmentBlock && typeof paygInstalmentBlock === 'object') {
     const rawT1 = parseNumeric(getValue(paygInstalmentBlock, 't1_instalment_income', 't1', 'T1'));
     const rawT2 = parseNumeric(getValue(paygInstalmentBlock, 't2_instalment_rate_percent', 't2', 'T2'));
@@ -389,6 +432,9 @@ const formatBasPlainText = (input: Record<string, unknown>): string | null => {
       pushRateLine(paygInstalmentLines, 'T3', rawT3);
     }
     pushMoneyLine(paygInstalmentLines, 'T11', rawT11);
+    if (raw5A !== null) {
+      summary5A = raw5A;
+    }
     pushMoneyLine(paygInstalmentLines, '5A', raw5A);
 
     const variationReason = getValue(
@@ -398,23 +444,71 @@ const formatBasPlainText = (input: Record<string, unknown>): string | null => {
       'variation_reason'
     );
     if (variationReason !== undefined && variationReason !== null && String(variationReason).trim() !== '') {
-      paygInstalmentLines.push(`Variation Reason: ${variationReason}`);
+      paygInstalmentLines.push(
+        `Variation Reason — Explanation for varied PAYG instalment: ${variationReason}`
+      );
     }
   }
 
-  const sections: { title: string; lines: string[] }[] = [
-    { title: 'GST', lines: gstLines },
-    { title: 'PAYG Withholding', lines: paygWithholdingLines },
-    { title: 'PAYG Instalments', lines: paygInstalmentLines }
+  const sections: { title: string; lines: string[]; noDataMessage: string }[] = [
+    {
+      title: 'GST',
+      lines: gstLines,
+      noDataMessage: 'No reportable GST activity supplied for this period.'
+    },
+    {
+      title: 'PAYG Withholding',
+      lines: paygWithholdingLines,
+      noDataMessage: 'No PAYG withholding amounts reported.'
+    },
+    {
+      title: 'PAYG Instalments',
+      lines: paygInstalmentLines,
+      noDataMessage: 'No PAYG instalment obligations reported.'
+    }
   ];
 
   sections.forEach((section, index) => {
     outputLines.push(section.title);
-    section.lines.forEach((line) => outputLines.push(line));
+    if (section.lines.length === 0) {
+      outputLines.push(section.noDataMessage);
+    } else {
+      section.lines.forEach((line) => outputLines.push(line));
+    }
     if (index < sections.length - 1) {
       outputLines.push('');
     }
   });
+
+  const summaryLines: string[] = [];
+  if (summary1A !== null || summary1B !== null || summaryW2 !== null || summary5A !== null) {
+    summaryLines.push('Summary Insights');
+    if (summaryG1 !== null) {
+      summaryLines.push(`- Reported taxable sales (G1) total ${formatCurrencyValue(Math.floor(summaryG1))}.`);
+    }
+    if (summary1A !== null && summary1B !== null) {
+      const netGST = summary1A - summary1B;
+      const netLabel = netGST >= 0 ? 'Net GST payable' : 'Net GST refundable';
+      summaryLines.push(
+        `- ${netLabel}: ${formatCurrencyValue(Math.floor(Math.abs(netGST)))} (calculated as 1A minus 1B).`
+      );
+    } else if (summary1A !== null) {
+      summaryLines.push(`- GST on sales (1A) reported at ${formatCurrencyValue(Math.floor(summary1A))}.`);
+    } else if (summary1B !== null) {
+      summaryLines.push(`- GST credits (1B) reported at ${formatCurrencyValue(Math.floor(summary1B))}.`);
+    }
+    if (summaryW2 !== null) {
+      summaryLines.push(`- PAYG withholding obligations (W2) total ${formatCurrencyValue(Math.floor(summaryW2))}.`);
+    }
+    if (summary5A !== null) {
+      summaryLines.push(`- PAYG instalment due (5A) is ${formatCurrencyValue(Math.floor(summary5A))}.`);
+    }
+  }
+
+  if (summaryLines.length > 0) {
+    outputLines.push('');
+    summaryLines.forEach((line) => outputLines.push(line));
+  }
 
   return outputLines.join('\n').replace(/\n+$/, '');
 };
