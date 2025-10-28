@@ -57,12 +57,17 @@ const XeroAdminManager: React.FC = () => {
       
       if (response.ok) {
         const data = await response.json();
-        if (data.success && data.data && data.data.client_id) {
-          // Auto-fill the form with existing credentials
+        const payload = data?.data || {};
+        const clientId = payload.client_id || payload.clientId || '';
+        const clientSecret = payload.client_secret || payload.clientSecret || '';
+        const redirectUri = payload.redirect_uri || payload.redirectUri || window.location.origin + '/redirecturl';
+
+        if (data.success && clientId) {
+          // Auto-fill the form with existing credentials (if available)
           setCredentials({
-            clientId: data.data.client_id,
-            clientSecret: data.data.client_secret || '', // Show the actual client secret
-            redirectUri: data.data.redirect_uri || window.location.origin + '/redirecturl'
+            clientId,
+            clientSecret,
+            redirectUri
           });
           console.log('✅ Auto-filled existing Xero credentials');
         }
@@ -98,13 +103,9 @@ const XeroAdminManager: React.FC = () => {
       
       if (data.success) {
         toast.success('Xero credentials assigned successfully!');
-        setCredentials({
-          clientId: '',
-          clientSecret: '',
-          redirectUri: window.location.origin + '/redirecturl'
-        });
         setSelectedCompany(null);
         loadCompanies(); // Refresh the list
+        loadExistingCredentials(); // Refresh saved credentials
       } else {
         toast.error(data.message || 'Failed to assign credentials');
       }
@@ -142,12 +143,8 @@ const XeroAdminManager: React.FC = () => {
       
       if (data.success) {
         toast.success(`Xero credentials assigned to ${data.updatedCount} companies!`);
-        setCredentials({
-          clientId: '',
-          clientSecret: '',
-          redirectUri: window.location.origin + '/redirecturl'
-        });
         loadCompanies(); // Refresh the list
+        loadExistingCredentials(); // Ensure form stays in sync with saved values
       } else {
         toast.error(data.message || 'Failed to bulk assign credentials');
       }
