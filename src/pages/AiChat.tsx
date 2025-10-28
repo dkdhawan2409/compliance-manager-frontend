@@ -45,6 +45,423 @@ interface FinancialAnalysis {
   Recommended_Actions: string[];
 }
 
+type BasFormattingResult = {
+  formatted: string;
+  source: Record<string, unknown>;
+};
+
+const parseNumeric = (value: unknown): number | null => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === 'string') {
+    const cleaned = value.replace(/[^\d\-.]/g, '');
+    if (!cleaned || cleaned === '-' || cleaned === '.' || cleaned === '-.') {
+      return null;
+    }
+    const parsed = Number(cleaned);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const floorCurrencyValue = (value: unknown): number | null => {
+  const numeric = parseNumeric(value);
+  if (numeric === null || numeric < 0) {
+    return null;
+  }
+  return Math.floor(numeric);
+};
+
+const formatCurrencyValue = (value: number): string =>
+  `$${value.toLocaleString('en-AU', { maximumFractionDigits: 0 })}`;
+
+const formatRateValue = (value: number): string => {
+  const decimals = Math.abs(value % 1) < 0.00001 ? 0 : 2;
+  return `${value.toFixed(decimals)}%`;
+};
+
+const toCamelCase = (input: string): string =>
+  input.replace(/[_\s]+([a-zA-Z0-9])/g, (_, char: string) => char.toUpperCase());
+
+const keyVariants = (key: string): string[] => {
+  const variants = new Set<string>();
+  variants.add(key);
+  variants.add(key.toLowerCase());
+  variants.add(key.toUpperCase());
+
+  const camel = toCamelCase(key);
+  variants.add(camel);
+  variants.add(camel.charAt(0).toLowerCase() + camel.slice(1));
+  variants.add(camel.charAt(0).toUpperCase() + camel.slice(1));
+
+  const noUnderscore = key.replace(/_/g, '');
+  if (noUnderscore && noUnderscore !== key) {
+    variants.add(noUnderscore);
+    variants.add(noUnderscore.toLowerCase());
+    variants.add(noUnderscore.toUpperCase());
+    const camelNoUnderscore = toCamelCase(noUnderscore);
+    variants.add(camelNoUnderscore);
+    variants.add(camelNoUnderscore.charAt(0).toLowerCase() + camelNoUnderscore.slice(1));
+    variants.add(camelNoUnderscore.charAt(0).toUpperCase() + camelNoUnderscore.slice(1));
+  }
+
+  return Array.from(variants);
+};
+
+const getValue = (source: any, ...keys: string[]): unknown => {
+  if (!source || typeof source !== 'object') {
+    return undefined;
+  }
+  for (const key of keys) {
+    const variants = keyVariants(key);
+    for (const variant of variants) {
+      if (Object.prototype.hasOwnProperty.call(source, variant)) {
+        return source[variant];
+      }
+    }
+  }
+  return undefined;
+};
+
+const pushMoneyLine = (lines: string[], label: string, rawValue: unknown) => {
+  const floored = floorCurrencyValue(rawValue);
+  if (floored === null) {
+    return;
+  }
+  lines.push(`${label}: ${formatCurrencyValue(floored)}`);
+};
+
+const pushRateLine = (lines: string[], label: string, rawValue: unknown) => {
+  const numeric = parseNumeric(rawValue);
+  if (numeric === null || numeric < 0) {
+    return;
+  }
+  lines.push(`${label}: ${formatRateValue(numeric)}`);
+};
+
+const findBasDataCandidate = (input: any, visited = new WeakSet<object>()): Record<string, unknown> | null => {
+  if (!input || typeof input !== 'object') {
+    return null;
+  }
+  if (visited.has(input)) {
+    return null;
+  }
+  visited.add(input);
+
+  const gst = getValue(input, 'gst', 'GST');
+  const paygWithholding = getValue(input, 'payg_withholding', 'paygWithholding', 'PAYG_Withholding');
+  const paygInstalment = getValue(input, 'payg_instalment', 'paygInstalment', 'payg_instalments', 'paygInstalments');
+  const basFields = getValue(input, 'BAS_Fields', 'bas_fields');
+
+  if ((gst && (paygWithholding || paygInstalment)) || basFields) {
+    return input as Record<string, unknown>;
+  }
+
+  if (Array.isArray(input)) {
+    for (const item of input) {
+      const result = findBasDataCandidate(item, visited);
+      if (result) {
+        return result;
+      }
+    }
+    return null;
+  }
+
+  for (const value of Object.values(input)) {
+    const result = findBasDataCandidate(value, visited);
+    if (result) {
+      return result;
+    }
+  }
+  return null;
+};
+
+const buildBasStructureFromFields = (input: Record<string, unknown>): Record<string, unknown> => {
+  const basFields = (getValue(input, 'BAS_Fields', 'bas_fields') ?? {}) as Record<string, unknown>;
+  const period = getValue(input, 'BAS_Period', 'bas_period', 'period');
+
+  return {
+    period: typeof period === 'string' ? period : undefined,
+    gst: {
+      sales: {
+        total_g1: getValue(basFields, 'G1'),
+        export_g2: getValue(basFields, 'G2'),
+        other_gst_free_g3: getValue(basFields, 'G3'),
+        input_taxed_sales: getValue(basFields, 'InputTaxedSales')
+      },
+      purchases: {
+        capital_g10: getValue(basFields, 'G10'),
+        non_capital_g11: getValue(basFields, 'G11')
+      },
+      calc_sheet: {
+        g21_gst_on_sales: getValue(basFields, 'G21'),
+        g22_sales_increasing_adj: getValue(basFields, 'G22'),
+        g23_gst_on_purchases: getValue(basFields, 'G23'),
+        g24_purchases_increasing_adj: getValue(basFields, 'G24')
+      },
+      totals: {
+        oneA_gst_on_sales: getValue(basFields, '1A', 'oneA'),
+        oneB_gst_on_purchases: getValue(basFields, '1B', 'oneB')
+      }
+    },
+    payg_withholding: {
+      w1_gross_wages: getValue(basFields, 'W1'),
+      w2_amounts_withheld: getValue(basFields, 'W2'),
+      w3_other_withholding: getValue(basFields, 'W3'),
+      w4_amounts_withheld_where_no_abn: getValue(basFields, 'W4'),
+      w5_total_amounts_withheld: getValue(basFields, 'W5')
+    }
+  };
+};
+
+const formatBasPlainText = (input: Record<string, unknown>): string | null => {
+  if (!input || typeof input !== 'object') {
+    return null;
+  }
+
+  let period: string | null = null;
+  const periodValue = getValue(input, 'period', 'BAS_Period', 'bas_period');
+  if (typeof periodValue === 'string' && periodValue.trim()) {
+    period = periodValue.trim();
+  } else {
+    const periodObject = getValue(input, 'period');
+    if (periodObject && typeof periodObject === 'object') {
+      const from = getValue(periodObject, 'fromDate', 'from');
+      const to = getValue(periodObject, 'toDate', 'to');
+      if (typeof from === 'string' && typeof to === 'string') {
+        period = `${from} to ${to}`;
+      }
+    }
+  }
+
+  let gstBlock = getValue(input, 'gst', 'GST') as Record<string, unknown> | undefined;
+  let paygWithholdingBlock = getValue(input, 'payg_withholding', 'paygWithholding', 'PAYG_Withholding') as
+    | Record<string, unknown>
+    | undefined;
+  let paygInstalmentBlock = getValue(
+    input,
+    'payg_instalment',
+    'paygInstalment',
+    'payg_instalments',
+    'paygInstalments'
+  ) as Record<string, unknown> | undefined;
+
+  const basFields = getValue(input, 'BAS_Fields', 'bas_fields');
+  if ((!gstBlock || typeof gstBlock !== 'object') && basFields && typeof basFields === 'object') {
+    const derived = buildBasStructureFromFields(input);
+    gstBlock = derived.gst as Record<string, unknown>;
+    if (!paygWithholdingBlock || typeof paygWithholdingBlock !== 'object') {
+      paygWithholdingBlock = derived.payg_withholding as Record<string, unknown>;
+    }
+    if (!period && typeof derived.period === 'string') {
+      period = derived.period;
+    }
+  }
+
+  if (!gstBlock && !paygWithholdingBlock && !paygInstalmentBlock) {
+    return null;
+  }
+
+  const outputLines: string[] = [];
+  outputLines.push(`BAS Period: ${period || 'Unknown'}`, '');
+
+  const gstLines: string[] = [];
+  if (gstBlock && typeof gstBlock === 'object') {
+    const sales = getValue(gstBlock, 'sales', 'Sales') as Record<string, unknown> | undefined;
+    const purchases = getValue(gstBlock, 'purchases', 'Purchases') as Record<string, unknown> | undefined;
+    const calcSheet = getValue(gstBlock, 'calc_sheet', 'calcSheet', 'calcsheet') as
+      | Record<string, unknown>
+      | undefined;
+    const totals = getValue(gstBlock, 'totals', 'Totals') as Record<string, unknown> | undefined;
+
+    const rawG1 = parseNumeric(getValue(sales, 'total_g1', 'totalG1', 'G1'));
+    const rawG2 = parseNumeric(getValue(sales, 'export_g2', 'exportG2', 'G2'));
+    const rawG3 = parseNumeric(getValue(sales, 'other_gst_free_g3', 'otherGstFreeG3', 'G3'));
+    const rawInputTaxed = parseNumeric(getValue(sales, 'input_taxed_sales', 'inputTaxedSales'));
+
+    const compareSum =
+      (rawG2 ?? 0) +
+      (rawG3 ?? 0) +
+      (rawInputTaxed ?? 0);
+
+    if (rawG1 !== null && rawG1 >= compareSum) {
+      pushMoneyLine(gstLines, 'G1', rawG1);
+    }
+    pushMoneyLine(gstLines, 'G2', rawG2);
+    pushMoneyLine(gstLines, 'G3', rawG3);
+
+    pushMoneyLine(gstLines, 'G10', parseNumeric(getValue(purchases, 'capital_g10', 'capitalG10', 'G10')));
+    pushMoneyLine(gstLines, 'G11', parseNumeric(getValue(purchases, 'non_capital_g11', 'nonCapitalG11', 'G11')));
+
+    const rawG21 = parseNumeric(getValue(calcSheet, 'g21_gst_on_sales', 'G21'));
+    const rawG22 = parseNumeric(getValue(calcSheet, 'g22_sales_increasing_adj', 'G22'));
+    const rawG23 = parseNumeric(getValue(calcSheet, 'g23_gst_on_purchases', 'G23'));
+    const rawG24 = parseNumeric(getValue(calcSheet, 'g24_purchases_increasing_adj', 'G24'));
+
+    pushMoneyLine(gstLines, 'G21', rawG21);
+    pushMoneyLine(gstLines, 'G22', rawG22);
+    pushMoneyLine(gstLines, 'G23', rawG23);
+    pushMoneyLine(gstLines, 'G24', rawG24);
+
+    let raw1A =
+      parseNumeric(getValue(totals, 'oneA_gst_on_sales', 'oneA', '1A')) ??
+      parseNumeric(getValue(gstBlock, 'oneA_gst_on_sales', '1A'));
+    if (raw1A === null) {
+      const adjG21 = rawG21 ?? 0;
+      const adjG22 = rawG22 ?? 0;
+      const computed = adjG21 + adjG22;
+      if (Number.isFinite(computed)) {
+        raw1A = computed;
+      }
+    }
+
+    let raw1B =
+      parseNumeric(getValue(totals, 'oneB_gst_on_purchases', 'oneB', '1B')) ??
+      parseNumeric(getValue(gstBlock, 'oneB_gst_on_purchases', '1B'));
+    if (raw1B === null) {
+      const adjG23 = rawG23 ?? 0;
+      const adjG24 = rawG24 ?? 0;
+      const computed = adjG23 + adjG24;
+      if (Number.isFinite(computed)) {
+        raw1B = computed;
+      }
+    }
+
+    pushMoneyLine(gstLines, '1A', raw1A);
+    pushMoneyLine(gstLines, '1B', raw1B);
+  }
+
+  const paygWithholdingLines: string[] = [];
+  if (paygWithholdingBlock && typeof paygWithholdingBlock === 'object') {
+    const stpPrefill = getValue(paygWithholdingBlock, 'stp_prefill', 'stpPrefill') as
+      | Record<string, unknown>
+      | undefined;
+
+    const rawW1 =
+      parseNumeric(getValue(stpPrefill, 'w1', 'W1')) ??
+      parseNumeric(getValue(paygWithholdingBlock, 'w1_gross_wages', 'w1', 'W1'));
+    const rawW2 =
+      parseNumeric(getValue(stpPrefill, 'w2', 'W2')) ??
+      parseNumeric(getValue(paygWithholdingBlock, 'w2_amounts_withheld', 'w2', 'W2'));
+    const rawW3 = parseNumeric(getValue(paygWithholdingBlock, 'w3_other_withholding', 'w3', 'W3'));
+    const rawW4 = parseNumeric(getValue(paygWithholdingBlock, 'w4_amounts_withheld_where_no_abn', 'w4', 'W4'));
+    let rawW5 = parseNumeric(getValue(paygWithholdingBlock, 'w5_total_amounts_withheld', 'w5', 'W5'));
+
+    if (rawW2 !== null && rawW5 !== null && rawW2 > rawW5) {
+      rawW5 = null;
+    }
+
+    pushMoneyLine(paygWithholdingLines, 'W1', rawW1);
+    pushMoneyLine(paygWithholdingLines, 'W2', rawW2);
+    pushMoneyLine(paygWithholdingLines, 'W3', rawW3);
+    pushMoneyLine(paygWithholdingLines, 'W4', rawW4);
+    pushMoneyLine(paygWithholdingLines, 'W5', rawW5);
+  }
+
+  const paygInstalmentLines: string[] = [];
+  if (paygInstalmentBlock && typeof paygInstalmentBlock === 'object') {
+    const rawT1 = parseNumeric(getValue(paygInstalmentBlock, 't1_instalment_income', 't1', 'T1'));
+    const rawT2 = parseNumeric(getValue(paygInstalmentBlock, 't2_instalment_rate_percent', 't2', 'T2'));
+    const rawT3 = parseNumeric(getValue(paygInstalmentBlock, 't3_varied_rate_percent', 't3', 'T3'));
+    let rawT11 = parseNumeric(getValue(paygInstalmentBlock, 't11_calculated_instalment', 't11', 'T11'));
+    let raw5A =
+      parseNumeric(getValue(paygInstalmentBlock, 'fiveA_payg_instalment', 'fiveA', '5A')) ??
+      parseNumeric(getValue(paygInstalmentBlock, 'five_a_payg_instalment'));
+
+    const appliedRate = rawT3 ?? rawT2;
+    if (rawT11 === null && rawT1 !== null && appliedRate !== null) {
+      rawT11 = rawT1 * (appliedRate / 100);
+    }
+
+    if (rawT11 !== null) {
+      raw5A = rawT11;
+    }
+
+    pushMoneyLine(paygInstalmentLines, 'T1', rawT1);
+    if (rawT2 !== null) {
+      pushRateLine(paygInstalmentLines, 'T2', rawT2);
+    }
+    if (rawT3 !== null) {
+      pushRateLine(paygInstalmentLines, 'T3', rawT3);
+    }
+    pushMoneyLine(paygInstalmentLines, 'T11', rawT11);
+    pushMoneyLine(paygInstalmentLines, '5A', raw5A);
+
+    const variationReason = getValue(
+      paygInstalmentBlock,
+      'variation_reason_code',
+      'variationReasonCode',
+      'variation_reason'
+    );
+    if (variationReason !== undefined && variationReason !== null && String(variationReason).trim() !== '') {
+      paygInstalmentLines.push(`Variation Reason: ${variationReason}`);
+    }
+  }
+
+  const sections: { title: string; lines: string[] }[] = [
+    { title: 'GST', lines: gstLines },
+    { title: 'PAYG Withholding', lines: paygWithholdingLines },
+    { title: 'PAYG Instalments', lines: paygInstalmentLines }
+  ];
+
+  sections.forEach((section, index) => {
+    outputLines.push(section.title);
+    section.lines.forEach((line) => outputLines.push(line));
+    if (index < sections.length - 1) {
+      outputLines.push('');
+    }
+  });
+
+  return outputLines.join('\n').replace(/\n+$/, '');
+};
+
+const tryParseBasJsonFromText = (text: string): BasFormattingResult | null => {
+  if (!text || typeof text !== 'string') {
+    return null;
+  }
+
+  const candidates: string[] = [];
+  const trimmed = text.trim();
+
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    candidates.push(trimmed);
+  }
+
+  const codeBlockMatches = Array.from(text.matchAll(/```(?:json)?\s*([\s\S]*?)```/gi));
+  codeBlockMatches.forEach((match) => {
+    if (match[1]) {
+      candidates.push(match[1].trim());
+    }
+  });
+
+  const firstBrace = text.indexOf('{');
+  const lastBrace = text.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    candidates.push(text.slice(firstBrace, lastBrace + 1));
+  }
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate);
+      const basCandidate = findBasDataCandidate(parsed);
+      if (basCandidate) {
+        const formatted = formatBasPlainText(basCandidate);
+        if (formatted) {
+          return { formatted, source: basCandidate };
+        }
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+};
+
 const AiChat: React.FC = () => {
   console.log('AiChat component rendered');
   
@@ -256,6 +673,20 @@ const AiChat: React.FC = () => {
     setIsLoading(true);
 
     try {
+      const basResult = tryParseBasJsonFromText(inputMessage);
+      if (basResult) {
+        console.log('🧾 Detected BAS JSON in chat message. Generating formatted BAS statement.');
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: basResult.formatted,
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+        toast.success('BAS statement generated successfully!');
+        return;
+      }
+
       console.log('🔑 AI Key Check for Chat Message:');
       
       // Try to get API key from backend first
@@ -939,6 +1370,41 @@ Please help me with the following:
           if (!xeroDataFromAnalysis) {
         toast.error('No Xero data available for analysis');
         return;
+      }
+
+      if (focus === 'bas') {
+        const basSourceCandidates = [
+          getSectionData(xeroDataFromAnalysis?.basData, 'basStatement'),
+          xeroDataFromAnalysis?.basData?.basStatement,
+          xeroDataFromAnalysis?.basData?.data,
+          xeroDataFromAnalysis?.basData,
+          xeroDataFromAnalysis
+        ];
+
+        let formattedBas: string | null = null;
+
+        for (const candidate of basSourceCandidates) {
+          const found = findBasDataCandidate(candidate);
+          if (found) {
+            formattedBas = formatBasPlainText(found);
+            if (formattedBas) {
+              break;
+            }
+          }
+        }
+
+        if (formattedBas) {
+          console.log('🧾 Generated BAS statement without AI usage.');
+          const assistantMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content: formattedBas,
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, assistantMessage]);
+          toast.success('BAS statement generated!');
+          return;
+        }
       }
 
       // Extract only essential financial data
