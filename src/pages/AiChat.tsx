@@ -1057,7 +1057,7 @@ const AiChat: React.FC = () => {
     error,
     selectedTenant,
     availableTenants: tenants = [],
-    loadSettings,
+    refreshConnection,
     selectTenant,
     loadData,
     data: xeroContextData,
@@ -1153,11 +1153,29 @@ const AiChat: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
-  // Load Xero settings and check connection status on component mount
+  // Load Xero settings and tenant list when the chat mounts
   useEffect(() => {
-    console.log('🔄 AiChat: Loading Xero settings and checking connection status...');
-    loadSettings();
-  }, [loadSettings]);
+    let isMounted = true;
+
+    const initializeXeroTenants = async () => {
+      try {
+        console.log('🔄 AiChat: Refreshing Xero connection and tenant list...');
+        await refreshConnection();
+      } catch (initError: any) {
+        console.error('❌ Failed to refresh Xero connection for AiChat:', initError);
+        if (isMounted) {
+          const message = initError?.message || 'Failed to load Xero organizations. Please retry from Xero settings.';
+          toast.error(message);
+        }
+      }
+    };
+
+    initializeXeroTenants();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [refreshConnection]);
 
   // Automatically select the best tenant when available (prioritize Demo Company Global)
   useEffect(() => {
