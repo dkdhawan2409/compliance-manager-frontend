@@ -50,6 +50,182 @@ type BasFormattingResult = {
   source: Record<string, unknown>;
 };
 
+type BasPromptPayload = {
+  period?: string;
+  gst?: {
+    sales?: {
+      total_g1?: number;
+      export_g2?: number;
+      other_gst_free_g3?: number;
+      input_taxed_sales?: number;
+    };
+    purchases?: {
+      capital_g10?: number;
+      non_capital_g11?: number;
+    };
+    calc_sheet?: {
+      g21_gst_on_sales?: number;
+      g22_sales_increasing_adj?: number;
+      g23_gst_on_purchases?: number;
+      g24_purchases_increasing_adj?: number;
+    };
+    totals?: {
+      oneA_gst_on_sales?: number;
+      oneB_gst_on_purchases?: number;
+    };
+  };
+  payg_withholding?: {
+    w1_gross_wages?: number;
+    w2_amounts_withheld?: number;
+    w3_other_withholding?: number;
+    w4_amounts_withheld_where_no_abn?: number;
+    w5_total_amounts_withheld?: number;
+    stp_prefill?: {
+      w1?: number;
+      w2?: number;
+    };
+  };
+  payg_instalment?: {
+    t1_instalment_income?: number;
+    t2_instalment_rate_percent?: number;
+    t3_varied_rate_percent?: number;
+    t11_calculated_instalment?: number;
+    fiveA_payg_instalment?: number;
+    variation_reason_code?: string;
+  };
+};
+
+const BAS_PROMPT_INSTRUCTIONS = `ROLE: You are an AI BAS preparation assistant for Australian entities. You receive a final, validated BAS JSON and must output a pre-filled BAS in plain text that matches ATO lodgement requirements. Your job is accuracy, not vibes.
+
+AUTHORITATIVE RULES
+1) Labels you may populate
+- GST: G1, G2, G3, G10, G11, G21, G22, G23, G24, 1A, 1B
+- PAYG Withholding: W1, W2, W3, W4, W5 (and label 4 if supplied)
+- PAYG Instalments: T1, T2, T3, T11, 5A (plus variation reason if supplied)
+
+2) Rounding & formatting
+- Round DOWN to whole dollars for all money values. No cents. Show a leading "$".
+- Do NOT show negative amounts. If a value would be negative or is missing, omit that label line entirely.
+- Only include labels that exist or can be derived per these rules. Never guess.
+
+3) GST classification logic
+- G1 Total sales: all sales for the period, including GST-free and input-taxed.
+- G2 Export sales: GST-free exports only.
+- G3 Other GST-free sales: domestic GST-free sales (exclude exports already in G2).
+- G10 Capital purchases: capital items (assets with enduring use).
+- G11 Non-capital purchases: normal operating expenses.
+- Calculation-sheet amounts (when provided):
+- G21 GST on taxable sales
+- G22 Adjustments increasing GST on sales
+- G23 GST on purchases
+- G24 Adjustments increasing GST on purchases
+Map to totals: 1A = G21 + G22; 1B = G23 + G24.
+
+4) PAYG withholding (W-labels)
+- W1: gross salary/wages and other payments subject to withholding
+- W2: total amounts withheld from W1
+- W3/W4/W5: other withholdings and totals if supplied
+- If STP prefill exists, use STP W1/W2 instead of raw payroll totals.
+
+5) PAYG income tax instalments
+- If using rate method: T1 × (T3 if provided, else T2) = T11, then 5A = T11.
+- If the JSON supplies varied values for T11 or 5A, output those and show T3 and variation reason if present.
+
+6) Edge-case rules
+- Input-taxed sales sit in G1 only and do not affect 1A.
+- GST-free purchases are counted in G10/G11 but contribute $0 to 1B.
+- Private use or non-creditable components are assumed pre-netted in the JSON; do not infer credits.
+- Adjustments: increasing adjustments for sales/purchases populate G22/G24 and flow into 1A/1B.
+
+INPUT EXPECTATIONS (single object; ignore keys not listed)
+{
+"period": "YYYY-MM",
+"gst": {
+"sales": {
+"total_g1": number,
+"export_g2": number,
+"other_gst_free_g3": number,
+"input_taxed_sales": number
+},
+"purchases": {
+"capital_g10": number,
+"non_capital_g11": number
+},
+"calc_sheet": {
+"g21_gst_on_sales": number,
+"g22_sales_increasing_adj": number,
+"g23_gst_on_purchases": number,
+"g24_purchases_increasing_adj": number
+},
+"totals": {
+"oneA_gst_on_sales": number,
+"oneB_gst_on_purchases": number
+}
+},
+"payg_withholding": {
+"w1_gross_wages": number,
+"w2_amounts_withheld": number,
+"w3_other_withholding": number,
+"w4_amounts_withheld_where_no_abn": number,
+"w5_total_amounts_withheld": number,
+"stp_prefill": { "w1": number, "w2": number }
+},
+"payg_instalment": {
+"t1_instalment_income": number,
+"t2_instalment_rate_percent": number,
+"t3_varied_rate_percent": number,
+"t11_calculated_instalment": number,
+"fiveA_payg_instalment": number,
+"variation_reason_code": "string"
+}
+}
+
+DERIVATIONS & RECONCILIATION
+- If 1A/1B are missing but calc-sheet numbers exist, compute: 1A = G21 + G22; 1B = G23 + G24.
+- Prefer STP prefill for W1/W2 when available; otherwise use payroll totals.
+- If T11 is missing but T1 and a rate exist, compute T11 = T1 × (T3 or else T2); then set 5A = T11.
+- Never invent classifications. If a number is absent or invalid, omit that label.
+
+QUALITY CHECKS BEFORE OUTPUT
+- If present, enforce G1 ≥ (G2 + G3 + input-taxed sales). If not true, omit G1.
+- Enforce 1A ≥ 0 and 1B ≥ 0.
+- If both present, enforce W2 ≤ W5.
+- If PAYGI rate method is used, enforce 5A = T11.
+
+OUTPUT FORMAT
+Return plain text, copy-paste ready. One label per line. Omit any label that is blank or disallowed by the rules. Use whole dollars (floored).
+
+Template:
+BAS Period: YYYY-MM
+
+GST
+G1: $[whole dollars]
+G2: $[whole dollars]
+G3: $[whole dollars]
+G10: $[whole dollars]
+G11: $[whole dollars]
+1A: $[whole dollars]
+1B: $[whole dollars]
+
+PAYG Withholding
+W1: $[whole dollars]
+W2: $[whole dollars]
+W3: $[whole dollars]
+W4: $[whole dollars]
+W5: $[whole dollars]
+
+PAYG Instalments
+T1: $[whole dollars]
+T2: [rate %]
+T3: [varied rate %]
+T11: $[whole dollars]
+5A: $[whole dollars]
+
+NOW DO THIS:
+1) Validate and reconcile the input per the rules above.
+2) Compute any missing derivable amounts.
+3) Output ONLY the populated labels in the exact template order, with whole dollars and the leading "$". No commentary or extra lines.`;
+
 const parseNumeric = (value: unknown): number | null => {
   if (value === null || value === undefined) {
     return null;
@@ -511,6 +687,321 @@ const formatBasPlainText = (input: Record<string, unknown>): string | null => {
   }
 
   return outputLines.join('\n').replace(/\n+$/, '');
+};
+
+const sanitizeBasMoneyValue = (value: unknown): number | undefined => {
+  const numeric = parseNumeric(value);
+  if (numeric === null || !Number.isFinite(numeric) || numeric < 0) {
+    return undefined;
+  }
+  return numeric;
+};
+
+const sanitizeBasRateValue = (value: unknown): number | undefined => {
+  const numeric = parseNumeric(value);
+  if (numeric === null || !Number.isFinite(numeric) || numeric < 0) {
+    return undefined;
+  }
+  return numeric;
+};
+
+const pruneEmptyBasValue = (value: unknown): unknown => {
+  if (value === null || value === undefined) {
+    return undefined;
+  }
+  if (Array.isArray(value)) {
+    const prunedArray = value
+      .map(pruneEmptyBasValue)
+      .filter((item) => item !== undefined);
+    return prunedArray.length > 0 ? prunedArray : undefined;
+  }
+  if (isPlainObject(value)) {
+    const result: Record<string, unknown> = {};
+    Object.entries(value as Record<string, unknown>).forEach(([key, val]) => {
+      const pruned = pruneEmptyBasValue(val);
+      if (pruned !== undefined) {
+        result[key] = pruned;
+      }
+    });
+    return Object.keys(result).length > 0 ? result : undefined;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed ? trimmed : undefined;
+  }
+  return value;
+};
+
+const normalizeBasDataForPrompt = (input: Record<string, unknown>): BasPromptPayload | null => {
+  if (!input || typeof input !== 'object') {
+    return null;
+  }
+
+  const payload: BasPromptPayload = {};
+
+  const periodValue = getValue(input, 'period', 'BAS_Period', 'bas_period');
+  if (typeof periodValue === 'string' && periodValue.trim()) {
+    payload.period = periodValue.trim();
+  } else {
+    const periodObject = getValue(input, 'period');
+    const fromDate = getValue(periodObject, 'fromDate', 'from');
+    const toDate = getValue(periodObject, 'toDate', 'to');
+    if (typeof fromDate === 'string' && typeof toDate === 'string') {
+      payload.period = `${fromDate} to ${toDate}`;
+    }
+  }
+
+  let gstBlock = getValue(input, 'gst', 'GST');
+  let paygWithholdingBlock = getValue(input, 'payg_withholding', 'paygWithholding', 'PAYG_Withholding');
+  let paygInstalmentBlock = getValue(
+    input,
+    'payg_instalment',
+    'paygInstalment',
+    'payg_instalments',
+    'paygInstalments'
+  );
+
+  const basFields = getValue(input, 'BAS_Fields', 'bas_fields');
+  if ((!gstBlock || typeof gstBlock !== 'object') && basFields && typeof basFields === 'object') {
+    const derived = buildBasStructureFromFields(input);
+    gstBlock = derived.gst;
+    if (!paygWithholdingBlock) {
+      paygWithholdingBlock = derived.payg_withholding;
+    }
+  }
+
+  if (gstBlock && typeof gstBlock === 'object') {
+    const gstPayload: NonNullable<BasPromptPayload['gst']> = {};
+    const sales = getValue(gstBlock, 'sales', 'Sales');
+    const purchases = getValue(gstBlock, 'purchases', 'Purchases');
+    const calcSheet = getValue(gstBlock, 'calc_sheet', 'calcSheet', 'calcsheet');
+    const totals = getValue(gstBlock, 'totals', 'Totals');
+
+    const salesPayload: NonNullable<BasPromptPayload['gst']>['sales'] = {};
+    const g1 = sanitizeBasMoneyValue(getValue(sales, 'total_g1', 'totalG1', 'G1'));
+    const g2 = sanitizeBasMoneyValue(getValue(sales, 'export_g2', 'exportG2', 'G2'));
+    const g3 = sanitizeBasMoneyValue(getValue(sales, 'other_gst_free_g3', 'otherGstFreeG3', 'G3'));
+    const inputTaxed = sanitizeBasMoneyValue(getValue(sales, 'input_taxed_sales', 'inputTaxedSales'));
+
+    const compareSum = (g2 ?? 0) + (g3 ?? 0) + (inputTaxed ?? 0);
+    if (g1 !== undefined && g1 >= compareSum) {
+      salesPayload.total_g1 = g1;
+    }
+    if (g2 !== undefined) {
+      salesPayload.export_g2 = g2;
+    }
+    if (g3 !== undefined) {
+      salesPayload.other_gst_free_g3 = g3;
+    }
+    if (inputTaxed !== undefined) {
+      salesPayload.input_taxed_sales = inputTaxed;
+    }
+    if (Object.keys(salesPayload).length > 0) {
+      gstPayload.sales = salesPayload;
+    }
+
+    const purchasesPayload: NonNullable<BasPromptPayload['gst']>['purchases'] = {};
+    const g10 = sanitizeBasMoneyValue(getValue(purchases, 'capital_g10', 'capitalG10', 'G10'));
+    const g11 = sanitizeBasMoneyValue(getValue(purchases, 'non_capital_g11', 'nonCapitalG11', 'G11'));
+    if (g10 !== undefined) {
+      purchasesPayload.capital_g10 = g10;
+    }
+    if (g11 !== undefined) {
+      purchasesPayload.non_capital_g11 = g11;
+    }
+    if (Object.keys(purchasesPayload).length > 0) {
+      gstPayload.purchases = purchasesPayload;
+    }
+
+    const calcSheetPayload: NonNullable<BasPromptPayload['gst']>['calc_sheet'] = {};
+    const g21 = sanitizeBasMoneyValue(getValue(calcSheet, 'g21_gst_on_sales', 'G21'));
+    const g22 = sanitizeBasMoneyValue(getValue(calcSheet, 'g22_sales_increasing_adj', 'G22'));
+    const g23 = sanitizeBasMoneyValue(getValue(calcSheet, 'g23_gst_on_purchases', 'G23'));
+    const g24 = sanitizeBasMoneyValue(getValue(calcSheet, 'g24_purchases_increasing_adj', 'G24'));
+    if (g21 !== undefined) {
+      calcSheetPayload.g21_gst_on_sales = g21;
+    }
+    if (g22 !== undefined) {
+      calcSheetPayload.g22_sales_increasing_adj = g22;
+    }
+    if (g23 !== undefined) {
+      calcSheetPayload.g23_gst_on_purchases = g23;
+    }
+    if (g24 !== undefined) {
+      calcSheetPayload.g24_purchases_increasing_adj = g24;
+    }
+    if (Object.keys(calcSheetPayload).length > 0) {
+      gstPayload.calc_sheet = calcSheetPayload;
+    }
+
+    const totalsPayload: NonNullable<BasPromptPayload['gst']>['totals'] = {};
+    let oneA = sanitizeBasMoneyValue(getValue(totals, 'oneA_gst_on_sales', 'oneA', '1A'));
+    if (oneA === undefined && (g21 !== undefined || g22 !== undefined)) {
+      oneA = (g21 ?? 0) + (g22 ?? 0);
+    }
+    let oneB = sanitizeBasMoneyValue(getValue(totals, 'oneB_gst_on_purchases', 'oneB', '1B'));
+    if (oneB === undefined && (g23 !== undefined || g24 !== undefined)) {
+      oneB = (g23 ?? 0) + (g24 ?? 0);
+    }
+    if (oneA !== undefined) {
+      totalsPayload.oneA_gst_on_sales = oneA;
+    }
+    if (oneB !== undefined) {
+      totalsPayload.oneB_gst_on_purchases = oneB;
+    }
+    if (Object.keys(totalsPayload).length > 0) {
+      gstPayload.totals = totalsPayload;
+    }
+
+    if (Object.keys(gstPayload).length > 0) {
+      payload.gst = gstPayload;
+    }
+  }
+
+  if (paygWithholdingBlock && typeof paygWithholdingBlock === 'object') {
+    const paygPayload: NonNullable<BasPromptPayload['payg_withholding']> = {};
+    const stp = getValue(paygWithholdingBlock, 'stp_prefill', 'stpPrefill');
+
+    const stpPayload: NonNullable<BasPromptPayload['payg_withholding']>['stp_prefill'] = {};
+    const stpW1 = sanitizeBasMoneyValue(getValue(stp, 'w1', 'W1'));
+    const stpW2 = sanitizeBasMoneyValue(getValue(stp, 'w2', 'W2'));
+    if (stpW1 !== undefined) {
+      stpPayload.w1 = stpW1;
+    }
+    if (stpW2 !== undefined) {
+      stpPayload.w2 = stpW2;
+    }
+    if (Object.keys(stpPayload).length > 0) {
+      paygPayload.stp_prefill = stpPayload;
+    }
+
+    const w1 = sanitizeBasMoneyValue(getValue(paygWithholdingBlock, 'w1_gross_wages', 'w1', 'W1'));
+    const w2 = sanitizeBasMoneyValue(getValue(paygWithholdingBlock, 'w2_amounts_withheld', 'w2', 'W2'));
+    const w3 = sanitizeBasMoneyValue(getValue(paygWithholdingBlock, 'w3_other_withholding', 'w3', 'W3'));
+    const w4 = sanitizeBasMoneyValue(
+      getValue(paygWithholdingBlock, 'w4_amounts_withheld_where_no_abn', 'w4', 'W4')
+    );
+    let w5 = sanitizeBasMoneyValue(getValue(paygWithholdingBlock, 'w5_total_amounts_withheld', 'w5', 'W5'));
+
+    if (w5 !== undefined && w2 !== undefined && w2 > w5) {
+      w5 = undefined;
+    }
+
+    if (w1 !== undefined) {
+      paygPayload.w1_gross_wages = w1;
+    }
+    if (w2 !== undefined) {
+      paygPayload.w2_amounts_withheld = w2;
+    }
+    if (w3 !== undefined) {
+      paygPayload.w3_other_withholding = w3;
+    }
+    if (w4 !== undefined) {
+      paygPayload.w4_amounts_withheld_where_no_abn = w4;
+    }
+    if (w5 !== undefined) {
+      paygPayload.w5_total_amounts_withheld = w5;
+    }
+
+    if (Object.keys(paygPayload).length > 0) {
+      payload.payg_withholding = paygPayload;
+    }
+  }
+
+  if (paygInstalmentBlock && typeof paygInstalmentBlock === 'object') {
+    const instalmentPayload: NonNullable<BasPromptPayload['payg_instalment']> = {};
+    const t1 = sanitizeBasMoneyValue(getValue(paygInstalmentBlock, 't1_instalment_income', 't1', 'T1'));
+    const t2 = sanitizeBasRateValue(getValue(paygInstalmentBlock, 't2_instalment_rate_percent', 't2', 'T2'));
+    const t3 = sanitizeBasRateValue(getValue(paygInstalmentBlock, 't3_varied_rate_percent', 't3', 'T3'));
+    let t11 = sanitizeBasMoneyValue(getValue(paygInstalmentBlock, 't11_calculated_instalment', 't11', 'T11'));
+    let fiveA =
+      sanitizeBasMoneyValue(getValue(paygInstalmentBlock, 'fiveA_payg_instalment', 'fiveA', '5A')) ??
+      sanitizeBasMoneyValue(getValue(paygInstalmentBlock, 'five_a_payg_instalment'));
+
+    const appliedRate = t3 ?? t2;
+    if (t11 === undefined && t1 !== undefined && appliedRate !== undefined) {
+      t11 = t1 * (appliedRate / 100);
+    }
+    if (t11 !== undefined) {
+      fiveA = t11;
+    }
+
+    if (t1 !== undefined) {
+      instalmentPayload.t1_instalment_income = t1;
+    }
+    if (t2 !== undefined) {
+      instalmentPayload.t2_instalment_rate_percent = t2;
+    }
+    if (t3 !== undefined) {
+      instalmentPayload.t3_varied_rate_percent = t3;
+    }
+    if (t11 !== undefined) {
+      instalmentPayload.t11_calculated_instalment = t11;
+    }
+    if (fiveA !== undefined) {
+      instalmentPayload.fiveA_payg_instalment = fiveA;
+    }
+
+    const variationReason = getValue(
+      paygInstalmentBlock,
+      'variation_reason_code',
+      'variationReasonCode',
+      'variation_reason'
+    );
+    if (variationReason !== undefined && variationReason !== null && String(variationReason).trim() !== '') {
+      instalmentPayload.variation_reason_code = String(variationReason).trim();
+    }
+
+    if (Object.keys(instalmentPayload).length > 0) {
+      payload.payg_instalment = instalmentPayload;
+    }
+  }
+
+  const cleaned = pruneEmptyBasValue(payload) as BasPromptPayload | undefined;
+  if (!cleaned || !isPlainObject(cleaned) || Object.keys(cleaned as Record<string, unknown>).length === 0) {
+    return null;
+  }
+
+  return cleaned as BasPromptPayload;
+};
+
+const prepareBasPromptData = (
+  xeroData: any
+): { payload: BasPromptPayload | null; formattedText: string | null } => {
+  const candidates = [
+    getSectionData(xeroData?.basData, 'basStatement'),
+    xeroData?.basData?.basStatement,
+    xeroData?.basData?.data,
+    xeroData?.basData,
+    xeroData
+  ];
+
+  let payload: BasPromptPayload | null = null;
+  let formattedText: string | null = null;
+
+  for (const candidate of candidates) {
+    if (!candidate) {
+      continue;
+    }
+    const found = findBasDataCandidate(candidate);
+    if (!found) {
+      continue;
+    }
+    if (!payload) {
+      const normalized = normalizeBasDataForPrompt(found);
+      if (normalized) {
+        payload = normalized;
+      }
+    }
+    if (!formattedText) {
+      formattedText = formatBasPlainText(found);
+    }
+    if (payload && formattedText) {
+      break;
+    }
+  }
+
+  return { payload, formattedText };
 };
 
 const tryParseBasJsonFromText = (text: string): BasFormattingResult | null => {
@@ -1461,45 +1952,214 @@ Please help me with the following:
 
   // Generate financial analysis using AI
   const generateFinancialAnalysis = useCallback(async (xeroDataFromAnalysis: any, focus: 'overall' | 'bas' | 'fas' = 'overall') => {
-          if (!xeroDataFromAnalysis) {
-        toast.error('No Xero data available for analysis');
-        return;
-      }
+    if (!xeroDataFromAnalysis) {
+      toast.error('No Xero data available for analysis');
+      return;
+    }
 
-      if (focus === 'bas') {
-        const basSourceCandidates = [
-          getSectionData(xeroDataFromAnalysis?.basData, 'basStatement'),
-          xeroDataFromAnalysis?.basData?.basStatement,
-          xeroDataFromAnalysis?.basData?.data,
-          xeroDataFromAnalysis?.basData,
-          xeroDataFromAnalysis
-        ];
+    if (focus === 'bas') {
+      let fallbackBasText: string | null = null;
 
-        let formattedBas: string | null = null;
+      try {
+        setIsLoading(true);
 
-        for (const candidate of basSourceCandidates) {
-          const found = findBasDataCandidate(candidate);
-          if (found) {
-            formattedBas = formatBasPlainText(found);
-            if (formattedBas) {
-              break;
-            }
+        const { payload: basPayload, formattedText } = prepareBasPromptData(xeroDataFromAnalysis);
+        fallbackBasText = formattedText;
+
+        if (!basPayload) {
+          if (fallbackBasText) {
+            console.log('🧾 Falling back to local BAS formatter due to missing structured payload.');
+            const assistantMessage: Message = {
+              id: (Date.now() + 1).toString(),
+              role: 'assistant',
+              content: fallbackBasText,
+              timestamp: new Date()
+            };
+            setMessages(prev => [...prev, assistantMessage]);
+            toast.success('BAS statement generated (fallback formatter).');
+          } else {
+            toast.error('Unable to locate BAS data in the Xero response.');
           }
+          return;
         }
 
-        if (formattedBas) {
-          console.log('🧾 Generated BAS statement without AI usage.');
+        const basJsonString = JSON.stringify(basPayload, null, 2);
+        console.log('🧾 Prepared BAS payload for OpenAI:', basPayload);
+
+        console.log('🔑 AI Key Check for BAS Analysis:');
+        let apiKey: string | null = null;
+        let keySource: 'backend' | 'environment' = 'backend';
+
+        try {
+          console.log('🔄 Getting API key from backend for BAS analysis...');
+          const apiKeyResponse = await openaiService.getApiKey();
+          console.log('🔍 Full API Key Response for BAS Analysis:', apiKeyResponse);
+
+          if (apiKeyResponse && apiKeyResponse.apiKey) {
+            apiKey = apiKeyResponse.apiKey;
+            console.log('✅ Retrieved API key from backend for BAS analysis');
+            console.log('  - Backend Key Length:', apiKey.length);
+            console.log('  - Backend Key Preview:', `${apiKey.substring(0, 10)}...${apiKey.substring(apiKey.length - 4)}`);
+            console.log('  - Key Valid:', apiKeyResponse.isValid);
+            console.log('  - Model:', apiKeyResponse.model || 'Not specified');
+          } else {
+            console.log('❌ No API key available from backend for BAS analysis');
+          }
+        } catch (backendError) {
+          console.log('❌ Failed to get API key from backend for BAS analysis:', backendError);
+          apiKey = AI_CONFIG.getApiKey();
+          keySource = 'environment';
+          console.log('🔄 Falling back to environment variable for BAS analysis');
+          console.log('  - Environment Key Available:', !!apiKey);
+          console.log('  - Environment Key Length:', apiKey ? apiKey.length : 0);
+        }
+
+        if (apiKey) {
+          console.log('🔧 Using API key for direct BAS analysis call');
+          console.log('  - Key Source:', keySource === 'environment' ? 'VITE_OPENAI_API_KEY environment variable' : 'Backend API');
+
+          if (!apiKey.startsWith('sk-')) {
+            console.error('❌ Invalid API key format - should start with "sk-"');
+            throw new Error('Invalid API key format. Key should start with "sk-"');
+          }
+
+          const settings = AI_CONFIG.getDefaultSettings();
+          const requestBody = {
+            model: settings.model,
+            messages: [
+              { role: 'system', content: BAS_PROMPT_INSTRUCTIONS },
+              { role: 'user', content: `Process the following BAS JSON and apply the rules exactly as specified.\n\n${basJsonString}` }
+            ],
+            max_tokens: settings.maxTokens,
+            temperature: settings.temperature
+          };
+
+          console.log('📤 BAS Analysis Request Body:', requestBody);
+
+          const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${apiKey}`
+            },
+            body: JSON.stringify(requestBody)
+          });
+
+          console.log('📡 OpenAI API Response Status (BAS):', response.status);
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ OpenAI API Error Response (BAS):', errorText);
+            throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+          }
+
+          const data = await response.json();
+          console.log('✅ OpenAI API Success Response (BAS):', {
+            model: data.model,
+            usage: data.usage,
+            choices: data.choices?.length || 0
+          });
+
+          let content = '';
+          if (data.choices && data.choices.length > 0 && data.choices[0].message) {
+            content = data.choices[0].message.content;
+          } else {
+            console.warn('⚠️ Unexpected OpenAI API response structure for BAS:', data);
+            content = 'Sorry, I received an unexpected response format. Please try again.';
+          }
+
+          console.log('📝 OpenAI BAS response content:', content);
+
           const assistantMessage: Message = {
             id: (Date.now() + 1).toString(),
             role: 'assistant',
-            content: formattedBas,
+            content,
             timestamp: new Date()
           };
+
           setMessages(prev => [...prev, assistantMessage]);
           toast.success('BAS statement generated!');
           return;
         }
+
+        console.log('🔄 No API key available, falling back to backend services for BAS analysis');
+        const basPromptString = `${BAS_PROMPT_INSTRUCTIONS}\n\nBAS JSON INPUT:\n${basJsonString}`;
+
+        let response: any;
+        try {
+          response = await openaiService.chatCompletion({
+            prompt: basPromptString
+          });
+          console.log('✅ OpenAI Service response for BAS:', response);
+        } catch (openaiError) {
+          console.log('⚠️ openaiService failed for BAS, trying companyService:', openaiError);
+          response = await companyService.chatCompletion(basPromptString);
+          console.log('✅ Company Service response for BAS:', response);
+        }
+
+        let responseContent = '';
+        if (response && typeof response === 'object') {
+          if (response.data && response.data.response) {
+            responseContent = response.data.response;
+          } else if (response.response) {
+            responseContent = response.response;
+          } else if (response.content) {
+            responseContent = response.content;
+          } else if (response.message) {
+            responseContent = response.message;
+          } else if (typeof response === 'string') {
+            responseContent = response;
+          } else {
+            console.warn('⚠️ Unexpected response structure for BAS fallback:', response);
+            responseContent = JSON.stringify(response);
+          }
+        } else if (typeof response === 'string') {
+          responseContent = response;
+        } else {
+          console.warn('⚠️ Invalid response for BAS fallback:', response);
+          responseContent = 'Sorry, I received an invalid response. Please try again.';
+        }
+
+        console.log('📝 Extracted BAS response content:', responseContent);
+
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: responseContent,
+          timestamp: new Date()
+        };
+
+        setMessages(prev => [...prev, assistantMessage]);
+        toast.success('BAS statement generated!');
+        return;
+      } catch (error: any) {
+        console.error('❌ BAS analysis error:', error);
+        const errorMessage = error?.message || 'Failed to generate BAS statement';
+        toast.error(errorMessage);
+
+        if (fallbackBasText) {
+          console.log('🧾 Providing fallback BAS statement after error.');
+          const assistantMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content: fallbackBasText,
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, assistantMessage]);
+        } else {
+          const errorResponse: Message = {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content: `Sorry, I encountered an error during BAS analysis: ${errorMessage}`,
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, errorResponse]);
+        }
+        return;
+      } finally {
+        setIsLoading(false);
       }
+    }
 
       // Extract only essential financial data
       const financialSummary = extractFinancialData(xeroDataFromAnalysis);
