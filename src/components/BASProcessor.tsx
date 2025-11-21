@@ -39,6 +39,8 @@ import {
   getSectionData,
   renderXeroDataPreview,
 } from './XeroDataPreview';
+import { downloadBASReportPdf } from '../api/xeroService';
+import toast from 'react-hot-toast';
 
 interface BASProcessorProps extends XeroDataProps {
   // Additional props specific to BAS processing
@@ -91,6 +93,7 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
   const [selectedQuarter, setSelectedQuarter] = useState<string>('');
   const [dateSelectionMode, setDateSelectionMode] = useState<'manual' | 'quarter'>('quarter');
   const requestSignatureRef = useRef<string | null>(null);
+  const [isDownloadingPDF, setIsDownloadingPDF] = useState(false);
 
   const { company } = useAuth();
   
@@ -386,48 +389,99 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
   const handleDownloadPDF = async () => {
     if (!selectedTenant || !fromDate || !toDate) {
       setCalculationError('Please load BAS data first before downloading PDF.');
+      toast.error('Please load BAS data first before downloading PDF.');
+      return;
+    }
+
+    if (!calculationResult) {
+      setCalculationError('Please calculate BAS data first before downloading PDF.');
+      toast.error('Please calculate BAS data first before downloading PDF.');
+      return;
+    }
+
+    if (!basData) {
+      setCalculationError('No BAS data available. Please load data first.');
+      toast.error('No BAS data available. Please load data first.');
       return;
     }
 
     try {
-      const tenantId = selectedTenant.tenantId || selectedTenant.id;
-      const token = localStorage.getItem('token');
-      
-      const params = new URLSearchParams({
-        tenantId,
-        fromDate,
-        toDate,
-        quarter: selectedQuarter || ''
-      });
+      setIsDownloadingPDF(true);
+      setCalculationError(null);
 
-      const url = `https://compliance-manager-backend.onrender.com/api/xero/bas-data/pdf?${params.toString()}`;
-      
-      console.log('📄 Downloading BAS PDF from:', url);
-
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`
+      // Prepare BAS data structure based on calculation results
+      const basDataForPDF = {
+        BAS_Period: selectedQuarter 
+          ? `${selectedQuarter} ${new Date().getFullYear()}`
+          : `${fromDate} to ${toDate}`,
+        BAS_Fields: {
+          G1: calculationResult.totalSales,
+          G2: calculationResult.totalPurchases,
+          G3: 0, // Not calculated in current implementation
+          G10: 0, // Not calculated in current implementation
+          G11: 0, // Not calculated in current implementation
+          '1A': calculationResult.gstOnSales,
+          '1B': calculationResult.gstOnPurchases,
+          W1: 0, // Wages not calculated in current implementation
+          W2: 0, // PAYG withholding not calculated in current implementation
         }
-      });
+      };
 
-      if (!response.ok) {
-        throw new Error('Failed to generate PDF');
-      }
+      const payload = {
+        basData: {
+          ...basDataForPDF,
+          rawXeroData: basData, // Include raw Xero data for reference
+        },
+        summary: {
+          totalSales: calculationResult.totalSales,
+          totalPurchases: calculationResult.totalPurchases,
+          totalGST: calculationResult.gstOnSales,
+          gstOnPurchases: calculationResult.gstOnPurchases,
+          netGST: calculationResult.netGST,
+          period: {
+            fromDate,
+            toDate,
+            quarter: selectedQuarter || null
+          }
+        },
+        metadata: {
+          companyName: company?.name || 'Unknown Company',
+          organizationName: selectedTenant.name || selectedTenant.organizationName || 'Unknown Organization',
+          tenantId: selectedTenant.tenantId || selectedTenant.id,
+          generatedAt: new Date().toISOString(),
+          period: {
+            fromDate,
+            toDate,
+            quarter: selectedQuarter || null
+          },
+          notes: `BAS PDF generated from Xero account data for ${selectedTenant.name || 'organization'}.`,
+          dataSource: 'Xero Accounting',
+          reportType: 'Business Activity Statement'
+        }
+      };
 
-      const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = `BAS_Report_${selectedQuarter || fromDate}_${new Date().toISOString().split('T')[0]}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      console.log('📄 Generating BAS PDF with Xero account data...', payload);
+
+      const pdfBlob = await downloadBASReportPdf(payload);
+      const downloadUrl = window.URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      const safePeriod = (selectedQuarter || fromDate).replace(/[^a-z0-9]+/gi, '_');
+      link.download = `BAS_Report_${selectedTenant.name?.replace(/[^a-z0-9]+/gi, '_') || 'Xero'}_${safePeriod}_${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
       window.URL.revokeObjectURL(downloadUrl);
 
       console.log('✅ BAS PDF downloaded successfully');
+      toast.success('BAS PDF downloaded successfully!');
     } catch (error: any) {
       console.error('❌ Error downloading BAS PDF:', error);
-      setCalculationError('Failed to download PDF: ' + error.message);
+      const errorMessage = error?.response?.data?.message || error.message || 'Failed to download PDF';
+      setCalculationError('Failed to download PDF: ' + errorMessage);
+      toast.error('Failed to download PDF: ' + errorMessage);
+    } finally {
+      setIsDownloadingPDF(false);
     }
   };
 
@@ -647,10 +701,10 @@ const BASProcessor: React.FC<BASProcessorProps> = ({
             variant="contained"
             color="success"
             onClick={handleDownloadPDF}
-            disabled={!basData || dataLoading}
-            startIcon={<DownloadIcon />}
+            disabled={!basData || !calculationResult || dataLoading || isDownloadingPDF}
+            startIcon={isDownloadingPDF ? <CircularProgress size={16} /> : <DownloadIcon />}
           >
-            📄 Download PDF
+            {isDownloadingPDF ? 'Generating PDF...' : '📄 Download PDF'}
           </Button>
         </Box>
 

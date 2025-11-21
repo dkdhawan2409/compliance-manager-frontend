@@ -39,6 +39,8 @@ import {
   getSectionData,
   renderXeroDataPreview,
 } from './XeroDataPreview';
+import { downloadFASReportPdf } from '../api/xeroService';
+import toast from 'react-hot-toast';
 
 interface FASProcessorProps extends XeroDataProps {
   // Additional props specific to FAS processing
@@ -93,6 +95,7 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
   const [selectedQuarter, setSelectedQuarter] = useState<string>('');
   const [dateSelectionMode, setDateSelectionMode] = useState<'manual' | 'quarter'>('quarter');
   const requestSignatureRef = useRef<string | null>(null);
+  const [isDownloadingPDF, setIsDownloadingPDF] = useState(false);
 
   const { company } = useAuth();
 
@@ -344,48 +347,101 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
   const handleDownloadPDF = async () => {
     if (!selectedTenant || !fromDate || !toDate) {
       setCalculationError('Please load FAS data first before downloading PDF.');
+      toast.error('Please load FAS data first before downloading PDF.');
+      return;
+    }
+
+    if (!calculationResult) {
+      setCalculationError('Please calculate FAS data first before downloading PDF.');
+      toast.error('Please calculate FAS data first before downloading PDF.');
+      return;
+    }
+
+    if (!fasData) {
+      setCalculationError('No FAS data available. Please load data first.');
+      toast.error('No FAS data available. Please load data first.');
       return;
     }
 
     try {
-      const tenantId = selectedTenant.tenantId || selectedTenant.id;
-      const token = localStorage.getItem('token');
-      
-      const params = new URLSearchParams({
-        tenantId,
-        fromDate,
-        toDate,
-        quarter: selectedQuarter || ''
-      });
+      setIsDownloadingPDF(true);
+      setCalculationError(null);
 
-      const url = `https://compliance-manager-backend.onrender.com/api/xero/fas-data/pdf?${params.toString()}`;
-      
-      console.log('📄 Downloading FAS PDF from:', url);
-
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`
+      // Prepare FAS data structure based on calculation results
+      const fasDataForPDF = {
+        FAS_Period: selectedQuarter 
+          ? `${selectedQuarter} ${new Date().getFullYear()}`
+          : `${fromDate} to ${toDate}`,
+        FAS_Fields: {
+          A1: calculationResult.totalFBT || calculationResult.grossTaxableValue,
+          A2: 0, // Not calculated in current implementation
+          A3: calculationResult.grossTaxableValue,
+          A4: 0, // Not calculated in current implementation
+          A5: calculationResult.fbtPayable,
+          A6: 47, // FBT rate is 47%
+          A7: 0, // Not calculated in current implementation
+          A8: 2.0802, // Type 1 gross-up rate
+          A9: 1.8868, // Type 2 gross-up rate
         }
-      });
+      };
 
-      if (!response.ok) {
-        throw new Error('Failed to generate PDF');
-      }
+      const payload = {
+        fasData: {
+          ...fasDataForPDF,
+          rawXeroData: fasData, // Include raw Xero data for reference
+        },
+        summary: {
+          totalFringeBenefits: calculationResult.totalFBT || calculationResult.grossTaxableValue,
+          fbtOnCars: calculationResult.fbtOnCars,
+          fbtOnEntertainment: calculationResult.fbtOnEntertainment,
+          fbtOnOther: calculationResult.fbtOnOther,
+          grossTaxableValue: calculationResult.grossTaxableValue,
+          fbtPayable: calculationResult.fbtPayable,
+          fbtRate: 47,
+          period: {
+            fromDate,
+            toDate,
+            quarter: selectedQuarter || null
+          }
+        },
+        metadata: {
+          companyName: company?.name || 'Unknown Company',
+          organizationName: selectedTenant.name || selectedTenant.organizationName || 'Unknown Organization',
+          tenantId: selectedTenant.tenantId || selectedTenant.id,
+          generatedAt: new Date().toISOString(),
+          period: {
+            fromDate,
+            toDate,
+            quarter: selectedQuarter || null
+          },
+          notes: `FAS PDF generated from Xero account data for ${selectedTenant.name || 'organization'}.`,
+          dataSource: 'Xero Accounting',
+          reportType: 'Fringe Benefits Tax Activity Statement'
+        }
+      };
 
-      const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = `FAS_Report_${selectedQuarter || fromDate}_${new Date().toISOString().split('T')[0]}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      console.log('📄 Generating FAS PDF with Xero account data...', payload);
+
+      const pdfBlob = await downloadFASReportPdf(payload);
+      const downloadUrl = window.URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      const safePeriod = (selectedQuarter || fromDate).replace(/[^a-z0-9]+/gi, '_');
+      link.download = `FAS_Report_${selectedTenant.name?.replace(/[^a-z0-9]+/gi, '_') || 'Xero'}_${safePeriod}_${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
       window.URL.revokeObjectURL(downloadUrl);
 
       console.log('✅ FAS PDF downloaded successfully');
+      toast.success('FAS PDF downloaded successfully!');
     } catch (error: any) {
       console.error('❌ Error downloading FAS PDF:', error);
-      setCalculationError('Failed to download PDF: ' + error.message);
+      const errorMessage = error?.response?.data?.message || error.message || 'Failed to download PDF';
+      setCalculationError('Failed to download PDF: ' + errorMessage);
+      toast.error('Failed to download PDF: ' + errorMessage);
+    } finally {
+      setIsDownloadingPDF(false);
     }
   };
 
@@ -605,10 +661,10 @@ const FASProcessor: React.FC<FASProcessorProps> = ({
             variant="contained"
             color="success"
             onClick={handleDownloadPDF}
-            disabled={!fasData || dataLoading}
-            startIcon={<DownloadIcon />}
+            disabled={!fasData || !calculationResult || dataLoading || isDownloadingPDF}
+            startIcon={isDownloadingPDF ? <CircularProgress size={16} /> : <DownloadIcon />}
           >
-            📄 Download PDF
+            {isDownloadingPDF ? 'Generating PDF...' : '📄 Download PDF'}
           </Button>
         </Box>
 

@@ -49,9 +49,11 @@ const FASProcessing: React.FC = () => {
           reportableBenefits: processedFASData.FAS_Fields.A3
         },
         metadata: {
-          companyName: company?.name,
+          companyName: company?.name || 'Unknown Company',
           generatedAt: new Date().toISOString(),
-          notes: 'FAS PDF generated from processed FAS data.'
+          dataSource: 'Xero Accounting',
+          reportType: 'Fringe Benefits Tax Activity Statement',
+          notes: 'FAS PDF generated from processed FAS data based on Xero account information.'
         }
       };
 

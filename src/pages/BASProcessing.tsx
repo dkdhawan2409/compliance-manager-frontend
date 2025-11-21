@@ -57,9 +57,11 @@ const BASProcessing: React.FC = () => {
           paygWithholding: processedBASData.BAS_Fields.W2
         },
         metadata: {
-          companyName: company?.name,
+          companyName: company?.name || 'Unknown Company',
           generatedAt: new Date().toISOString(),
-          notes: 'BAS PDF generated from processed BAS data.'
+          dataSource: 'Xero Accounting',
+          reportType: 'Business Activity Statement',
+          notes: 'BAS PDF generated from processed BAS data based on Xero account information.'
         }
       };
 
